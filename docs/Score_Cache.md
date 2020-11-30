@@ -113,12 +113,12 @@ towards the end of the runs to highlight this.
 Screen shot showing 80.08% samples spent waiting on L3 misses loading from the score cache along with the
 settings for the Counters instrument:
 
-![L3 Misses and Settings](images/ScoreOrdinals/ScoreCache_STALLS_L3_MISS_settings.png)
+![L3 Misses and Settings](images/ScoreCache/ScoreCache_STALLS_L3_MISS_settings.png)
 
 Screen shot showing the same profile at the same point, but with hotspots shown which give a hint that
 cache pollution by the score cache is wrecking our access to the `setCounters` array later as well.
 
-![L3 Misses and Hotspots](images/ScoreOrdinals/ScoreCache_STALLS_L3_MISS_hotspots.png)
+![L3 Misses and Hotspots](images/ScoreCache/ScoreCache_STALLS_L3_MISS_hotspots.png)
 
 ## Conclusions
 
