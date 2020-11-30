@@ -30,8 +30,9 @@ TODO: add a table of results for different game sizes and algorithms, along with
 ## Docs
 
 * [Packed Indices for Mastermind Scores](docs/Score_Ordinals.md)
+* [Score Caching Considered Harmful](docs/Score_Cache.md)
 
-*TODO: I'll be adding details on the tradeoffs in various parts of the implementation, the GPU algorithms, performance work,
+*TODO: I'll be adding more details on the tradeoffs in various parts of the implementation, the GPU algorithms, performance work,
 etc. over time.*
 
 ## Easier Implementations

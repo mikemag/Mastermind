@@ -15,6 +15,7 @@
 //
 // References:
 // [1] D.E. Knuth. The computer as Master Mind. Journal of Recreational Mathematics, 9(1):1–6, 1976.
+// https://www.cs.uni.edu/~wallingf/teaching/cs3530/resources/knuth-mastermind.pdf
 //
 // [2] Geoffroy Ville, An Optimal Mastermind (4,7) Strategy<pinCount,c> and More Results in the Expected Case, March
 // 2013, arXiv:1305.1010 [cs.GT].
