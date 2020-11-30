@@ -29,7 +29,7 @@ TODO: add a table of results for different game sizes and algorithms, along with
 
 ## Docs
 
-I'll be adding details on the tradeoffs in various parts of the implementation, the GPU algorithms, performance work,
+TODO: I'll be adding details on the tradeoffs in various parts of the implementation, the GPU algorithms, performance work,
 etc. over time.
 
 ## Easier Implementations
@@ -37,6 +37,37 @@ etc. over time.
 I originally wrote similar code in Java, since I was first motivated by the APCS students. I've kept the Java version
 pretty straightforward, and it is an easier introduction to the problem than the optimized C++ code you'll find here.
 See https://github.com/mikemag/CS-Education/tree/master/APCS/Mastermind
+
+## Building
+
+This can be built two ways: CMake and XCode. If you build with just CMake then the GPU support is turned off, since I
+didn't feel like putting in the effort to make a proper cmake that includes building the Objective-C and Metal code
+correctly. If you build with XCode then the GPU support is turned on and works automatically.
+
+There is a CLion workspace included in the repo, so if you use CLion you can just clone and go. This is the way I 
+develop 95% of the code and the only thing missing is the GPU acceleration. Works with CLion 2020.2 and the bundled CMake.
+
+The XCode project works with XCode 12.2.
+
+All development and tests done (so far) on a MacBook Pro (16-inch, 2019) running macOS Catalina 10.15.7. The GPU kernels
+have been tested on both GPUs in my laptop: the integrated Intel UHD Graphics 630 and the discrete AMD Radeon Pro 5500M.
+The program will tell you about the GPUs on your system and which one it selected when you run:
+
+```
+GPU devices available:
+
+GPU name: AMD Radeon Pro 5500M
+Max threads per threadgroup: 1024
+Max threadgroup memory length: 65536
+Max buffer length: 3758096384
+
+GPU name: Intel(R) UHD Graphics 630
+Max threads per threadgroup: 1024
+Max threadgroup memory length: 65536
+Max buffer length: 2147483648
+
+Using GPU: AMD Radeon Pro 5500M
+``` 
 
 ## License
 
