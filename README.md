@@ -29,8 +29,10 @@ TODO: add a table of results for different game sizes and algorithms, along with
 
 ## Docs
 
-TODO: I'll be adding details on the tradeoffs in various parts of the implementation, the GPU algorithms, performance work,
-etc. over time.
+* [Packed Indices for Mastermind Scores](docs/Score_Ordinals.md)
+
+*TODO: I'll be adding details on the tradeoffs in various parts of the implementation, the GPU algorithms, performance work,
+etc. over time.*
 
 ## Easier Implementations
 
