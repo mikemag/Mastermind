@@ -1,0 +1,203 @@
+// Copyright (c) Michael M. Magruder (https://github.com/mikemag)
+//
+// This source code is licensed under the MIT license found in the
+// LICENSE file in the root directory of this source tree.
+
+#import "gpu_interface.h"
+#import <Foundation/Foundation.h>
+#import <Metal/Metal.h>
+
+@implementation GPUInterface {
+  uint _mPinCount;
+
+  id<MTLDevice> _mDevice;
+  id<MTLComputePipelineState> _mComputeKernelFunctionPSO;
+  id<MTLCommandQueue> _mCommandQueue;
+
+  int _mAllCodewordsCount;
+  id<MTLBuffer> _mBufferAllCodewords;
+  id<MTLBuffer> _mBufferAllCodewordsColors;
+
+  id<MTLBuffer> _mBufferPossibleSolutionsCount;
+  id<MTLBuffer> _mBufferPossibleSolutions;
+  id<MTLBuffer> _mBufferPossibleSolutionsColors;
+
+  id<MTLBuffer> _mBufferScores;
+  id<MTLBuffer> _mBufferRemainingIsPossibleSolution;
+}
+
+- (instancetype)initWithPinCount:(uint)pinCount totalCodewords:(uint)totalCodewords kernelName:(NSString *)kernelName {
+  self = [super init];
+  if (self) {
+    NSArray<id<MTLDevice>> *availableDevices = MTLCopyAllDevices();
+
+    printf("GPU devices available:\n\n");
+    _mDevice = nil;
+    for (id<MTLDevice> device in availableDevices) {
+      printf("GPU name: %s\n", device.name.UTF8String);
+      printf("Max threads per threadgroup: %lu\n", (unsigned long)device.maxThreadsPerThreadgroup.width);
+      printf("Max threadgroup memory length: %lu\n", (unsigned long)device.maxThreadgroupMemoryLength);
+      printf("Max buffer length: %lu\n", (unsigned long)device.maxBufferLength);
+      printf("\n");
+
+      if ((_mDevice == nil) || !device.isLowPower) {
+        _mDevice = device;
+      }
+    }
+
+    if (_mDevice == nil) {
+      printf("No suitable GPU found!\n");
+      return nil;
+    }
+
+    printf("Using GPU: %s\n\n", _mDevice.name.UTF8String);
+
+    id<MTLLibrary> defaultLibrary = [_mDevice newDefaultLibrary];
+    if (defaultLibrary == nil) {
+      NSLog(@"Failed to find the default library.");
+      exit(-1);
+    }
+
+    // Lookup the specialized kernel using the pin count in the name
+    _mPinCount = pinCount;
+    id<MTLFunction> computeKernelFunction =
+        [defaultLibrary newFunctionWithName:[NSMutableString stringWithFormat:@"%@_%d", kernelName, _mPinCount]];
+    if (computeKernelFunction == nil) {
+      NSLog(@"Failed to find kernel function: %@_%d", kernelName, _mPinCount);
+      exit(-1);
+    }
+
+    NSError *error = nil;
+    _mComputeKernelFunctionPSO = [_mDevice newComputePipelineStateWithFunction:computeKernelFunction error:&error];
+    if (_mComputeKernelFunctionPSO == nil) {
+      NSLog(@"Failed to created pipeline state object, error %@.", error);
+      exit(-1);
+    }
+
+    _mCommandQueue = [_mDevice newCommandQueue];
+    if (_mCommandQueue == nil) {
+      NSLog(@"Failed to find the command queue.");
+      exit(-1);
+    }
+
+    [self createBuffers:totalCodewords];
+  }
+  return self;
+}
+
+// TODO: consider merging the two small buffers into a single buffer w/ a struct.
+- (void)createBuffers:(uint)maxCodewords {
+  _mBufferAllCodewords = [_mDevice newBufferWithLength:maxCodewords * sizeof(uint32_t)
+                                               options:MTLResourceStorageModeManaged];
+  _mBufferAllCodewordsColors = [_mDevice newBufferWithLength:maxCodewords * sizeof(unsigned __int128)
+                                                     options:MTLResourceStorageModeManaged];
+
+  _mBufferPossibleSolutionsCount = [_mDevice newBufferWithLength:sizeof(uint32_t) options:MTLResourceStorageModeShared];
+  _mBufferPossibleSolutions =
+      [_mDevice newBufferWithLength:maxCodewords * sizeof(uint32_t)
+                            options:MTLResourceStorageModeShared | MTLResourceCPUCacheModeWriteCombined];
+  _mBufferPossibleSolutionsColors =
+      [_mDevice newBufferWithLength:maxCodewords * sizeof(unsigned __int128)
+                            options:MTLResourceStorageModeShared | MTLResourceCPUCacheModeWriteCombined];
+
+  _mBufferScores = [_mDevice newBufferWithLength:maxCodewords * sizeof(uint32_t) options:MTLResourceStorageModeShared];
+  _mBufferRemainingIsPossibleSolution = [_mDevice newBufferWithLength:maxCodewords * sizeof(bool)
+                                                              options:MTLResourceStorageModeShared];
+}
+
+- (uint32_t *)getAllCodewordsBuffer {
+  return _mBufferAllCodewords.contents;
+}
+
+- (unsigned __int128 *)getAllCodewordsColorsBuffer {
+  return _mBufferAllCodewordsColors.contents;
+}
+
+- (void)setAllCodewordsCount:(uint32_t)count {
+  _mAllCodewordsCount = count;
+}
+
+- (void)syncAllCodewords:(uint32_t)count {
+  [_mBufferAllCodewords didModifyRange:NSMakeRange(0, count * sizeof(uint32_t))];
+  [_mBufferAllCodewordsColors didModifyRange:NSMakeRange(0, count * sizeof(unsigned __int128))];
+}
+
+- (uint32_t *)getPossibleSolutionssBuffer {
+  return _mBufferPossibleSolutions.contents;
+}
+
+- (unsigned __int128 *)getPossibleSolutionsColorsBuffer {
+  return _mBufferPossibleSolutionsColors.contents;
+}
+
+- (void)setPossibleSolutionsCount:(uint32_t)count {
+  *((uint32_t *)_mBufferPossibleSolutionsCount.contents) = count;
+}
+
+- (void)sendComputeCommand {
+  bool capture = false; // Debugging
+  if (capture) {
+    MTLCaptureManager *captureManager = [MTLCaptureManager sharedCaptureManager];
+    MTLCaptureDescriptor *captureDescriptor = [[MTLCaptureDescriptor alloc] init];
+    captureDescriptor.captureObject = _mDevice;
+    NSError *error;
+    if (![captureManager startCaptureWithDescriptor:captureDescriptor error:&error]) {
+      NSLog(@"Failed to start capture, error %@", error);
+    }
+  }
+
+  id<MTLCommandBuffer> commandBuffer = [_mCommandQueue commandBuffer];
+  assert(commandBuffer != nil);
+  id<MTLComputeCommandEncoder> computeEncoder = [commandBuffer computeCommandEncoder];
+  assert(computeEncoder != nil);
+  [self encodeComputeCommand:computeEncoder];
+  [computeEncoder endEncoding];
+
+  // Execute the command
+  [commandBuffer commit];
+
+  [commandBuffer waitUntilCompleted];
+
+  if (capture) {
+    MTLCaptureManager *captureManager = [MTLCaptureManager sharedCaptureManager];
+    [captureManager stopCapture];
+  }
+}
+
+- (void)encodeComputeCommand:(id<MTLComputeCommandEncoder>)computeEncoder {
+  [computeEncoder setComputePipelineState:_mComputeKernelFunctionPSO];
+  [computeEncoder setBuffer:_mBufferAllCodewords offset:0 atIndex:0];
+  [computeEncoder setBuffer:_mBufferAllCodewordsColors offset:0 atIndex:1];
+  [computeEncoder setBuffer:_mBufferPossibleSolutionsCount offset:0 atIndex:2];
+  [computeEncoder setBuffer:_mBufferPossibleSolutions offset:0 atIndex:3];
+  [computeEncoder setBuffer:_mBufferPossibleSolutionsColors offset:0 atIndex:4];
+  [computeEncoder setBuffer:_mBufferScores offset:0 atIndex:5];
+  [computeEncoder setBuffer:_mBufferRemainingIsPossibleSolution offset:0 atIndex:6];
+
+  MTLSize gridSize = MTLSizeMake(_mAllCodewordsCount, 1, 1);
+
+  // 64 covers two SIMD groups and thus one CU on my current GPU. They all ought to be able share the threadgroup
+  // memory well.
+  NSUInteger targetThreadGroupSize = 64;
+  if (targetThreadGroupSize > _mAllCodewordsCount) {
+    targetThreadGroupSize = _mAllCodewordsCount;
+  }
+  MTLSize threadgroupSize = MTLSizeMake(targetThreadGroupSize, 1, 1);
+
+  // NB: matches the def in the compute kernel.
+  const int totalScores = ((_mPinCount * (_mPinCount + 3)) / 2) + 1;
+  [computeEncoder setThreadgroupMemoryLength:targetThreadGroupSize * sizeof(uint32_t) * totalScores atIndex:0];
+
+  // Encode the compute command.
+  [computeEncoder dispatchThreads:gridSize threadsPerThreadgroup:threadgroupSize];
+}
+
+// Access to output buffers
+- (uint32_t *)getScores {
+  return (uint32_t *)_mBufferScores.contents;
+}
+- (bool *)getRemainingIsPossibleSolution {
+  return (bool *)_mBufferRemainingIsPossibleSolution.contents;
+}
+
+@end
