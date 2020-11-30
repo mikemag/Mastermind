@@ -41,7 +41,7 @@ See https://github.com/mikemag/CS-Education/tree/master/APCS/Mastermind
 ## License
 
 Code is licensed under the MIT license except as otherwise noted.
-See [LICENSE](https://github.com/mikemag/XXX/blob/master/LICENSE) for details.
+See [LICENSE](https://github.com/mikemag/Mastermind/blob/master/LICENSE) for details.
 
 Documents and images are copyright by [Michael Magruder](https://github.com/mikemag) and licensed under a 
 [Creative Commons Attribution-ShareAlike 4.0 International License](http://creativecommons.org/licenses/by-sa/4.0/).
