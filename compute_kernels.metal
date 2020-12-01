@@ -5,6 +5,8 @@
 
 #include <metal_stdlib>
 
+#include "compute_kernel_constants.h"
+
 using namespace metal;
 
 // The core of Knuth's Mastermind algorithm, and others, as a Metal compute kernels.
@@ -83,10 +85,15 @@ bool computeSubsetSizes(int totalScores, threadgroup uint32_t *scoreCounts, devi
 // Finally, there's threadgroup memory for each thread with enough room for all of the intermediate subset sizes.
 // This is important: the first version held this in threadlocal memory and occupancy was terrible.
 template <uint32_t pinCount>
-kernel void findKnuthGuessKernel(device const uint32_t *allCodewords, device const uint4 *allCodewordsColors,
-                                 constant uint32_t &possibleSolutionsCount, constant uint32_t *possibleSolutions,
-                                 constant uint4 *possibleSolutionsColors, device uint32_t *scores,
-                                 device bool *remainingIsPossibleSolution,
+kernel void findKnuthGuessKernel(device const uint32_t *allCodewords [[buffer(BufferIndexAllCodewords)]],
+                                 device const uint4 *allCodewordsColors [[buffer(BufferIndexAllCodewordsColors)]],
+                                 constant uint32_t &possibleSolutionsCount
+                                 [[buffer(BufferIndexPossibleSolutionsCount)]],
+                                 constant uint32_t *possibleSolutions [[buffer(BufferIndexPossibleSolutions)]],
+                                 constant uint4 *possibleSolutionsColors [[buffer(BufferIndexPossibleSolutionsColors)]],
+                                 device uint32_t *scores [[buffer(BufferIndexScores)]],
+                                 device bool *remainingIsPossibleSolution
+                                 [[buffer(BufferIndexRemainingIsPossibleSolution)]],
                                  threadgroup uint32_t *tgScoreCounts [[threadgroup(0)]],
                                  const uint tidGrid [[thread_position_in_grid]],
                                  const uint tidGroup [[thread_position_in_threadgroup]]) {
@@ -106,15 +113,20 @@ kernel void findKnuthGuessKernel(device const uint32_t *allCodewords, device con
   remainingIsPossibleSolution[tidGrid] = isPossibleSolution;
 }
 
-// mmmfixme: this version includes the optimization for small PS sets and fully discriminating guesses. Currently hacked
+// TODO: this version includes the optimization for small PS sets and fully discriminating guesses. Currently hacked
 //  in for testing purposes only.
 template <uint32_t pinCount>
-kernel void findKnuthGuessKernelSmallOpt(
-    device const uint32_t *allCodewords, device const uint4 *allCodewordsColors,
-    constant uint32_t &possibleSolutionsCount, constant uint32_t *possibleSolutions,
-    constant uint4 *possibleSolutionsColors, device uint32_t *scores, device bool *remainingIsPossibleSolution,
-    device uint32_t *smallOptOut, threadgroup uint32_t *tgScoreCounts [[threadgroup(0)]],
-    const uint tidGrid [[thread_position_in_grid]], const uint tidGroup [[thread_position_in_threadgroup]],
+kernel void findKnuthGuessWithFDKernel(
+    device const uint32_t *allCodewords [[buffer(BufferIndexAllCodewords)]],
+    device const uint4 *allCodewordsColors [[buffer(BufferIndexAllCodewordsColors)]],
+    constant uint32_t &possibleSolutionsCount [[buffer(BufferIndexPossibleSolutionsCount)]],
+    constant uint32_t *possibleSolutions [[buffer(BufferIndexPossibleSolutions)]],
+    constant uint4 *possibleSolutionsColors [[buffer(BufferIndexPossibleSolutionsColors)]],
+    device uint32_t *scores [[buffer(BufferIndexScores)]],
+    device bool *remainingIsPossibleSolution [[buffer(BufferIndexRemainingIsPossibleSolution)]],
+    device uint32_t *fullyDiscriminatingCodewords [[buffer(BufferIndexFullyDiscriminatingCodewords)]],
+    threadgroup uint32_t *tgScoreCounts [[threadgroup(0)]], const uint tidGrid [[thread_position_in_grid]],
+    const uint tidGroup [[thread_position_in_threadgroup]],
     const uint gridSize [[threads_per_grid]], const uint threadsPerSIMDGroup [[threads_per_simdgroup]]) {
   // Total scores = (p * (p + 3)) / 2, but +1 for imperfect packing.
   constexpr int totalScores = ((pinCount * (pinCount + 3)) / 2) + 1;
@@ -141,7 +153,7 @@ kernel void findKnuthGuessKernelSmallOpt(
   if (totalUsedSubsets == possibleSolutionsCount) {
     uint d = simd_min(tidGrid);
     if (simd_is_first()) {
-      smallOptOut[tidGrid / threadsPerSIMDGroup] = d;
+      fullyDiscriminatingCodewords[tidGrid / threadsPerSIMDGroup] = d;
     }
   }
 
@@ -151,13 +163,16 @@ kernel void findKnuthGuessKernelSmallOpt(
 
 // Compute kernel for the Most Parts strategy
 template <uint32_t pinCount>
-kernel void findMostPartsGuessKernel(device const uint32_t *allCodewords, device const uint4 *allCodewordsColors,
-                                     constant uint32_t &possibleSolutionsCount, constant uint32_t *possibleSolutions,
-                                     constant uint4 *possibleSolutionsColors, device uint32_t *scores,
-                                     device bool *remainingIsPossibleSolution,
-                                     threadgroup uint32_t *tgScoreCounts [[threadgroup(0)]],
-                                     const uint tidGrid [[thread_position_in_grid]],
-                                     const uint tidGroup [[thread_position_in_threadgroup]]) {
+kernel void findMostPartsGuessKernel(
+    device const uint32_t *allCodewords [[buffer(BufferIndexAllCodewords)]],
+    device const uint4 *allCodewordsColors [[buffer(BufferIndexAllCodewordsColors)]],
+    constant uint32_t &possibleSolutionsCount [[buffer(BufferIndexPossibleSolutionsCount)]],
+    constant uint32_t *possibleSolutions [[buffer(BufferIndexPossibleSolutions)]],
+    constant uint4 *possibleSolutionsColors [[buffer(BufferIndexPossibleSolutionsColors)]],
+    device uint32_t *scores [[buffer(BufferIndexScores)]],
+    device bool *remainingIsPossibleSolution [[buffer(BufferIndexRemainingIsPossibleSolution)]],
+    threadgroup uint32_t *tgScoreCounts [[threadgroup(0)]], const uint tidGrid [[thread_position_in_grid]],
+    const uint tidGroup [[thread_position_in_threadgroup]]) {
   // Total scores = (p * (p + 3)) / 2, but +1 for imperfect packing.
   constexpr int totalScores = ((pinCount * (pinCount + 3)) / 2) + 1;
   threadgroup uint32_t *scoreCounts = &tgScoreCounts[tidGroup * totalScores];
@@ -178,13 +193,16 @@ kernel void findMostPartsGuessKernel(device const uint32_t *allCodewords, device
 
 // Compute kernel for the Entropy strategy
 template <uint32_t pinCount>
-kernel void findEntropyGuessKernel(device const uint32_t *allCodewords, device const uint4 *allCodewordsColors,
-                                   constant uint32_t &possibleSolutionsCount, constant uint32_t *possibleSolutions,
-                                   constant uint4 *possibleSolutionsColors, device uint32_t *scores,
-                                   device bool *remainingIsPossibleSolution,
-                                   threadgroup uint32_t *tgScoreCounts [[threadgroup(0)]],
-                                   const uint tidGrid [[thread_position_in_grid]],
-                                   const uint tidGroup [[thread_position_in_threadgroup]]) {
+kernel void findEntropyGuessKernel(
+    device const uint32_t *allCodewords [[buffer(BufferIndexAllCodewords)]],
+    device const uint4 *allCodewordsColors [[buffer(BufferIndexAllCodewordsColors)]],
+    constant uint32_t &possibleSolutionsCount [[buffer(BufferIndexPossibleSolutionsCount)]],
+    constant uint32_t *possibleSolutions [[buffer(BufferIndexPossibleSolutions)]],
+    constant uint4 *possibleSolutionsColors [[buffer(BufferIndexPossibleSolutionsColors)]],
+    device uint32_t *scores [[buffer(BufferIndexScores)]],
+    device bool *remainingIsPossibleSolution [[buffer(BufferIndexRemainingIsPossibleSolution)]],
+    threadgroup uint32_t *tgScoreCounts [[threadgroup(0)]], const uint tidGrid [[thread_position_in_grid]],
+    const uint tidGroup [[thread_position_in_threadgroup]]) {
   // Total scores = (p * (p + 3)) / 2, but +1 for imperfect packing.
   constexpr int totalScores = ((pinCount * (pinCount + 3)) / 2) + 1;
   threadgroup uint32_t *scoreCounts = &tgScoreCounts[tidGroup * totalScores];
@@ -206,13 +224,16 @@ kernel void findEntropyGuessKernel(device const uint32_t *allCodewords, device c
 
 // Compute kernel for the Expected Size strategy
 template <uint32_t pinCount>
-kernel void findExpectedSizeGuessKernel(device const uint32_t *allCodewords, device const uint4 *allCodewordsColors,
-                                        constant uint32_t &possibleSolutionsCount, constant uint32_t *possibleSolutions,
-                                        constant uint4 *possibleSolutionsColors, device uint32_t *scores,
-                                        device bool *remainingIsPossibleSolution,
-                                        threadgroup uint32_t *tgScoreCounts [[threadgroup(0)]],
-                                        const uint tidGrid [[thread_position_in_grid]],
-                                        const uint tidGroup [[thread_position_in_threadgroup]]) {
+kernel void findExpectedSizeGuessKernel(
+    device const uint32_t *allCodewords [[buffer(BufferIndexAllCodewords)]],
+    device const uint4 *allCodewordsColors [[buffer(BufferIndexAllCodewordsColors)]],
+    constant uint32_t &possibleSolutionsCount [[buffer(BufferIndexPossibleSolutionsCount)]],
+    constant uint32_t *possibleSolutions [[buffer(BufferIndexPossibleSolutions)]],
+    constant uint4 *possibleSolutionsColors [[buffer(BufferIndexPossibleSolutionsColors)]],
+    device uint32_t *scores [[buffer(BufferIndexScores)]],
+    device bool *remainingIsPossibleSolution [[buffer(BufferIndexRemainingIsPossibleSolution)]],
+    threadgroup uint32_t *tgScoreCounts [[threadgroup(0)]], const uint tidGrid [[thread_position_in_grid]],
+    const uint tidGroup [[thread_position_in_threadgroup]]) {
   // Total scores = (p * (p + 3)) / 2, but +1 for imperfect packing.
   constexpr int totalScores = ((pinCount * (pinCount + 3)) / 2) + 1;
   threadgroup uint32_t *scoreCounts = &tgScoreCounts[tidGroup * totalScores];
@@ -241,20 +262,20 @@ template [[host_name("findKnuthGuessKernel_3")]] kernel void findKnuthGuessKerne
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, threadgroup uint32_t *, const uint, const uint);
 
-template [[host_name("findKnuthGuessKernel_4o")]] kernel void findKnuthGuessKernel<4>(
+template [[host_name("findKnuthGuessKernel_4_orig")]] kernel void findKnuthGuessKernel<4>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, threadgroup uint32_t *, const uint, const uint);
 
-template [[host_name("findKnuthGuessKernel_4")]] kernel void findKnuthGuessKernelSmallOpt<4>(
+template [[host_name("findKnuthGuessKernel_4")]] kernel void findKnuthGuessWithFDKernel<4>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint,
     const uint);
 
-template [[host_name("findKnuthGuessKernel_5o")]] kernel void findKnuthGuessKernel<5>(
+template [[host_name("findKnuthGuessKernel_5_orig")]] kernel void findKnuthGuessKernel<5>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, threadgroup uint32_t *, const uint, const uint);
 
-template [[host_name("findKnuthGuessKernel_5")]] kernel void findKnuthGuessKernelSmallOpt<5>(
+template [[host_name("findKnuthGuessKernel_5")]] kernel void findKnuthGuessWithFDKernel<5>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint,
     const uint);

@@ -4,6 +4,7 @@
 // LICENSE file in the root directory of this source tree.
 
 #import "gpu_interface.h"
+#include "compute_kernel_constants.h"
 #import <Foundation/Foundation.h>
 #import <Metal/Metal.h>
 
@@ -25,7 +26,7 @@
   id<MTLBuffer> _mBufferScores;
   id<MTLBuffer> _mBufferRemainingIsPossibleSolution;
 
-  id<MTLBuffer> _mBufferSmallOptsOut;
+  id<MTLBuffer> _mBufferFullyDiscriminatingCodewords;
 }
 
 - (instancetype)initWithPinCount:(uint)pinCount totalCodewords:(uint)totalCodewords kernelName:(NSString *)kernelName {
@@ -82,13 +83,13 @@
       exit(-1);
     }
 
-    [self createBuffers:totalCodewords];
+    [self createBuffers:totalCodewords executionWidth:_mComputeKernelFunctionPSO.threadExecutionWidth];
   }
   return self;
 }
 
 // TODO: consider merging the two small buffers into a single buffer w/ a struct.
-- (void)createBuffers:(uint)maxCodewords {
+- (void)createBuffers:(uint)maxCodewords executionWidth:(NSUInteger)executionWidth {
   _mBufferAllCodewords = [_mDevice newBufferWithLength:maxCodewords * sizeof(uint32_t)
                                                options:MTLResourceStorageModeManaged];
   _mBufferAllCodewordsColors = [_mDevice newBufferWithLength:maxCodewords * sizeof(unsigned __int128)
@@ -106,9 +107,9 @@
   _mBufferRemainingIsPossibleSolution = [_mDevice newBufferWithLength:maxCodewords * sizeof(bool)
                                                               options:MTLResourceStorageModeShared];
 
-  // mmmfixme: cleanup, make optional for testing, fix that constant
-  _mBufferSmallOptsOut = [_mDevice newBufferWithLength:maxCodewords * sizeof(uint32_t) / 32 // mmmfixme: SIMD group size
-                                               options:MTLResourceStorageModeShared];
+  _mBufferFullyDiscriminatingCodewords =
+      [_mDevice newBufferWithLength:maxCodewords * (sizeof(uint32_t) / executionWidth + 1)
+                            options:MTLResourceStorageModeShared];
 }
 
 - (uint32_t *)getAllCodewordsBuffer {
@@ -164,15 +165,6 @@
 
   [commandBuffer waitUntilCompleted];
 
-  // mmmfixme: temp testing
-  //  printf("PS Size = %d\n", *(uint32_t *)(_mBufferPossibleSolutionsCount.contents));
-  //  uint32_t *pSmallOptsOut = _mBufferSmallOptsOut.contents;
-  //  for (int i = 0; i < _mAllCodewordsCount / 32; i++) {
-  //    if (pSmallOptsOut[i] != 0) {
-  //      printf("%d: %d\n", i, pSmallOptsOut[i]);
-  //    }
-  //  }
-
   if (capture) {
     MTLCaptureManager *captureManager = [MTLCaptureManager sharedCaptureManager];
     [captureManager stopCapture];
@@ -181,17 +173,22 @@
 
 - (void)encodeComputeCommand:(id<MTLComputeCommandEncoder>)computeEncoder {
   [computeEncoder setComputePipelineState:_mComputeKernelFunctionPSO];
-  [computeEncoder setBuffer:_mBufferAllCodewords offset:0 atIndex:0];
-  [computeEncoder setBuffer:_mBufferAllCodewordsColors offset:0 atIndex:1];
-  [computeEncoder setBuffer:_mBufferPossibleSolutionsCount offset:0 atIndex:2];
-  [computeEncoder setBuffer:_mBufferPossibleSolutions offset:0 atIndex:3];
-  [computeEncoder setBuffer:_mBufferPossibleSolutionsColors offset:0 atIndex:4];
-  [computeEncoder setBuffer:_mBufferScores offset:0 atIndex:5];
-  [computeEncoder setBuffer:_mBufferRemainingIsPossibleSolution offset:0 atIndex:6];
+  [computeEncoder setBuffer:_mBufferAllCodewords offset:0 atIndex:BufferIndexAllCodewords];
+  [computeEncoder setBuffer:_mBufferAllCodewordsColors offset:0 atIndex:BufferIndexAllCodewordsColors];
+  [computeEncoder setBuffer:_mBufferPossibleSolutionsCount offset:0 atIndex:BufferIndexPossibleSolutionsCount];
+  [computeEncoder setBuffer:_mBufferPossibleSolutions offset:0 atIndex:BufferIndexPossibleSolutions];
+  [computeEncoder setBuffer:_mBufferPossibleSolutionsColors offset:0 atIndex:BufferIndexPossibleSolutionsColors];
+  [computeEncoder setBuffer:_mBufferScores offset:0 atIndex:BufferIndexScores];
+  [computeEncoder setBuffer:_mBufferRemainingIsPossibleSolution
+                     offset:0
+                    atIndex:BufferIndexRemainingIsPossibleSolution];
 
-  // mmmfixme: cleanup, make optional
-  memset(_mBufferSmallOptsOut.contents, 0, _mBufferSmallOptsOut.length);
-  [computeEncoder setBuffer:_mBufferSmallOptsOut offset:0 atIndex:7]; // mmmfixme: share the indicies in a header
+  // TODO: this is here just for the version that finds fully discriminating codewords. Will be ignored by the others.
+  // At some point I'll either keep this and make them all use it, or nuke it.
+  memset(_mBufferFullyDiscriminatingCodewords.contents, 0, _mBufferFullyDiscriminatingCodewords.length);
+  [computeEncoder setBuffer:_mBufferFullyDiscriminatingCodewords
+                     offset:0
+                    atIndex:BufferIndexFullyDiscriminatingCodewords];
 
   MTLSize gridSize = MTLSizeMake(_mAllCodewordsCount, 1, 1);
 
@@ -219,8 +216,9 @@
   return (bool *)_mBufferRemainingIsPossibleSolution.contents;
 }
 
-- (uint32_t *)getSmallOptsOut {
-  return (uint32_t *)_mBufferSmallOptsOut.contents;
+- (uint32_t *)getFullyDiscriminatingCodewords:(uint32_t *)count {
+  *count = (uint32_t)(_mBufferFullyDiscriminatingCodewords.length / sizeof(uint32_t));
+  return (uint32_t *)_mBufferFullyDiscriminatingCodewords.contents;
 }
 
 @end

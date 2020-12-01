@@ -11,8 +11,6 @@ NS_ASSUME_NONNULL_BEGIN
 @interface GPUInterface : NSObject
 - (instancetype)initWithPinCount:(uint)pinCount totalCodewords:(uint)totalCodewords kernelName:(NSString *)kernelName;
 
-- (void)createBuffers:(uint)maxCodewords;
-
 - (uint32_t *)getAllCodewordsBuffer;
 - (unsigned __int128 *)getAllCodewordsColorsBuffer;
 - (void)setAllCodewordsCount:(uint32_t)count;
@@ -27,7 +25,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (uint32_t *)getScores;
 - (bool *)getRemainingIsPossibleSolution;
 
-- (uint32_t *)getSmallOptsOut;
+- (uint32_t *)getFullyDiscriminatingCodewords:(uint32_t *)count;
 @end
 
 NS_ASSUME_NONNULL_END

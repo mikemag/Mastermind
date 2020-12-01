@@ -111,15 +111,15 @@ Codeword<p, c> StrategySubsettingGPU<p, c, log>::selectNextGuess() {
   uint32_t *maxScoreCounts = gpuInterface->getScores();
   bool *remainingIsPossibleSolution = gpuInterface->getRemainingIsPossibleSolution();
 
-  // Shortcut small sets with fully discriminating codewords.
-  // mmmfixme: cleanup, make optional for testing.
-  uint32_t *smallOptsOut = gpuInterface->getSmallOptsOut();
-  if (smallOptsOut != nullptr) {
+  if (Strategy<p, c, log>::enableSmallPSShortcutGPU) {
+    // Shortcut small sets with fully discriminating codewords. Certain versions of the GPU kernels look for these and
+    // pass them back in a list of useful codewords per SIMD group. Running through the list in-order and taking the
+    // first one gives the first lexically ordered option.
+    uint32_t discriminatingCount = 0;
+    uint32_t *smallOptsOut = gpuInterface->getFullyDiscriminatingCodewords(discriminatingCount);
     auto &allCodewords = Codeword<p, c>::getAllCodewords();
-    auto smallOptsOutLength = allCodewords.size() / 32;  // mmmfixme: SIMD group size
-    for (int i = 0; i < smallOptsOutLength; i++) {
+    for (int i = 0; i < discriminatingCount; i++) {
       if (smallOptsOut[i] > 0) {
-        // We have one
         Codeword<p, c> g = allCodewords[smallOptsOut[i]];
         if (log) {
           cout << "Selecting fully discriminating guess from GPU: " << g

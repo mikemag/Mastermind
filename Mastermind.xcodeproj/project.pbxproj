@@ -30,6 +30,7 @@
 
 /* Begin PBXFileReference section */
 		271B925C2563A6B50084A744 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
+		274AB9F82576F300008AD945 /* compute_kernel_constants.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = compute_kernel_constants.h; sourceTree = "<group>"; };
 		274B56B9257472460058882F /* score.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = score.cpp; sourceTree = "<group>"; };
 		274B56BA257472460058882F /* gpu_interface.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = gpu_interface.h; sourceTree = "<group>"; };
 		274B56BB257472460058882F /* main.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
@@ -78,13 +79,16 @@
 			children = (
 				274B56C8257472460058882F /* codeword.cpp */,
 				274B56C6257472460058882F /* codeword.hpp */,
+				274AB9F82576F300008AD945 /* compute_kernel_constants.h */,
 				274B56BE257472460058882F /* compute_kernels.metal */,
+				271B925B2563A6B50084A744 /* Frameworks */,
 				274B56C2257472460058882F /* gpu_interface_wrapper.hpp */,
 				274B56BD257472460058882F /* gpu_interface_wrapper.mm */,
 				274B56BA257472460058882F /* gpu_interface.h */,
 				274B56C9257472460058882F /* gpu_interface.m */,
 				274B56C5257472460058882F /* LICENSE */,
 				274B56BB257472460058882F /* main.cpp */,
+				278FA71525609AE9001C553E /* Products */,
 				274B56CC257472460058882F /* README.md */,
 				274B56B9257472460058882F /* score.cpp */,
 				274B56BC257472460058882F /* score.hpp */,
@@ -96,8 +100,6 @@
 				274B56C0257472460058882F /* subsetting_strategies.hpp */,
 				274B56C1257472460058882F /* utils.cpp */,
 				274B56CB257472460058882F /* utils.hpp */,
-				278FA71525609AE9001C553E /* Products */,
-				271B925B2563A6B50084A744 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};

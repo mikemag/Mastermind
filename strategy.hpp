@@ -82,6 +82,7 @@ class Strategy {
   // Optimization control -- for experimentation
   constexpr static bool enableTwoPSShortcut = true;
   constexpr static bool enableSmallPSShortcut = true;
+  constexpr static bool enableSmallPSShortcutGPU = true;
 
   // Optimization metrics -- measuring experimentation
   constexpr static bool enableTwoPSMetrics = true;
