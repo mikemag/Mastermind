@@ -26,6 +26,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (uint32_t *)getScores;
 - (bool *)getRemainingIsPossibleSolution;
+
+- (uint32_t *)getSmallOptsOut;
 @end
 
 NS_ASSUME_NONNULL_END

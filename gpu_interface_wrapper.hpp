@@ -37,4 +37,6 @@ class GPUInterfaceWrapper {
 
   uint32_t* getScores();
   bool* getRemainingIsPossibleSolution();
+
+  uint32_t* getSmallOptsOut();
 };

@@ -24,6 +24,8 @@
 
   id<MTLBuffer> _mBufferScores;
   id<MTLBuffer> _mBufferRemainingIsPossibleSolution;
+
+  id<MTLBuffer> _mBufferSmallOptsOut;
 }
 
 - (instancetype)initWithPinCount:(uint)pinCount totalCodewords:(uint)totalCodewords kernelName:(NSString *)kernelName {
@@ -103,6 +105,10 @@
   _mBufferScores = [_mDevice newBufferWithLength:maxCodewords * sizeof(uint32_t) options:MTLResourceStorageModeShared];
   _mBufferRemainingIsPossibleSolution = [_mDevice newBufferWithLength:maxCodewords * sizeof(bool)
                                                               options:MTLResourceStorageModeShared];
+
+  // mmmfixme: cleanup, make optional for testing, fix that constant
+  _mBufferSmallOptsOut = [_mDevice newBufferWithLength:maxCodewords * sizeof(uint32_t) / 32 // mmmfixme: SIMD group size
+                                               options:MTLResourceStorageModeShared];
 }
 
 - (uint32_t *)getAllCodewordsBuffer {
@@ -158,6 +164,15 @@
 
   [commandBuffer waitUntilCompleted];
 
+  // mmmfixme: temp testing
+  //  printf("PS Size = %d\n", *(uint32_t *)(_mBufferPossibleSolutionsCount.contents));
+  //  uint32_t *pSmallOptsOut = _mBufferSmallOptsOut.contents;
+  //  for (int i = 0; i < _mAllCodewordsCount / 32; i++) {
+  //    if (pSmallOptsOut[i] != 0) {
+  //      printf("%d: %d\n", i, pSmallOptsOut[i]);
+  //    }
+  //  }
+
   if (capture) {
     MTLCaptureManager *captureManager = [MTLCaptureManager sharedCaptureManager];
     [captureManager stopCapture];
@@ -173,6 +188,10 @@
   [computeEncoder setBuffer:_mBufferPossibleSolutionsColors offset:0 atIndex:4];
   [computeEncoder setBuffer:_mBufferScores offset:0 atIndex:5];
   [computeEncoder setBuffer:_mBufferRemainingIsPossibleSolution offset:0 atIndex:6];
+
+  // mmmfixme: cleanup, make optional
+  memset(_mBufferSmallOptsOut.contents, 0, _mBufferSmallOptsOut.length);
+  [computeEncoder setBuffer:_mBufferSmallOptsOut offset:0 atIndex:7]; // mmmfixme: share the indicies in a header
 
   MTLSize gridSize = MTLSizeMake(_mAllCodewordsCount, 1, 1);
 
@@ -198,6 +217,10 @@
 }
 - (bool *)getRemainingIsPossibleSolution {
   return (bool *)_mBufferRemainingIsPossibleSolution.contents;
+}
+
+- (uint32_t *)getSmallOptsOut {
+  return (uint32_t *)_mBufferSmallOptsOut.contents;
 }
 
 @end

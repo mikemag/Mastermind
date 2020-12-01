@@ -139,3 +139,7 @@ wasn't worth it to me anymore.
 My results should be easily reproducible in any Java or C++ implementation with a score cache, and it's not
 too bad to go add it back into my implementations for further study if someone has an interesting 
 variant I should explore.
+
+## References
+
+[1] D.E. Knuth. The computer as Master Mind. Journal of Recreational Mathematics, 9(1):1–6, 1976.

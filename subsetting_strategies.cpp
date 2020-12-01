@@ -106,9 +106,31 @@ Codeword<p, c> StrategySubsettingGPU<p, c, log>::selectNextGuess() {
 
   gpuInterface->sendComputeCommand();
   kernelsExecuted++;
+  this->scoreCounterGPU += Codeword<p, c>::getAllCodewords().size() * this->possibleSolutions.size();
 
   uint32_t *maxScoreCounts = gpuInterface->getScores();
   bool *remainingIsPossibleSolution = gpuInterface->getRemainingIsPossibleSolution();
+
+  // Shortcut small sets with fully discriminating codewords.
+  // mmmfixme: cleanup, make optional for testing.
+  uint32_t *smallOptsOut = gpuInterface->getSmallOptsOut();
+  if (smallOptsOut != nullptr) {
+    auto &allCodewords = Codeword<p, c>::getAllCodewords();
+    auto smallOptsOutLength = allCodewords.size() / 32;  // mmmfixme: SIMD group size
+    for (int i = 0; i < smallOptsOutLength; i++) {
+      if (smallOptsOut[i] > 0) {
+        // We have one
+        Codeword<p, c> g = allCodewords[smallOptsOut[i]];
+        if (log) {
+          cout << "Selecting fully discriminating guess from GPU: " << g
+               << ", subsets: " << this->possibleSolutions.size()
+               << ", isPossibleSolution: " << remainingIsPossibleSolution[smallOptsOut[i]]
+               << ", small opts index: " << i << endl;
+        }
+        return g;
+      }
+    }
+  }
 
   Codeword<p, c> bestGuess;
   size_t bestScore = 0;
@@ -127,8 +149,6 @@ Codeword<p, c> StrategySubsettingGPU<p, c, log>::selectNextGuess() {
       bestIsPossibleSolution = remainingIsPossibleSolution[i];
     }
   }
-
-  this->scoreCounterGPU += Codeword<p, c>::getAllCodewords().size() * this->possibleSolutions.size();
 
   if (log) {
     cout << "Selecting best guess: " << bestGuess << "\tscore: " << bestScore << " (GPU)" << endl;

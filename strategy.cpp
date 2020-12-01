@@ -107,7 +107,8 @@ void Strategy<p, c, log>::removeImpossibleSolutions(Score r) {
 // codeword can fully discriminate all of the possible solutions (i.e., it produces a different score for each one),
 // then play it right away since it will tell us the winner.
 //
-// TODO: notes on speed improvements, selecting better guesses than some algs (prove it), tradeoff for the extra overhead.
+// TODO: notes on speed improvements, selecting better guesses than some algs (prove it), tradeoff for the extra
+// overhead.
 
 template <uint8_t p, uint8_t c, bool log>
 Codeword<p, c> Strategy<p, c, log>::shortcutSmallSets() {

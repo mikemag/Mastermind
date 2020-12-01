@@ -9,10 +9,10 @@ using namespace metal;
 
 // The core of Knuth's Mastermind algorithm, and others, as a Metal compute kernels.
 //
-// Scores here are not the classic combindation of black hits and white hits. A score's ordinal is (b(p + 1) - ((b -
-// 1)b) / 2) + w. See README.md for details.  By using the score's ordinal we can have densly packed set of counters to
-// form the subset counts as we go. These scores never escape the GPU, so it doesn't matter that they don't match any
-// other forms of scores in the rest of the program.
+// Scores here are not the classic combination of black hits and white hits. A score's ordinal is (b(p + 1) - ((b -
+// 1)b) / 2) + w. See docs/Score_Ordinals.md for details. By using the score's ordinal we can have densely packed set
+// of counters to form the subset counts as we go. These scores never escape the GPU, so it doesn't matter that they
+// don't match any other forms of scores in the rest of the program.
 
 // Mastermind scoring function
 //
@@ -102,6 +102,49 @@ kernel void findKnuthGuessKernel(device const uint32_t *allCodewords, device con
   for (int i = 0; i < totalScores; i++) {
     largestSubsetSize = max(largestSubsetSize, scoreCounts[i]);
   }
+  scores[tidGrid] = possibleSolutionsCount - largestSubsetSize;
+  remainingIsPossibleSolution[tidGrid] = isPossibleSolution;
+}
+
+// mmmfixme: this version includes the optimization for small PS sets and fully discriminating guesses. Currently hacked
+//  in for testing purposes only.
+template <uint32_t pinCount>
+kernel void findKnuthGuessKernelSmallOpt(
+    device const uint32_t *allCodewords, device const uint4 *allCodewordsColors,
+    constant uint32_t &possibleSolutionsCount, constant uint32_t *possibleSolutions,
+    constant uint4 *possibleSolutionsColors, device uint32_t *scores, device bool *remainingIsPossibleSolution,
+    device uint32_t *smallOptOut, threadgroup uint32_t *tgScoreCounts [[threadgroup(0)]],
+    const uint tidGrid [[thread_position_in_grid]], const uint tidGroup [[thread_position_in_threadgroup]],
+    const uint gridSize [[threads_per_grid]], const uint threadsPerSIMDGroup [[threads_per_simdgroup]]) {
+  // Total scores = (p * (p + 3)) / 2, but +1 for imperfect packing.
+  constexpr int totalScores = ((pinCount * (pinCount + 3)) / 2) + 1;
+  threadgroup uint32_t *scoreCounts = &tgScoreCounts[tidGroup * totalScores];
+
+  bool isPossibleSolution =
+      computeSubsetSizes<pinCount>(totalScores, scoreCounts, allCodewords[tidGrid], allCodewordsColors[tidGrid],
+                                   possibleSolutionsCount, possibleSolutions, possibleSolutionsColors);
+
+  uint32_t largestSubsetSize = 0;
+  uint32_t totalUsedSubsets = 0;
+  for (int i = 0; i < totalScores; i++) {
+    largestSubsetSize = max(largestSubsetSize, scoreCounts[i]);
+    if (scoreCounts[i] > 0) {
+      totalUsedSubsets++;
+    }
+  }
+
+  // If we find some guesses which are fully descriminating, we want to pick the first one lexically to play. tidGrid is
+  // the same as the ordinal for each member of allCodewords, so we can simply take the min tidGrid. We'll have every
+  // member of each SIMD group that finds such a solution vote on the minimum, and have the first of them write the
+  // result. I could do a further reduction to a value per threadgroup, or a final single value, but for now I'll just
+  // let the CPU take the first non-zero result and run with it.
+  if (totalUsedSubsets == possibleSolutionsCount) {
+    uint d = simd_min(tidGrid);
+    if (simd_is_first()) {
+      smallOptOut[tidGrid / threadsPerSIMDGroup] = d;
+    }
+  }
+
   scores[tidGrid] = possibleSolutionsCount - largestSubsetSize;
   remainingIsPossibleSolution[tidGrid] = isPossibleSolution;
 }
@@ -198,13 +241,23 @@ template [[host_name("findKnuthGuessKernel_3")]] kernel void findKnuthGuessKerne
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, threadgroup uint32_t *, const uint, const uint);
 
-template [[host_name("findKnuthGuessKernel_4")]] kernel void findKnuthGuessKernel<4>(
+template [[host_name("findKnuthGuessKernel_4o")]] kernel void findKnuthGuessKernel<4>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, threadgroup uint32_t *, const uint, const uint);
 
-template [[host_name("findKnuthGuessKernel_5")]] kernel void findKnuthGuessKernel<5>(
+template [[host_name("findKnuthGuessKernel_4")]] kernel void findKnuthGuessKernelSmallOpt<4>(
+    device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint,
+    const uint);
+
+template [[host_name("findKnuthGuessKernel_5o")]] kernel void findKnuthGuessKernel<5>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, threadgroup uint32_t *, const uint, const uint);
+
+template [[host_name("findKnuthGuessKernel_5")]] kernel void findKnuthGuessKernelSmallOpt<5>(
+    device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint,
+    const uint);
 
 template [[host_name("findKnuthGuessKernel_6")]] kernel void findKnuthGuessKernel<6>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,

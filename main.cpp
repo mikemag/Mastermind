@@ -34,8 +34,8 @@ enum Algo {
 // Config for a single game
 static constexpr bool playSingleGame = true;
 static constexpr Algo algo = Algo::Knuth;
-static constexpr uint8_t pinCount = 4;    // 1-8, 4 is classic
-static constexpr uint8_t colorCount = 6;  // 1-15, 6 is classic
+static constexpr uint8_t pinCount = 5;    // 1-8, 4 is classic
+static constexpr uint8_t colorCount = 8;  // 1-15, 6 is classic
 
 static constexpr bool playMultipleGames = false;  // Play a set of games defined below.
 static constexpr bool runTests = true;            // Run unit tests and play Knuth's game

@@ -103,3 +103,12 @@ bool *GPUInterfaceWrapper::getRemainingIsPossibleSolution() {
   return nullptr;
 #endif
 }
+
+uint32_t *GPUInterfaceWrapper::getSmallOptsOut() {
+#ifdef __MM_GPU_METAL__
+  return [wrapped getSmallOptsOut];
+#else
+  assert(!"No GPU support!");
+  return nullptr;
+#endif
+}

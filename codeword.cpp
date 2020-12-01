@@ -151,6 +151,7 @@ Score Codeword<pinCount, c>::scoreCountingHandVec(const Codeword &guess) const {
 }
 
 // Wrapper for the real scoring function to allow for easy experimentation.
+// Note: I used to employ a score cache here, see docs/Score_Cache.md for details.
 template <uint8_t p, uint8_t c>
 Score Codeword<p, c>::score(const Codeword &guess) const {
   return scoreCountingHandVec(guess);
