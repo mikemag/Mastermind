@@ -127,8 +127,7 @@ kernel void findKnuthGuessWithFDKernel(
     device bool *remainingIsPossibleSolution [[buffer(BufferIndexRemainingIsPossibleSolution)]],
     device uint32_t *fullyDiscriminatingCodewords [[buffer(BufferIndexFullyDiscriminatingCodewords)]],
     threadgroup uint32_t *tgScoreCounts [[threadgroup(0)]], const uint tidGrid [[thread_position_in_grid]],
-    const uint tidGroup [[thread_position_in_threadgroup]], const uint gridSize [[threads_per_grid]],
-    const uint threadsPerSIMDGroup [[threads_per_simdgroup]]) {
+    const uint tidGroup [[thread_position_in_threadgroup]], const uint threadsPerSIMDGroup [[threads_per_simdgroup]]) {
   // Total scores = (p * (p + 3)) / 2, but +1 for imperfect packing.
   constexpr int totalScores = ((pinCount * (pinCount + 3)) / 2) + 1;
   threadgroup uint32_t *scoreCounts = &tgScoreCounts[tidGroup * totalScores];
@@ -269,8 +268,7 @@ template [[host_name("findKnuthGuessKernel_4_orig")]] kernel void findKnuthGuess
 
 template [[host_name("findKnuthGuessKernel_4")]] kernel void findKnuthGuessWithFDKernel<4>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
-    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint,
-    const uint);
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
 template [[host_name("findKnuthGuessKernel_5_orig")]] kernel void findKnuthGuessKernel<5>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
@@ -278,8 +276,7 @@ template [[host_name("findKnuthGuessKernel_5_orig")]] kernel void findKnuthGuess
 
 template [[host_name("findKnuthGuessKernel_5")]] kernel void findKnuthGuessWithFDKernel<5>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
-    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint,
-    const uint);
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
 template [[host_name("findKnuthGuessKernel_6")]] kernel void findKnuthGuessKernel<6>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,

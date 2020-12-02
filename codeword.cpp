@@ -72,7 +72,7 @@ Score Codeword<pinCount, c>::scoreSimpleLoops(const Codeword &guess) const {
 // Elapsed time 3.1218s, average search 2.4088ms
 template <uint8_t pinCount, uint8_t c>
 Score Codeword<pinCount, c>::scoreCountingScalar(const Codeword &guess) const {
-  constexpr static uint32_t unusedPinsMask = 0xFFFFFFFFu << (pinCount * 4u);
+  constexpr static uint32_t unusedPinsMask = (uint32_t)(0xFFFFFFFFlu << (pinCount * 4u));
   uint32_t v = this->codeword ^ guess.codeword;  // Matched pins are now 0.
   v |= unusedPinsMask;                           // Ensure that any unused pin positions are non-zero.
   uint32_t r = ~((((v & 0x77777777u) + 0x77777777u) | v) | 0x77777777u);  // Yields 1 bit per matched pin
@@ -104,7 +104,7 @@ Score Codeword<pinCount, c>::scoreCountingScalar(const Codeword &guess) const {
 // Elapsed time 2.2948s, average search 1.7707ms
 template <uint8_t pinCount, uint8_t c>
 Score Codeword<pinCount, c>::scoreCountingAutoVec(const Codeword &guess) const {
-  constexpr static uint32_t unusedPinsMask = 0xFFFFFFFFu << (pinCount * 4u);
+  constexpr static uint32_t unusedPinsMask = (uint32_t)(0xFFFFFFFFlu << (pinCount * 4u));
   uint32_t v = this->codeword ^ guess.codeword;  // Matched pins are now 0.
   v |= unusedPinsMask;                           // Ensure that any unused pin positions are non-zero.
   uint32_t r = ~((((v & 0x77777777u) + 0x77777777u) | v) | 0x77777777u);  // Yields 1 bit per matched pin
@@ -128,7 +128,7 @@ Score Codeword<pinCount, c>::scoreCountingAutoVec(const Codeword &guess) const {
 // Elapsed time 0.9237s, average search 0.7127ms
 template <uint8_t pinCount, uint8_t c>
 Score Codeword<pinCount, c>::scoreCountingHandVec(const Codeword &guess) const {
-  constexpr static uint32_t unusedPinsMask = 0xFFFFFFFFu << (pinCount * 4u);
+  constexpr static uint32_t unusedPinsMask = (uint32_t)(0xFFFFFFFFlu << (pinCount * 4u));
   uint32_t v = this->codeword ^ guess.codeword;  // Matched pins are now 0.
   v |= unusedPinsMask;                           // Ensure that any unused pin positions are non-zero.
   uint32_t r = ~((((v & 0x77777777u) + 0x77777777u) | v) | 0x77777777u);  // Yields 1 bit per matched pin

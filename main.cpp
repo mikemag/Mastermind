@@ -26,7 +26,7 @@ enum Algo {
   FirstOne,      // Pick the first of the remaining choices.
   Random,        // Pick any of the remaining choices.
   Knuth,         // Pick the one that will eliminate the most remaining choices.
-  MostParts,     // Mazimize the number of scores at each round.
+  MostParts,     // Maximize the number of scores at each round.
   ExpectedSize,  // Minimize the expected size of the remaining choices.
   Entropy,       // Pick the maximum entropy guess.
 };
@@ -78,18 +78,37 @@ void runKnuthTest() {
   printf("\n");
 }
 
+static constexpr uint histogramSize = 16;
+static vector<int> histogram(histogramSize, 0);
+static vector<string> histogramHeaders;
+
+static void setupHistogramHeaders() {
+  for (int i = 0; i < histogramSize; i++) {
+    std::stringstream ss;
+    ss << "Hist_" << setw(2) << setfill('0') << i;
+    histogramHeaders.emplace_back(ss.str());
+  }
+}
+
 template <uint8_t pinCount, uint8_t colorCount, bool log>
-void playAllGamesForStrategy(shared_ptr<Strategy<pinCount, colorCount, log>> strategy) {
-  auto &allCodewords = Codeword<pinCount, colorCount>::getAllCodewords();
+void playAllGamesForStrategy(shared_ptr<Strategy<pinCount, colorCount, log>> strategy, StatsRecorder& statsRecorder) {
+  auto& allCodewords = Codeword<pinCount, colorCount>::getAllCodewords();
   printf("Playing all %d pin %d color games using algorithm '%s' for every possible secret...\n", pinCount, colorCount,
          strategy->getName().c_str());
+  statsRecorder.add("Pin Count", (int)pinCount);
+  statsRecorder.add("Color Count", (int)colorCount);
+  statsRecorder.add("Strategy", strategy->getName());
+
   cout << "Total codewords: " << commaString(allCodewords.size()) << endl;
+  statsRecorder.add("Total Codewords", allCodewords.size());
+
+  Codeword<pinCount, colorCount> initialGuess = strategy->currentGuess();
   cout << "Initial guess: " << strategy->currentGuess() << endl;
+  statsRecorder.add("Initial Guess", initialGuess);
 
   int maxTurns = 0;
   int totalTurns = 0;
-  constexpr uint histogramSize = 16;
-  vector<int> histogram(histogramSize, 0);
+  fill(begin(histogram), end(histogram), 0);
   Codeword<pinCount, colorCount> maxSecret;
   bool showProgress = true;
   int progressFactor = 1000;
@@ -97,7 +116,7 @@ void playAllGamesForStrategy(shared_ptr<Strategy<pinCount, colorCount, log>> str
   auto startTime = chrono::high_resolution_clock::now();
   auto lastTime = startTime;
 
-  for (const auto &secret : allCodewords) {
+  for (const auto& secret : allCodewords) {
     uint turns = strategy->findSecret(secret);
     totalTurns += turns;
     histogram[min(turns, histogramSize)]++;
@@ -126,18 +145,26 @@ void playAllGamesForStrategy(shared_ptr<Strategy<pinCount, colorCount, log>> str
   auto endTime = chrono::high_resolution_clock::now();
   double averageTurns = (double)totalTurns / allCodewords.size();
   printf("Average number of turns was %.4f\n", averageTurns);
+  statsRecorder.add("Average Turns", averageTurns);
   cout << "Maximum number of turns over all possible secrets was " << maxTurns << " with secret " << maxSecret << endl;
-  strategy->printScoreCounters();
+  statsRecorder.add("Max Turns", maxTurns);
+  statsRecorder.add("Max Secret", maxSecret);
   chrono::duration<float, milli> elapsedMS = endTime - startTime;
-  cout << "Elapsed time " << commaString(elapsedMS.count() / 1000) << "s, average search "
-       << commaString(elapsedMS.count() / allCodewords.size()) << "ms" << endl;
+  auto elapsedS = elapsedMS.count() / 1000;
+  auto avgGameTimeMS = elapsedMS.count() / allCodewords.size();
+  cout << "Elapsed time " << commaString(elapsedS) << "s, average search " << commaString(avgGameTimeMS) << "ms"
+       << endl;
+  statsRecorder.add("Elapsed (s)", elapsedS);
+  statsRecorder.add("Average Game Time (ms)", avgGameTimeMS);
   strategy->printStats(elapsedMS);
+  strategy->recordStats(statsRecorder, elapsedMS);
 
   printf("\n");
   for (int i = 0; i < histogramSize; i++) {
     if (histogram[i] > 0) {
       printf("%2d: %s ", i, commaString(histogram[i]).c_str());
     }
+    statsRecorder.add(histogramHeaders[i], histogram[i]);
   }
   printf("\n");
 
@@ -165,45 +192,55 @@ shared_ptr<Strategy<pinCount, colorCount, log>> makeStrategyWithAlgo(Algo algori
   }
 };
 
-// Specific games to play
-// static vector<void (*)()> manyGamesSpecific = {
-//    []() { playAllGamesForStrategy(makeStrategyWithAlgo<4, 6, false>(Algo::Knuth)); },
-//    []() { playAllGamesForStrategy(makeStrategyWithAlgo<4, 7, false>(Algo::Knuth)); },
-//    []() { playAllGamesForStrategy(makeStrategyWithAlgo<5, 7, false>(Algo::Knuth)); },
-//    []() { playAllGamesForStrategy(makeStrategyWithAlgo<5, 8, false>(Algo::Knuth)); },
-//};
+int main(int argc, const char* argv[]) {
+  setupHistogramHeaders();
 
-int main(int argc, const char *argv[]) {
   if (runTests) {
     runUnitTests();
     runKnuthTest();
   }
 
+  StatsRecorder statsRecorder;
+
   if (playSingleGame) {
+    statsRecorder.newRun();
     auto strategy = makeStrategyWithAlgo<pinCount, colorCount, false>(algo);
-    playAllGamesForStrategy(strategy);
+    playAllGamesForStrategy(strategy, statsRecorder);
   }
 
   if (playMultipleGames) {
     // NB: the templating of all of this means that multiple copies of much of the code are created for each entry in
     // this table. So only create it if we're actually playinig multiple games. This keeps build times lower during
     // development.
-    static vector<void (*)(Algo algorithm)> manyGamesByAlgo = {
-        [](Algo algorithm) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 6, false>(algorithm)); },
-        [](Algo algorithm) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 7, false>(algorithm)); },
-        [](Algo algorithm) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 10, false>(algorithm)); },
-        [](Algo algorithm) { playAllGamesForStrategy(makeStrategyWithAlgo<5, 7, false>(algorithm)); },
-        [](Algo algorithm) { playAllGamesForStrategy(makeStrategyWithAlgo<5, 8, false>(algorithm)); },
+    static vector<void (*)(Algo, StatsRecorder&)> manyGamesByAlgo = {
+        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<2, 2, false>(a), s); },
+        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<2, 3, false>(a), s); },
+        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<2, 4, false>(a), s); },
+        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<2, 5, false>(a), s); },
+        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<2, 6, false>(a), s); },
+        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<2, 7, false>(a), s); },
+        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<2, 8, false>(a), s); },
+        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<2, 9, false>(a), s); },
+        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<2, 10, false>(a), s); },
+        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<2, 11, false>(a), s); },
+        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<2, 12, false>(a), s); },
+        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<2, 13, false>(a), s); },
+        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<2, 14, false>(a), s); },
+        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<2, 15, false>(a), s); },
+
     };
 
     static vector<Algo> interestingAlgos = {Knuth, MostParts, Entropy, ExpectedSize, FirstOne};
 
-    for (auto &a : interestingAlgos) {
-      for (auto &f : manyGamesByAlgo) {
-        f(a);
+    for (auto& f : manyGamesByAlgo) {
+      for (auto& a : interestingAlgos) {
+        statsRecorder.newRun();
+        f(a, statsRecorder);
       }
     }
   }
+
+  statsRecorder.writeStats("mastermind_run_stats.csv");
 
   return 0;
 }

@@ -102,6 +102,7 @@ class StrategySubsetting : public Strategy<p, c, l> {
 //
 // See compute_kernels.metal for the implementation on the GPU side.
 enum GPUMode { Both, GPU, CPU };
+const char *GPUModeNames[] = {"Both", "GPU", "CPU"};
 
 template <uint8_t pinCount, uint8_t c, bool l>
 class StrategySubsettingGPU : public StrategySubsetting<pinCount, c, l> {
@@ -123,6 +124,7 @@ class StrategySubsettingGPU : public StrategySubsetting<pinCount, c, l> {
   Codeword<pinCount, c> selectNextGuess() override;
 
   void printStats(std::chrono::duration<float, std::milli> elapsedMS) override;
+  void recordStats(StatsRecorder &sr, std::chrono::duration<float, std::milli> elapsedMS) override;
 
  protected:
   GPUMode mode = Both;

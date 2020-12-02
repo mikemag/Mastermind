@@ -182,10 +182,20 @@ void StrategySubsettingGPU<p, c, l>::copyAllCodewordsToGPU() {
 
 template <uint8_t p, uint8_t c, bool l>
 void StrategySubsettingGPU<p, c, l>::printStats(chrono::duration<float, milli> elapsedMS) {
+  StrategySubsetting<p, c, l>::printStats(elapsedMS);
   if (mode != CPU && gpuInterface->gpuAvailable()) {
     cout << "GPU kernels executed: " << commaString(kernelsExecuted)
          << "  FPS: " << commaString((float)kernelsExecuted / (elapsedMS.count() / 1000.0)) << endl;
   }
+}
+
+template <uint8_t p, uint8_t c, bool l>
+void StrategySubsettingGPU<p, c, l>::recordStats(StatsRecorder &sr,
+                                                 std::chrono::duration<float, std::milli> elapsedMS) {
+  StrategySubsetting<p, c, l>::recordStats(sr, elapsedMS);
+  sr.add("GPU Mode", GPUModeNames[mode]);
+  sr.add("GPU Kernels", kernelsExecuted);
+  sr.add("GPU FPS", (float)kernelsExecuted / (elapsedMS.count() / 1000.0));
 }
 
 // --------------------------------------------------------------------------------------------------------------------

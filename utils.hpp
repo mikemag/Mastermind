@@ -9,6 +9,8 @@
 #include <iostream>
 #include <locale>
 #include <sstream>
+#include <unordered_map>
+#include <vector>
 
 // This embodies my love/hate relationship with C++. Simple shit just isn't simple :(
 class comma_numpunct : public std::numpunct<char> {
@@ -72,3 +74,27 @@ template <bool enabled>
 std::ostream &operator<<(std::ostream &stream, const ExperimentCounter<enabled> &r) {
   return r.dump(stream);
 }
+
+// A way to record various stats about a game so we can write a nice csv of results.
+class StatsRecorder {
+ public:
+  std::vector<std::unordered_map<std::string, std::string>> stats;
+  size_t currentRun = 0;
+
+  void newRun() {
+    stats.emplace_back();
+    currentRun = stats.size() - 1;
+  }
+
+  template <typename T>
+  void add(const std::string &name, T value) {
+    std::stringstream ss;
+    ss << value;
+    stats[currentRun][name] = ss.str();
+  }
+
+  void add(const std::string &name, const std::string &value) { stats[currentRun][name] = value; }
+  void add(const std::string &name, const char *value) { stats[currentRun][name] = value; }
+
+  void writeStats(const std::string &filename);
+};

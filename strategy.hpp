@@ -38,8 +38,9 @@ class Strategy {
 
   uint32_t findSecret(Codeword<p, c> secret, int depth = 0);
 
-  virtual void printStats(std::chrono::duration<float, std::milli> elapsedMS){};
-  void printScoreCounters();
+  virtual void printStats(std::chrono::duration<float, std::milli> elapsedMS);
+  virtual void recordStats(StatsRecorder &sr, std::chrono::duration<float, std::milli> elapsedMS);
+
   static void resetScoreCounters() { scoreCounterGPU = scoreCounterCPU = 0; }
 
   // Output the strategy for visualization with GraphViz. Copy-and-paste the output file to sites

@@ -5,10 +5,48 @@
 
 #include "utils.hpp"
 
-std::string commaString(float f) {
-  std::locale comma_locale(std::locale(), new comma_numpunct());
-  std::stringstream ss;
+#include <fstream>
+#include <set>
+
+using namespace std;
+
+string commaString(float f) {
+  locale comma_locale(locale(), new comma_numpunct());
+  stringstream ss;
   ss.imbue(comma_locale);
-  ss << std::setprecision(4) << std::fixed << f;
+  ss << setprecision(4) << fixed << f;
   return ss.str();
+}
+
+void StatsRecorder::writeStats(const std::string &filename) {
+  // Some runs may include stats that others don't, so aggregate the headers from them all so every row as the same
+  // number of columns in the same order.
+  set<string> headers;
+  for (const auto &run : stats) {
+    for (const auto &s : run) {
+      headers.insert(s.first);
+    }
+  }
+
+  ofstream ss(filename);
+
+  // Write header row first
+  auto hit = headers.begin();
+  ss << *hit;
+  for (++hit; hit != headers.end(); ++hit) {
+    ss << "," << *hit;
+  }
+  ss << endl;
+
+  // One row per game
+  for (auto &run : stats) {
+    hit = headers.begin();
+    ss << run[*hit];
+    for (++hit; hit != headers.end(); ++hit) {
+      ss << "," << run[*hit];
+    }
+    ss << endl;
+  }
+
+  ss.close();
 }

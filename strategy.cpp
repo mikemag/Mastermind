@@ -145,9 +145,15 @@ Codeword<p, c> Strategy<p, c, log>::shortcutSmallSets() {
 }
 
 template <uint8_t p, uint8_t c, bool l>
-void Strategy<p, c, l>::printScoreCounters() {
+void Strategy<p, c, l>::printStats(std::chrono::duration<float, std::milli> elapsedMS) {
   cout << "Codeword comparisons: CPU = " << commaString(scoreCounterCPU) << ", GPU = " << commaString(scoreCounterGPU)
        << ", total = " << commaString(scoreCounterCPU + scoreCounterGPU) << endl;
+}
+
+template <uint8_t p, uint8_t c, bool l>
+void Strategy<p, c, l>::recordStats(StatsRecorder &sr, std::chrono::duration<float, std::milli> elapsedMS) {
+  sr.add("CPU Scores", scoreCounterCPU);
+  sr.add("GPU Score", scoreCounterGPU);
 }
 
 // See header for notes on how to use this output. Parameters for the graph are currently set to convey the point while
