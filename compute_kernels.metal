@@ -26,9 +26,8 @@ using namespace metal;
 // variation on determining if a word has a zero byte from https://graphics.stanford.edu/~seander/bithacks.html. This
 // part ends with using the GPU's SIMD popcount() to count the zero nibbles.
 //
-// Next, color counts come from the parallel buffer, and we can run over them and add up total hits per Knuth by
-// aggregating min color counts between the secret and guess. While I made a SIMD vesion of this for the CPU version,
-// I haven't tried to see if that's possible here.
+// Next, color counts come from the parallel buffer, and we can run over them and add up total hits, per Knuth[1], by
+// aggregating min color counts between the secret and guess.
 //
 // Templated w/ pinCount and explicitly specalized below. We lookup the correct version to use by name during startup.
 template <uint32_t pinCount>
@@ -40,12 +39,14 @@ uint8_t scoreCodewords(device const uint32_t &secret, device const uint4 &secret
   uint32_t r = ~((((v & 0x77777777u) + 0x77777777u) | v) | 0x77777777u);  // Yields 1 bit per matched pin
   uint8_t b = popcount(r);
 
-  int allHits = 0;
-  device const uint8_t *scc = (device const uint8_t *)&secretColors;
-  constant uint8_t *gcc = (constant uint8_t *)&guessColors;
-  for (int i = 0; i < 16; i++) {
-    allHits += min(scc[i], gcc[i]);
-  }
+  device const uchar4 *scc = (device const uchar4 *)&secretColors;
+  constant uchar4 *gcc = (constant uchar4 *)&guessColors;
+  uchar4 mins1 = min(scc[0], gcc[0]);
+  uchar4 mins2 = min(scc[1], gcc[1]);
+  uchar4 mins3 = min(scc[2], gcc[2]);
+  uchar4 mins4 = min(scc[3], gcc[3]);
+  uchar4 totals = (mins1 + mins2) + (mins3 + mins4);
+  int allHits = (totals.x + totals.y) + (totals.z + totals.w);
 
   // Given w = ah - b, simplify to i = bp - ((b - 1)b) / 2) + ah. I wonder if the compiler noticed that.
   // https://godbolt.org/z/ab5vTn -- gcc 10.2 notices and simplifies, clang 11.0.0 misses it.
@@ -126,8 +127,8 @@ kernel void findKnuthGuessWithFDKernel(
     device bool *remainingIsPossibleSolution [[buffer(BufferIndexRemainingIsPossibleSolution)]],
     device uint32_t *fullyDiscriminatingCodewords [[buffer(BufferIndexFullyDiscriminatingCodewords)]],
     threadgroup uint32_t *tgScoreCounts [[threadgroup(0)]], const uint tidGrid [[thread_position_in_grid]],
-    const uint tidGroup [[thread_position_in_threadgroup]],
-    const uint gridSize [[threads_per_grid]], const uint threadsPerSIMDGroup [[threads_per_simdgroup]]) {
+    const uint tidGroup [[thread_position_in_threadgroup]], const uint gridSize [[threads_per_grid]],
+    const uint threadsPerSIMDGroup [[threads_per_simdgroup]]) {
   // Total scores = (p * (p + 3)) / 2, but +1 for imperfect packing.
   constexpr int totalScores = ((pinCount * (pinCount + 3)) / 2) + 1;
   threadgroup uint32_t *scoreCounts = &tgScoreCounts[tidGroup * totalScores];
