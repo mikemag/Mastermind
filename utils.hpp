@@ -36,6 +36,38 @@ constexpr T constPow(T num, T pow) {
   return pow == 0 ? 1 : num * constPow(num, pow - 1);
 }
 
+// A way to record various stats about a game so we can write a nice csv of results.
+class StatsRecorder {
+ public:
+  std::vector<std::unordered_map<std::string, std::string>> runs;
+  size_t currentRun = 0;
+  std::unordered_map<std::string, std::string> all;
+
+  void newRun() {
+    runs.emplace_back();
+    currentRun = runs.size() - 1;
+  }
+
+  template <typename T>
+  void add(const std::string &name, T value) {
+    std::stringstream ss;
+    ss << value;
+    runs[currentRun][name] = ss.str();
+  }
+
+  void add(const std::string &name, const std::string &value) { runs[currentRun][name] = value; }
+  void add(const std::string &name, const char *value) { runs[currentRun][name] = value; }
+
+  template <typename T>
+  void addAll(const std::string &name, T value) {
+    std::stringstream ss;
+    ss << value;
+    all[name] = ss.str();
+  }
+
+  void writeStats(const std::string &filename);
+};
+
 // Counters for various experiments, no overhead if not enabled.
 template <bool enabled>
 class ExperimentCounter {
@@ -68,33 +100,11 @@ class ExperimentCounter {
     }
     return stream;
   }
+
+  void record(StatsRecorder &sr) { sr.add(name, value); }
 };
 
 template <bool enabled>
 std::ostream &operator<<(std::ostream &stream, const ExperimentCounter<enabled> &r) {
   return r.dump(stream);
 }
-
-// A way to record various stats about a game so we can write a nice csv of results.
-class StatsRecorder {
- public:
-  std::vector<std::unordered_map<std::string, std::string>> stats;
-  size_t currentRun = 0;
-
-  void newRun() {
-    stats.emplace_back();
-    currentRun = stats.size() - 1;
-  }
-
-  template <typename T>
-  void add(const std::string &name, T value) {
-    std::stringstream ss;
-    ss << value;
-    stats[currentRun][name] = ss.str();
-  }
-
-  void add(const std::string &name, const std::string &value) { stats[currentRun][name] = value; }
-  void add(const std::string &name, const char *value) { stats[currentRun][name] = value; }
-
-  void writeStats(const std::string &filename);
-};

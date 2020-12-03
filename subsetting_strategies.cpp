@@ -196,6 +196,9 @@ void StrategySubsettingGPU<p, c, l>::recordStats(StatsRecorder &sr,
   sr.add("GPU Mode", GPUModeNames[mode]);
   sr.add("GPU Kernels", kernelsExecuted);
   sr.add("GPU FPS", (float)kernelsExecuted / (elapsedMS.count() / 1000.0));
+  if (gpuInterface->gpuAvailable()) {
+    sr.add("GPU Name", gpuInterface->getGPUName());
+  }
 }
 
 // --------------------------------------------------------------------------------------------------------------------

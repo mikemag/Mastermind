@@ -112,3 +112,13 @@ uint32_t *GPUInterfaceWrapper::getFullyDiscriminatingCodewords(uint32_t &count) 
   return nullptr;
 #endif
 }
+
+
+std::string GPUInterfaceWrapper::getGPUName() {
+#ifdef __MM_GPU_METAL__
+  return [wrapped getGPUName].UTF8String;
+#else
+  assert(!"No GPU support!");
+  return "";
+#endif
+}

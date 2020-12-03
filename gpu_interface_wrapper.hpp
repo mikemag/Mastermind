@@ -39,4 +39,6 @@ class GPUInterfaceWrapper {
   bool* getRemainingIsPossibleSolution();
 
   uint32_t* getFullyDiscriminatingCodewords(uint32_t& count);
+
+  std::string getGPUName();
 };

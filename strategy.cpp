@@ -148,12 +148,38 @@ template <uint8_t p, uint8_t c, bool l>
 void Strategy<p, c, l>::printStats(std::chrono::duration<float, std::milli> elapsedMS) {
   cout << "Codeword comparisons: CPU = " << commaString(scoreCounterCPU) << ", GPU = " << commaString(scoreCounterGPU)
        << ", total = " << commaString(scoreCounterCPU + scoreCounterGPU) << endl;
+
+  if (enableTwoPSMetrics) {
+    cout << twoPSShortcuts << endl;
+  }
+
+  if (enableSmallPSMetrics) {
+    cout << smallPSHighShortcuts << endl;
+    cout << smallPSHighWasted << endl;
+    cout << smallPSHighScores << endl;
+    cout << smallPSInnerShortcuts << endl;
+    cout << smallPSInnerWasted << endl;
+    cout << smallPSInnerScoresSkipped << endl;
+  }
 }
 
 template <uint8_t p, uint8_t c, bool l>
 void Strategy<p, c, l>::recordStats(StatsRecorder &sr, std::chrono::duration<float, std::milli> elapsedMS) {
   sr.add("CPU Scores", scoreCounterCPU);
   sr.add("GPU Score", scoreCounterGPU);
+
+  if (enableTwoPSMetrics) {
+    twoPSShortcuts.record(sr);
+  }
+
+  if (enableSmallPSMetrics) {
+    smallPSHighShortcuts.record(sr);
+    smallPSHighWasted.record(sr);
+    smallPSHighScores.record(sr);
+    smallPSInnerShortcuts.record(sr);
+    smallPSInnerWasted.record(sr);
+    smallPSInnerScoresSkipped.record(sr);
+  }
 }
 
 // See header for notes on how to use this output. Parameters for the graph are currently set to convey the point while
@@ -204,21 +230,5 @@ void Strategy<p, c, l>::dumpChildren(ofstream &graphStream) {
   for (const auto &m : nextMoves) {
     m.second->dump(graphStream);
     graphStream << (uint64_t)this << " -> " << (uint64_t)(m.second.get()) << " [label=\"" << m.first << "\"]" << endl;
-  }
-}
-
-template <uint8_t p, uint8_t c, bool l>
-void Strategy<p, c, l>::dumpExperimentStats() {
-  if (enableTwoPSMetrics) {
-    cout << twoPSShortcuts << endl;
-  }
-
-  if (enableSmallPSMetrics) {
-    cout << smallPSHighShortcuts << endl;
-    cout << smallPSHighWasted << endl;
-    cout << smallPSHighScores << endl;
-    cout << smallPSInnerShortcuts << endl;
-    cout << smallPSInnerWasted << endl;
-    cout << smallPSInnerScoresSkipped << endl;
   }
 }

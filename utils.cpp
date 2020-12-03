@@ -19,10 +19,12 @@ string commaString(float f) {
 }
 
 void StatsRecorder::writeStats(const std::string &filename) {
+  cout << "Writing all game stats to " << filename << endl;
+
   // Some runs may include stats that others don't, so aggregate the headers from them all so every row as the same
   // number of columns in the same order.
   set<string> headers;
-  for (const auto &run : stats) {
+  for (const auto &run : runs) {
     for (const auto &s : run) {
       headers.insert(s.first);
     }
@@ -36,14 +38,20 @@ void StatsRecorder::writeStats(const std::string &filename) {
   for (++hit; hit != headers.end(); ++hit) {
     ss << "," << *hit;
   }
+  for (const auto& a : all) {
+    ss << "," << a.first;
+  }
   ss << endl;
 
   // One row per game
-  for (auto &run : stats) {
+  for (auto &run : runs) {
     hit = headers.begin();
     ss << run[*hit];
     for (++hit; hit != headers.end(); ++hit) {
       ss << "," << run[*hit];
+    }
+    for (const auto& a : all) {
+      ss << "," << a.second;
     }
     ss << endl;
   }

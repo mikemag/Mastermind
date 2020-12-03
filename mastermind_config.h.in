@@ -1,0 +1,8 @@
+// Copyright (c) Michael M. Magruder (https://github.com/mikemag)
+//
+// This source code is licensed under the MIT license found in the
+// LICENSE file in the root directory of this source tree.
+
+#define MASTERMIND_GIT_BRANCH "@GIT_BRANCH@"
+#define MASTERMIND_GIT_COMMIT_HASH "@GIT_COMMIT_HASH@"
+#define MASTERMIND_GIT_COMMIT_DATE "@GIT_COMMIT_DATE@"

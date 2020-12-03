@@ -53,8 +53,6 @@ class Strategy {
   // in a large JPG.
   void dump();
 
-  void dumpExperimentStats();
-
  protected:
   // These extra members are to allow us to build the strategy lazily, as we play games using any algorithm. nb: these
   // are copies.
@@ -87,13 +85,13 @@ class Strategy {
 
   // Optimization metrics -- measuring experimentation
   constexpr static bool enableTwoPSMetrics = true;
-  static inline auto twoPSShortcuts = ExperimentCounter<enableTwoPSMetrics>("Size 2 PS Shortcuts");
+  static inline auto twoPSShortcuts = ExperimentCounter<enableTwoPSMetrics>("Exp: Size 2 PS Shortcuts");
   constexpr static bool enableSmallPSMetrics = true;
-  static inline auto smallPSHighShortcuts = ExperimentCounter<enableSmallPSMetrics>("Small PS High Shortcuts");
-  static inline auto smallPSHighWasted = ExperimentCounter<enableSmallPSMetrics>("Small PS High Wasted");
-  static inline auto smallPSHighScores = ExperimentCounter<enableSmallPSMetrics>("Small PS High Scores");
-  static inline auto smallPSInnerShortcuts = ExperimentCounter<enableSmallPSMetrics>("Small PS Inner Shortcuts");
-  static inline auto smallPSInnerWasted = ExperimentCounter<enableSmallPSMetrics>("Small PS Inner Wasted");
+  static inline auto smallPSHighShortcuts = ExperimentCounter<enableSmallPSMetrics>("Exp: Small PS High Shortcuts");
+  static inline auto smallPSHighWasted = ExperimentCounter<enableSmallPSMetrics>("Exp: Small PS High Wasted");
+  static inline auto smallPSHighScores = ExperimentCounter<enableSmallPSMetrics>("Exp: Small PS High Scores");
+  static inline auto smallPSInnerShortcuts = ExperimentCounter<enableSmallPSMetrics>("Exp: Small PS Inner Shortcuts");
+  static inline auto smallPSInnerWasted = ExperimentCounter<enableSmallPSMetrics>("Exp: Small PS Inner Wasted");
   static inline auto smallPSInnerScoresSkipped =
       ExperimentCounter<enableSmallPSMetrics>("Small PS Inner Scores Skipped");
 

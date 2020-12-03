@@ -221,4 +221,8 @@
   return (uint32_t *)_mBufferFullyDiscriminatingCodewords.contents;
 }
 
+- (NSString*)getGPUName {
+  return _mDevice.name;
+}
+
 @end

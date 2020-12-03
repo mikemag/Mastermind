@@ -26,6 +26,8 @@ NS_ASSUME_NONNULL_BEGIN
 - (bool *)getRemainingIsPossibleSolution;
 
 - (uint32_t *)getFullyDiscriminatingCodewords:(uint32_t *)count;
+
+- (NSString*)getGPUName;
 @end
 
 NS_ASSUME_NONNULL_END

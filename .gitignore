@@ -149,3 +149,4 @@ DerivedData/
 # End of https://www.toptal.com/developers/gitignore/api/xcode
 
 .DS_Store
+mastermind_config.h
