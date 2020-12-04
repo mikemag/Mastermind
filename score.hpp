@@ -15,7 +15,7 @@ class Score {
  public:
   uint8_t result;
 
-  constexpr Score() { result = 0xFFu; }
+  constexpr Score() : result(0xFFu) {}
   constexpr Score(uint8_t b, uint8_t w) noexcept : result((b << 4u) | w) {}
 
   bool isInvalid() const { return result == 0xFFu; }

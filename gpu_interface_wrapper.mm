@@ -4,6 +4,7 @@
 // LICENSE file in the root directory of this source tree.
 
 #include "gpu_interface_wrapper.hpp"
+#include <cassert>
 #include <iostream>
 #include <string>
 

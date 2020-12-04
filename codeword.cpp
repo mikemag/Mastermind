@@ -5,6 +5,7 @@
 
 #include <immintrin.h>  // For SSE/AVX support
 
+#include <bit>
 #include <iomanip>
 
 #include "score.hpp"

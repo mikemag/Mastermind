@@ -181,6 +181,8 @@ shared_ptr<Strategy<pinCount, colorCount, log>> makeStrategyWithAlgo(Algo algori
       return make_shared<StrategyExpectedSize<pinCount, colorCount, log>>(mode);
     case Entropy:
       return make_shared<StrategyEntropy<pinCount, colorCount, log>>(mode);
+    default:
+      return nullptr;
   }
 };
 
