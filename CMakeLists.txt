@@ -33,8 +33,7 @@ configure_file(
 )
 
 add_executable(mastermind
-        gpu_interface_wrapper.hpp
-        gpu_interface_wrapper.mm
+        gpu_interface_wrapper.cpp
         main.cpp
         score.cpp
         utils.hpp

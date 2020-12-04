@@ -4,9 +4,12 @@
 // LICENSE file in the root directory of this source tree.
 
 #include "gpu_interface_wrapper.hpp"
-#import "gpu_interface.h"
 #include <iostream>
 #include <string>
+
+#ifdef __MM_GPU_METAL__
+#import "gpu_interface.h"
+#endif
 
 GPUInterfaceWrapper::GPUInterfaceWrapper(unsigned int pinCount, unsigned int totalCodewords, const char *kernelName) {
 #ifdef __MM_GPU_METAL__
