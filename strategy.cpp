@@ -23,7 +23,7 @@ uint32_t Strategy<p, c, log>::findSecret(Codeword<p, c> secret, int depth) {
 
   // Play a guess and see how we did.
   Score r = secret.score(guess);
-  scoreCounterCPU++;
+  rootData->scoreCounterCPU++;
   depth += 1;
   if (log) {
     cout << endl << "Tried guess " << guess << " against secret " << secret << " => " << r << endl;
@@ -62,7 +62,7 @@ uint32_t Strategy<p, c, log>::findSecret(Codeword<p, c> secret, int depth) {
     if (log) {
       cout << "Only two solutions remain, selecting the first one blindly: " << nextGuess << endl;
     }
-    ++twoPSShortcuts;
+    ++rootData->twoPSShortcuts;
   } else if (enableSmallPSShortcut && possibleSolutions.size() <= totalScores) {
     nextGuess = shortcutSmallSets();
   } else {
@@ -86,11 +86,9 @@ void Strategy<p, c, log>::removeImpossibleSolutions(Score r) {
   if (log) {
     cout << "Removing inconsistent possibilities... ";
   }
+  rootData->scoreCounterCPU += possibleSolutions.size();
   possibleSolutions.erase(remove_if(possibleSolutions.begin(), possibleSolutions.end(),
-                                    [&](Codeword<p, c> codeword) {
-                                      scoreCounterCPU++;
-                                      return codeword.score(guess) != r;
-                                    }),
+                                    [&](Codeword<p, c> codeword) { return codeword.score(guess) != r; }),
                           possibleSolutions.end());
   if (log) {
     cout << possibleSolutions.size() << " remain." << endl;
@@ -122,8 +120,8 @@ Codeword<p, c> Strategy<p, c, log>::shortcutSmallSets() {
       Score r = psa.score(psb);
       subsetSizes[r.result] = 1;
     }
-    smallPSHighScores += possibleSolutions.size();
-    scoreCounterCPU += possibleSolutions.size();
+    rootData->smallPSHighScores += possibleSolutions.size();
+    rootData->scoreCounterCPU += possibleSolutions.size();
     int totalSubsets = 0;
     for (auto s : subsetSizes) {
       if (s > 0) {
@@ -134,51 +132,52 @@ Codeword<p, c> Strategy<p, c, log>::shortcutSmallSets() {
       if (log) {
         cout << "Selecting fully discriminating guess from PS: " << psa << ", subsets: " << totalSubsets << endl;
       }
-      ++smallPSHighShortcuts;
+      ++rootData->smallPSHighShortcuts;
       return psa;
     }
   }
 
   // Didn't find a good candidate, fallback
-  ++smallPSHighWasted;
+  ++rootData->smallPSHighWasted;
   return selectNextGuess();
 }
 
 template <uint8_t p, uint8_t c, bool l>
 void Strategy<p, c, l>::printStats(std::chrono::duration<float, std::milli> elapsedMS) {
-  cout << "Codeword comparisons: CPU = " << commaString(scoreCounterCPU) << ", GPU = " << commaString(scoreCounterGPU)
-       << ", total = " << commaString(scoreCounterCPU + scoreCounterGPU) << endl;
+  cout << "Codeword comparisons: CPU = " << commaString(rootData->scoreCounterCPU)
+       << ", GPU = " << commaString(rootData->scoreCounterGPU)
+       << ", total = " << commaString(rootData->scoreCounterCPU + rootData->scoreCounterGPU) << endl;
 
-  if (enableTwoPSMetrics) {
-    cout << twoPSShortcuts << endl;
+  if (rootData->enableTwoPSMetrics) {
+    cout << rootData->twoPSShortcuts << endl;
   }
 
-  if (enableSmallPSMetrics) {
-    cout << smallPSHighShortcuts << endl;
-    cout << smallPSHighWasted << endl;
-    cout << smallPSHighScores << endl;
-    cout << smallPSInnerShortcuts << endl;
-    cout << smallPSInnerWasted << endl;
-    cout << smallPSInnerScoresSkipped << endl;
+  if (rootData->enableSmallPSMetrics) {
+    cout << rootData->smallPSHighShortcuts << endl;
+    cout << rootData->smallPSHighWasted << endl;
+    cout << rootData->smallPSHighScores << endl;
+    cout << rootData->smallPSInnerShortcuts << endl;
+    cout << rootData->smallPSInnerWasted << endl;
+    cout << rootData->smallPSInnerScoresSkipped << endl;
   }
 }
 
 template <uint8_t p, uint8_t c, bool l>
 void Strategy<p, c, l>::recordStats(StatsRecorder &sr, std::chrono::duration<float, std::milli> elapsedMS) {
-  sr.add("CPU Scores", scoreCounterCPU);
-  sr.add("GPU Score", scoreCounterGPU);
+  sr.add("CPU Scores", rootData->scoreCounterCPU);
+  sr.add("GPU Scores", rootData->scoreCounterGPU);
 
-  if (enableTwoPSMetrics) {
-    twoPSShortcuts.record(sr);
+  if (rootData->enableTwoPSMetrics) {
+    rootData->twoPSShortcuts.record(sr);
   }
 
-  if (enableSmallPSMetrics) {
-    smallPSHighShortcuts.record(sr);
-    smallPSHighWasted.record(sr);
-    smallPSHighScores.record(sr);
-    smallPSInnerShortcuts.record(sr);
-    smallPSInnerWasted.record(sr);
-    smallPSInnerScoresSkipped.record(sr);
+  if (rootData->enableSmallPSMetrics) {
+    rootData->smallPSHighShortcuts.record(sr);
+    rootData->smallPSHighWasted.record(sr);
+    rootData->smallPSHighScores.record(sr);
+    rootData->smallPSInnerShortcuts.record(sr);
+    rootData->smallPSInnerWasted.record(sr);
+    rootData->smallPSInnerScoresSkipped.record(sr);
   }
 }
 

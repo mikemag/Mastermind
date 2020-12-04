@@ -5,6 +5,15 @@
 
 #pragma once
 
+enum Algo {
+  FirstOne,      // Pick the first of the remaining choices.
+  Random,        // Pick any of the remaining choices.
+  Knuth,         // Pick the one that will eliminate the most remaining choices.
+  MostParts,     // Maximize the number of scores at each round.
+  ExpectedSize,  // Minimize the expected size of the remaining choices.
+  Entropy,       // Pick the maximum entropy guess.
+};
+
 enum ComputeKernelBufferIndices {
   BufferIndexAllCodewords = 0,
   BufferIndexAllCodewordsColors = 1,

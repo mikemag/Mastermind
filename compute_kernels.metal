@@ -85,39 +85,8 @@ bool computeSubsetSizes(int totalScores, threadgroup uint32_t *scoreCounts, devi
 //
 // Finally, there's threadgroup memory for each thread with enough room for all of the intermediate subset sizes.
 // This is important: the first version held this in threadlocal memory and occupancy was terrible.
-template <uint32_t pinCount>
-kernel void findKnuthGuessKernel(device const uint32_t *allCodewords [[buffer(BufferIndexAllCodewords)]],
-                                 device const uint4 *allCodewordsColors [[buffer(BufferIndexAllCodewordsColors)]],
-                                 constant uint32_t &possibleSolutionsCount
-                                 [[buffer(BufferIndexPossibleSolutionsCount)]],
-                                 constant uint32_t *possibleSolutions [[buffer(BufferIndexPossibleSolutions)]],
-                                 constant uint4 *possibleSolutionsColors [[buffer(BufferIndexPossibleSolutionsColors)]],
-                                 device uint32_t *scores [[buffer(BufferIndexScores)]],
-                                 device bool *remainingIsPossibleSolution
-                                 [[buffer(BufferIndexRemainingIsPossibleSolution)]],
-                                 threadgroup uint32_t *tgScoreCounts [[threadgroup(0)]],
-                                 const uint tidGrid [[thread_position_in_grid]],
-                                 const uint tidGroup [[thread_position_in_threadgroup]]) {
-  // Total scores = (p * (p + 3)) / 2, but +1 for imperfect packing.
-  constexpr int totalScores = ((pinCount * (pinCount + 3)) / 2) + 1;
-  threadgroup uint32_t *scoreCounts = &tgScoreCounts[tidGroup * totalScores];
-
-  bool isPossibleSolution =
-      computeSubsetSizes<pinCount>(totalScores, scoreCounts, allCodewords[tidGrid], allCodewordsColors[tidGrid],
-                                   possibleSolutionsCount, possibleSolutions, possibleSolutionsColors);
-
-  uint32_t largestSubsetSize = 0;
-  for (int i = 0; i < totalScores; i++) {
-    largestSubsetSize = max(largestSubsetSize, scoreCounts[i]);
-  }
-  scores[tidGrid] = possibleSolutionsCount - largestSubsetSize;
-  remainingIsPossibleSolution[tidGrid] = isPossibleSolution;
-}
-
-// TODO: this version includes the optimization for small PS sets and fully discriminating guesses. Currently hacked
-//  in for testing purposes only.
-template <uint32_t pinCount>
-kernel void findKnuthGuessWithFDKernel(
+template <uint32_t pinCount, Algo algo>
+kernel void subsettingAlgosKernel(
     device const uint32_t *allCodewords [[buffer(BufferIndexAllCodewords)]],
     device const uint4 *allCodewordsColors [[buffer(BufferIndexAllCodewordsColors)]],
     constant uint32_t &possibleSolutionsCount [[buffer(BufferIndexPossibleSolutionsCount)]],
@@ -135,14 +104,45 @@ kernel void findKnuthGuessWithFDKernel(
   bool isPossibleSolution =
       computeSubsetSizes<pinCount>(totalScores, scoreCounts, allCodewords[tidGrid], allCodewordsColors[tidGrid],
                                    possibleSolutionsCount, possibleSolutions, possibleSolutionsColors);
+  remainingIsPossibleSolution[tidGrid] = isPossibleSolution;
 
   uint32_t largestSubsetSize = 0;
   uint32_t totalUsedSubsets = 0;
+  float entropySum = 0.0;
+  float expectedSize = 0.0;
   for (int i = 0; i < totalScores; i++) {
-    largestSubsetSize = max(largestSubsetSize, scoreCounts[i]);
     if (scoreCounts[i] > 0) {
       totalUsedSubsets++;
+      switch (algo) {
+        case Knuth:
+          largestSubsetSize = max(largestSubsetSize, scoreCounts[i]);
+          break;
+        case MostParts:
+          // Already done
+          break;
+        case ExpectedSize:
+          expectedSize += ((float)scoreCounts[i] * (float)scoreCounts[i]) / possibleSolutionsCount;
+          break;
+        case Entropy:
+          float pi = (float)scoreCounts[i] / possibleSolutionsCount;
+          entropySum -= pi * log(pi);
+          break;
+      }
     }
+  }
+  switch (algo) {
+    case Knuth:
+      scores[tidGrid] = possibleSolutionsCount - largestSubsetSize;
+      break;
+    case MostParts:
+      scores[tidGrid] = totalUsedSubsets;
+      break;
+    case ExpectedSize:
+      scores[tidGrid] = (uint32_t)round(expectedSize * 1'000'000.0) * -1;  // 9 digits of precision
+      break;
+    case Entropy:
+      scores[tidGrid] = round(entropySum * 1'000'000'000.0);  // 9 digits of precision
+      break;
   }
 
   // If we find some guesses which are fully descriminating, we want to pick the first one lexically to play. tidGrid is
@@ -156,223 +156,120 @@ kernel void findKnuthGuessWithFDKernel(
       fullyDiscriminatingCodewords[tidGrid / threadsPerSIMDGroup] = d;
     }
   }
-
-  scores[tidGrid] = possibleSolutionsCount - largestSubsetSize;
-  remainingIsPossibleSolution[tidGrid] = isPossibleSolution;
-}
-
-// Compute kernel for the Most Parts strategy
-template <uint32_t pinCount>
-kernel void findMostPartsGuessKernel(
-    device const uint32_t *allCodewords [[buffer(BufferIndexAllCodewords)]],
-    device const uint4 *allCodewordsColors [[buffer(BufferIndexAllCodewordsColors)]],
-    constant uint32_t &possibleSolutionsCount [[buffer(BufferIndexPossibleSolutionsCount)]],
-    constant uint32_t *possibleSolutions [[buffer(BufferIndexPossibleSolutions)]],
-    constant uint4 *possibleSolutionsColors [[buffer(BufferIndexPossibleSolutionsColors)]],
-    device uint32_t *scores [[buffer(BufferIndexScores)]],
-    device bool *remainingIsPossibleSolution [[buffer(BufferIndexRemainingIsPossibleSolution)]],
-    threadgroup uint32_t *tgScoreCounts [[threadgroup(0)]], const uint tidGrid [[thread_position_in_grid]],
-    const uint tidGroup [[thread_position_in_threadgroup]]) {
-  // Total scores = (p * (p + 3)) / 2, but +1 for imperfect packing.
-  constexpr int totalScores = ((pinCount * (pinCount + 3)) / 2) + 1;
-  threadgroup uint32_t *scoreCounts = &tgScoreCounts[tidGroup * totalScores];
-
-  bool isPossibleSolution =
-      computeSubsetSizes<pinCount>(totalScores, scoreCounts, allCodewords[tidGrid], allCodewordsColors[tidGrid],
-                                   possibleSolutionsCount, possibleSolutions, possibleSolutionsColors);
-
-  uint32_t totalUsedSubsets = 0;
-  for (int i = 0; i < totalScores; i++) {
-    if (scoreCounts[i] > 0) {
-      totalUsedSubsets++;
-    }
-  }
-  scores[tidGrid] = totalUsedSubsets;
-  remainingIsPossibleSolution[tidGrid] = isPossibleSolution;
-}
-
-// Compute kernel for the Entropy strategy
-template <uint32_t pinCount>
-kernel void findEntropyGuessKernel(
-    device const uint32_t *allCodewords [[buffer(BufferIndexAllCodewords)]],
-    device const uint4 *allCodewordsColors [[buffer(BufferIndexAllCodewordsColors)]],
-    constant uint32_t &possibleSolutionsCount [[buffer(BufferIndexPossibleSolutionsCount)]],
-    constant uint32_t *possibleSolutions [[buffer(BufferIndexPossibleSolutions)]],
-    constant uint4 *possibleSolutionsColors [[buffer(BufferIndexPossibleSolutionsColors)]],
-    device uint32_t *scores [[buffer(BufferIndexScores)]],
-    device bool *remainingIsPossibleSolution [[buffer(BufferIndexRemainingIsPossibleSolution)]],
-    threadgroup uint32_t *tgScoreCounts [[threadgroup(0)]], const uint tidGrid [[thread_position_in_grid]],
-    const uint tidGroup [[thread_position_in_threadgroup]]) {
-  // Total scores = (p * (p + 3)) / 2, but +1 for imperfect packing.
-  constexpr int totalScores = ((pinCount * (pinCount + 3)) / 2) + 1;
-  threadgroup uint32_t *scoreCounts = &tgScoreCounts[tidGroup * totalScores];
-
-  bool isPossibleSolution =
-      computeSubsetSizes<pinCount>(totalScores, scoreCounts, allCodewords[tidGrid], allCodewordsColors[tidGrid],
-                                   possibleSolutionsCount, possibleSolutions, possibleSolutionsColors);
-
-  float entropySum = 0.0;
-  for (int i = 0; i < totalScores; i++) {
-    if (scoreCounts[i] > 0) {
-      float pi = (float)scoreCounts[i] / possibleSolutionsCount;
-      entropySum -= pi * log(pi);
-    }
-  }
-  scores[tidGrid] = round(entropySum * 1'000'000'000.0);  // 9 digits of precision
-  remainingIsPossibleSolution[tidGrid] = isPossibleSolution;
-}
-
-// Compute kernel for the Expected Size strategy
-template <uint32_t pinCount>
-kernel void findExpectedSizeGuessKernel(
-    device const uint32_t *allCodewords [[buffer(BufferIndexAllCodewords)]],
-    device const uint4 *allCodewordsColors [[buffer(BufferIndexAllCodewordsColors)]],
-    constant uint32_t &possibleSolutionsCount [[buffer(BufferIndexPossibleSolutionsCount)]],
-    constant uint32_t *possibleSolutions [[buffer(BufferIndexPossibleSolutions)]],
-    constant uint4 *possibleSolutionsColors [[buffer(BufferIndexPossibleSolutionsColors)]],
-    device uint32_t *scores [[buffer(BufferIndexScores)]],
-    device bool *remainingIsPossibleSolution [[buffer(BufferIndexRemainingIsPossibleSolution)]],
-    threadgroup uint32_t *tgScoreCounts [[threadgroup(0)]], const uint tidGrid [[thread_position_in_grid]],
-    const uint tidGroup [[thread_position_in_threadgroup]]) {
-  // Total scores = (p * (p + 3)) / 2, but +1 for imperfect packing.
-  constexpr int totalScores = ((pinCount * (pinCount + 3)) / 2) + 1;
-  threadgroup uint32_t *scoreCounts = &tgScoreCounts[tidGroup * totalScores];
-
-  bool isPossibleSolution =
-      computeSubsetSizes<pinCount>(totalScores, scoreCounts, allCodewords[tidGrid], allCodewordsColors[tidGrid],
-                                   possibleSolutionsCount, possibleSolutions, possibleSolutionsColors);
-
-  float expectedSize = 0.0;
-  for (int i = 0; i < totalScores; i++) {
-    if (scoreCounts[i] > 0) {
-      expectedSize += ((float)scoreCounts[i] * (float)scoreCounts[i]) / possibleSolutionsCount;
-    }
-  }
-
-  scores[tidGrid] = (uint32_t)round(expectedSize * 1'000'000.0) * -1;  // 9 digits of precision
-  remainingIsPossibleSolution[tidGrid] = isPossibleSolution;
 }
 
 // Explicit specializations Knuth
-template [[host_name("findKnuthGuessKernel_2")]] kernel void findKnuthGuessKernel<2>(
-    device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
-    device uint32_t *, device bool *, threadgroup uint32_t *, const uint, const uint);
-
-template [[host_name("findKnuthGuessKernel_3")]] kernel void findKnuthGuessKernel<3>(
-    device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
-    device uint32_t *, device bool *, threadgroup uint32_t *, const uint, const uint);
-
-template [[host_name("findKnuthGuessKernel_4_orig")]] kernel void findKnuthGuessKernel<4>(
-    device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
-    device uint32_t *, device bool *, threadgroup uint32_t *, const uint, const uint);
-
-template [[host_name("findKnuthGuessKernel_4")]] kernel void findKnuthGuessWithFDKernel<4>(
+template [[host_name("findKnuthGuessKernel_2")]] kernel void subsettingAlgosKernel<2, Knuth>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findKnuthGuessKernel_5_orig")]] kernel void findKnuthGuessKernel<5>(
-    device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
-    device uint32_t *, device bool *, threadgroup uint32_t *, const uint, const uint);
-
-template [[host_name("findKnuthGuessKernel_5")]] kernel void findKnuthGuessWithFDKernel<5>(
+template [[host_name("findKnuthGuessKernel_3")]] kernel void subsettingAlgosKernel<3, Knuth>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findKnuthGuessKernel_6")]] kernel void findKnuthGuessKernel<6>(
+template [[host_name("findKnuthGuessKernel_4")]] kernel void subsettingAlgosKernel<4, Knuth>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
-    device uint32_t *, device bool *, threadgroup uint32_t *, const uint, const uint);
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findKnuthGuessKernel_7")]] kernel void findKnuthGuessKernel<7>(
+template [[host_name("findKnuthGuessKernel_5")]] kernel void subsettingAlgosKernel<5, Knuth>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
-    device uint32_t *, device bool *, threadgroup uint32_t *, const uint, const uint);
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findKnuthGuessKernel_8")]] kernel void findKnuthGuessKernel<8>(
+template [[host_name("findKnuthGuessKernel_6")]] kernel void subsettingAlgosKernel<6, Knuth>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
-    device uint32_t *, device bool *, threadgroup uint32_t *, const uint, const uint);
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
+
+template [[host_name("findKnuthGuessKernel_7")]] kernel void subsettingAlgosKernel<7, Knuth>(
+    device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
+
+template [[host_name("findKnuthGuessKernel_8")]] kernel void subsettingAlgosKernel<8, Knuth>(
+    device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
 // Explicit specializations Most Parts
-template [[host_name("findMostPartsGuessKernel_2")]] kernel void findMostPartsGuessKernel<2>(
+template [[host_name("findMostPartsGuessKernel_2")]] kernel void subsettingAlgosKernel<2, MostParts>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
-    device uint32_t *, device bool *, threadgroup uint32_t *, const uint, const uint);
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findMostPartsGuessKernel_3")]] kernel void findMostPartsGuessKernel<3>(
+template [[host_name("findMostPartsGuessKernel_3")]] kernel void subsettingAlgosKernel<3, MostParts>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
-    device uint32_t *, device bool *, threadgroup uint32_t *, const uint, const uint);
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findMostPartsGuessKernel_4")]] kernel void findMostPartsGuessKernel<4>(
+template [[host_name("findMostPartsGuessKernel_4")]] kernel void subsettingAlgosKernel<4, MostParts>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
-    device uint32_t *, device bool *, threadgroup uint32_t *, const uint, const uint);
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findMostPartsGuessKernel_5")]] kernel void findMostPartsGuessKernel<5>(
+template [[host_name("findMostPartsGuessKernel_5")]] kernel void subsettingAlgosKernel<5, MostParts>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
-    device uint32_t *, device bool *, threadgroup uint32_t *, const uint, const uint);
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findMostPartsGuessKernel_6")]] kernel void findMostPartsGuessKernel<6>(
+template [[host_name("findMostPartsGuessKernel_6")]] kernel void subsettingAlgosKernel<6, MostParts>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
-    device uint32_t *, device bool *, threadgroup uint32_t *, const uint, const uint);
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findMostPartsGuessKernel_7")]] kernel void findMostPartsGuessKernel<7>(
+template [[host_name("findMostPartsGuessKernel_7")]] kernel void subsettingAlgosKernel<7, MostParts>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
-    device uint32_t *, device bool *, threadgroup uint32_t *, const uint, const uint);
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findMostPartsGuessKernel_8")]] kernel void findMostPartsGuessKernel<8>(
+template [[host_name("findMostPartsGuessKernel_8")]] kernel void subsettingAlgosKernel<8, MostParts>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
-    device uint32_t *, device bool *, threadgroup uint32_t *, const uint, const uint);
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
 // Explicit specializations Entropy
-template [[host_name("findEntropyGuessKernel_2")]] kernel void findEntropyGuessKernel<2>(
+template [[host_name("findEntropyGuessKernel_2")]] kernel void subsettingAlgosKernel<2, Entropy>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
-    device uint32_t *, device bool *, threadgroup uint32_t *, const uint, const uint);
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findEntropyGuessKernel_3")]] kernel void findEntropyGuessKernel<3>(
+template [[host_name("findEntropyGuessKernel_3")]] kernel void subsettingAlgosKernel<3, Entropy>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
-    device uint32_t *, device bool *, threadgroup uint32_t *, const uint, const uint);
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findEntropyGuessKernel_4")]] kernel void findEntropyGuessKernel<4>(
+template [[host_name("findEntropyGuessKernel_4")]] kernel void subsettingAlgosKernel<4, Entropy>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
-    device uint32_t *, device bool *, threadgroup uint32_t *, const uint, const uint);
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findEntropyGuessKernel_5")]] kernel void findEntropyGuessKernel<5>(
+template [[host_name("findEntropyGuessKernel_5")]] kernel void subsettingAlgosKernel<5, Entropy>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
-    device uint32_t *, device bool *, threadgroup uint32_t *, const uint, const uint);
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findEntropyGuessKernel_6")]] kernel void findEntropyGuessKernel<6>(
+template [[host_name("findEntropyGuessKernel_6")]] kernel void subsettingAlgosKernel<6, Entropy>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
-    device uint32_t *, device bool *, threadgroup uint32_t *, const uint, const uint);
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findEntropyGuessKernel_7")]] kernel void findEntropyGuessKernel<7>(
+template [[host_name("findEntropyGuessKernel_7")]] kernel void subsettingAlgosKernel<7, Entropy>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
-    device uint32_t *, device bool *, threadgroup uint32_t *, const uint, const uint);
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findEntropyGuessKernel_8")]] kernel void findEntropyGuessKernel<8>(
+template [[host_name("findEntropyGuessKernel_8")]] kernel void subsettingAlgosKernel<8, Entropy>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
-    device uint32_t *, device bool *, threadgroup uint32_t *, const uint, const uint);
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
 // Explicit specializations Expected Size
-template [[host_name("findExpectedSizeGuessKernel_2")]] kernel void findExpectedSizeGuessKernel<2>(
+template [[host_name("findExpectedSizeGuessKernel_2")]] kernel void subsettingAlgosKernel<2, ExpectedSize>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
-    device uint32_t *, device bool *, threadgroup uint32_t *, const uint, const uint);
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findExpectedSizeGuessKernel_3")]] kernel void findExpectedSizeGuessKernel<3>(
+template [[host_name("findExpectedSizeGuessKernel_3")]] kernel void subsettingAlgosKernel<3, ExpectedSize>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
-    device uint32_t *, device bool *, threadgroup uint32_t *, const uint, const uint);
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findExpectedSizeGuessKernel_4")]] kernel void findExpectedSizeGuessKernel<4>(
+template [[host_name("findExpectedSizeGuessKernel_4")]] kernel void subsettingAlgosKernel<4, ExpectedSize>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
-    device uint32_t *, device bool *, threadgroup uint32_t *, const uint, const uint);
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findExpectedSizeGuessKernel_5")]] kernel void findExpectedSizeGuessKernel<5>(
+template [[host_name("findExpectedSizeGuessKernel_5")]] kernel void subsettingAlgosKernel<5, ExpectedSize>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
-    device uint32_t *, device bool *, threadgroup uint32_t *, const uint, const uint);
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findExpectedSizeGuessKernel_6")]] kernel void findExpectedSizeGuessKernel<6>(
+template [[host_name("findExpectedSizeGuessKernel_6")]] kernel void subsettingAlgosKernel<6, ExpectedSize>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
-    device uint32_t *, device bool *, threadgroup uint32_t *, const uint, const uint);
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findExpectedSizeGuessKernel_7")]] kernel void findExpectedSizeGuessKernel<7>(
+template [[host_name("findExpectedSizeGuessKernel_7")]] kernel void subsettingAlgosKernel<7, ExpectedSize>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
-    device uint32_t *, device bool *, threadgroup uint32_t *, const uint, const uint);
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findExpectedSizeGuessKernel_8")]] kernel void findExpectedSizeGuessKernel<8>(
+template [[host_name("findExpectedSizeGuessKernel_8")]] kernel void subsettingAlgosKernel<8, ExpectedSize>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
-    device uint32_t *, device bool *, threadgroup uint32_t *, const uint, const uint);
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);

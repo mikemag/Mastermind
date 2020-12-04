@@ -27,7 +27,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (uint32_t *)getFullyDiscriminatingCodewords:(uint32_t *)count;
 
-- (NSString*)getGPUName;
+- (NSString *)getGPUName;
 @end
 
 NS_ASSUME_NONNULL_END

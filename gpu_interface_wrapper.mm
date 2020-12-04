@@ -18,6 +18,12 @@ GPUInterfaceWrapper::GPUInterfaceWrapper(unsigned int pinCount, unsigned int tot
 #endif
 }
 
+GPUInterfaceWrapper::~GPUInterfaceWrapper() {
+#ifdef __MM_GPU_METAL__
+  wrapped = nil;
+#endif
+}
+
 uint32_t *GPUInterfaceWrapper::getAllCodewordsBuffer() {
 #ifdef __MM_GPU_METAL__
   return [wrapped getAllCodewordsBuffer];
@@ -112,7 +118,6 @@ uint32_t *GPUInterfaceWrapper::getFullyDiscriminatingCodewords(uint32_t &count) 
   return nullptr;
 #endif
 }
-
 
 std::string GPUInterfaceWrapper::getGPUName() {
 #ifdef __MM_GPU_METAL__

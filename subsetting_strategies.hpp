@@ -53,9 +53,9 @@ class StrategySubsetting : public Strategy<p, c, l> {
     }
   }
 
-  StrategySubsetting(Codeword<p, c> nextGuess, std::vector<Codeword<p, c>> &nextPossibleSolutions,
-                     std::vector<uint32_t> &nextUsedCodewords)
-      : Strategy<p, c, l>(nextGuess, nextPossibleSolutions), savedUsedCodewords(std::move(nextUsedCodewords)) {}
+  StrategySubsetting(Strategy<p, c, l> &parent, Codeword<p, c> nextGuess,
+                     std::vector<Codeword<p, c>> &nextPossibleSolutions, std::vector<uint32_t> &nextUsedCodewords)
+      : Strategy<p, c, l>(parent, nextGuess, nextPossibleSolutions), savedUsedCodewords(std::move(nextUsedCodewords)) {}
 
   Codeword<p, c> selectNextGuess() override;
   virtual size_t computeSubsetScore() = 0;
@@ -104,22 +104,34 @@ class StrategySubsetting : public Strategy<p, c, l> {
 enum GPUMode { Both, GPU, CPU };
 const char *GPUModeNames[] = {"Both", "GPU", "CPU"};
 
+struct StrategySubsettingGPURootData {
+  GPUInterfaceWrapper *gpuInterface = nullptr;
+  uint64_t kernelsExecuted = 0;
+
+  ~StrategySubsettingGPURootData();
+};
+
 template <uint8_t pinCount, uint8_t c, bool l>
 class StrategySubsettingGPU : public StrategySubsetting<pinCount, c, l> {
  public:
   StrategySubsettingGPU(const char *kernelName, GPUMode mode = Both)
       : StrategySubsetting<pinCount, c, l>{}, mode(mode) {
+    gpuRootData = make_shared<StrategySubsettingGPURootData>();
     setupGPUInterface(kernelName);
   }
 
   StrategySubsettingGPU(Codeword<pinCount, c> initialGuess, const char *kernelName)
       : StrategySubsetting<pinCount, c, l>{initialGuess} {
+    gpuRootData = make_shared<StrategySubsettingGPURootData>();
     setupGPUInterface(kernelName);
   }
 
-  StrategySubsettingGPU(Codeword<pinCount, c> nextGuess, std::vector<Codeword<pinCount, c>> &nextPossibleSolutions,
+  StrategySubsettingGPU(StrategySubsettingGPU<pinCount, c, l> &parent, Codeword<pinCount, c> nextGuess,
+                        std::vector<Codeword<pinCount, c>> &nextPossibleSolutions,
                         std::vector<uint32_t> &nextUsedCodewords)
-      : StrategySubsetting<pinCount, c, l>(nextGuess, nextPossibleSolutions, nextUsedCodewords) {}
+      : StrategySubsetting<pinCount, c, l>(parent, nextGuess, nextPossibleSolutions, nextUsedCodewords) {
+    gpuRootData = parent.gpuRootData;
+  }
 
   Codeword<pinCount, c> selectNextGuess() override;
 
@@ -128,22 +140,19 @@ class StrategySubsettingGPU : public StrategySubsetting<pinCount, c, l> {
 
  protected:
   GPUMode mode = Both;
+  shared_ptr<StrategySubsettingGPURootData> gpuRootData = nullptr;
 
  private:
-  static inline GPUInterfaceWrapper *gpuInterface = nullptr;
-  static inline bool allCodewordsOnGPU = false;
-  static void copyAllCodewordsToGPU();
-  static inline uint64_t kernelsExecuted = 0;
+  void copyAllCodewordsToGPU();
 
   void setupGPUInterface(const char *kernelName) {
     if (mode != CPU) {
-      if (gpuInterface == nullptr) {
-        gpuInterface = new GPUInterfaceWrapper(pinCount, (uint)Codeword<pinCount, c>::totalCodewords, kernelName);
-        copyAllCodewordsToGPU();
-      }
-      if (!gpuInterface->gpuAvailable()) {
-        mode = CPU;
-      }
+      gpuRootData->gpuInterface =
+          new GPUInterfaceWrapper(pinCount, (uint)Codeword<pinCount, c>::totalCodewords, kernelName);
+      copyAllCodewordsToGPU();
+    }
+    if (!gpuRootData->gpuInterface->gpuAvailable()) {
+      mode = CPU;
     }
   }
 };
@@ -177,9 +186,9 @@ class StrategyKnuth : public StrategySubsettingGPU<p, c, l> {
 
   explicit StrategyKnuth(Codeword<p, c> initialGuess) : StrategySubsettingGPU<p, c, l>{initialGuess, kernelName} {}
 
-  StrategyKnuth(Codeword<p, c> nextGuess, std::vector<Codeword<p, c>> &nextPossibleSolutions,
-                std::vector<uint32_t> &nextUsedCodewords)
-      : StrategySubsettingGPU<p, c, l>(nextGuess, nextPossibleSolutions, nextUsedCodewords) {}
+  StrategyKnuth(StrategySubsettingGPU<p, c, l> &parent, Codeword<p, c> nextGuess,
+                std::vector<Codeword<p, c>> &nextPossibleSolutions, std::vector<uint32_t> &nextUsedCodewords)
+      : StrategySubsettingGPU<p, c, l>(parent, nextGuess, nextPossibleSolutions, nextUsedCodewords) {}
 
   std::string getName() const override { return "Knuth"; }
 
@@ -224,9 +233,9 @@ class StrategyMostParts : public StrategySubsettingGPU<p, c, l> {
 
   explicit StrategyMostParts(Codeword<p, c> initialGuess) : StrategySubsettingGPU<p, c, l>{initialGuess, kernelName} {}
 
-  StrategyMostParts(Codeword<p, c> nextGuess, std::vector<Codeword<p, c>> &nextPossibleSolutions,
-                    std::vector<uint32_t> &nextUsedCodewords)
-      : StrategySubsettingGPU<p, c, l>(nextGuess, nextPossibleSolutions, nextUsedCodewords) {}
+  StrategyMostParts(StrategySubsettingGPU<p, c, l> &parent, Codeword<p, c> nextGuess,
+                    std::vector<Codeword<p, c>> &nextPossibleSolutions, std::vector<uint32_t> &nextUsedCodewords)
+      : StrategySubsettingGPU<p, c, l>(parent, nextGuess, nextPossibleSolutions, nextUsedCodewords) {}
 
   std::string getName() const override { return "Most Parts"; }
 
@@ -280,9 +289,9 @@ class StrategyExpectedSize : public StrategySubsettingGPU<p, c, l> {
   explicit StrategyExpectedSize(Codeword<p, c> initialGuess)
       : StrategySubsettingGPU<p, c, l>{initialGuess, kernelName} {}
 
-  StrategyExpectedSize(Codeword<p, c> nextGuess, std::vector<Codeword<p, c>> &nextPossibleSolutions,
-                       std::vector<uint32_t> &nextUsedCodewords)
-      : StrategySubsettingGPU<p, c, l>(nextGuess, nextPossibleSolutions, nextUsedCodewords) {}
+  StrategyExpectedSize(StrategySubsettingGPU<p, c, l> &parent, Codeword<p, c> nextGuess,
+                       std::vector<Codeword<p, c>> &nextPossibleSolutions, std::vector<uint32_t> &nextUsedCodewords)
+      : StrategySubsettingGPU<p, c, l>(parent, nextGuess, nextPossibleSolutions, nextUsedCodewords) {}
 
   std::string getName() const override { return "Expected Size"; }
 
@@ -330,9 +339,9 @@ class StrategyEntropy : public StrategySubsettingGPU<p, c, l> {
 
   explicit StrategyEntropy(Codeword<p, c> initialGuess) : StrategySubsettingGPU<p, c, l>{initialGuess, kernelName} {}
 
-  StrategyEntropy(Codeword<p, c> nextGuess, std::vector<Codeword<p, c>> &nextPossibleSolutions,
-                  std::vector<uint32_t> &nextUsedCodewords)
-      : StrategySubsettingGPU<p, c, l>(nextGuess, nextPossibleSolutions, nextUsedCodewords) {}
+  StrategyEntropy(StrategySubsettingGPU<p, c, l> &parent, Codeword<p, c> nextGuess,
+                  std::vector<Codeword<p, c>> &nextPossibleSolutions, std::vector<uint32_t> &nextUsedCodewords)
+      : StrategySubsettingGPU<p, c, l>(parent, nextGuess, nextPossibleSolutions, nextUsedCodewords) {}
 
   std::string getName() const override { return "Entropy"; }
 

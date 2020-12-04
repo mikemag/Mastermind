@@ -38,7 +38,7 @@ void StatsRecorder::writeStats(const std::string &filename) {
   for (++hit; hit != headers.end(); ++hit) {
     ss << "," << *hit;
   }
-  for (const auto& a : all) {
+  for (const auto &a : all) {
     ss << "," << a.first;
   }
   ss << endl;
@@ -50,7 +50,7 @@ void StatsRecorder::writeStats(const std::string &filename) {
     for (++hit; hit != headers.end(); ++hit) {
       ss << "," << run[*hit];
     }
-    for (const auto& a : all) {
+    for (const auto &a : all) {
       ss << "," << a.second;
     }
     ss << endl;

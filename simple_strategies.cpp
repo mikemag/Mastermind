@@ -22,7 +22,7 @@ Codeword<p, c> StrategyFirstOne<p, c, log>::selectNextGuess() {
 
 template <uint8_t p, uint8_t c, bool l>
 shared_ptr<Strategy<p, c, l>> StrategyFirstOne<p, c, l>::createNewMove(Score r, Codeword<p, c> nextGuess) {
-  auto next = make_shared<StrategyFirstOne<p, c, l>>(nextGuess, this->possibleSolutions);
+  auto next = make_shared<StrategyFirstOne<p, c, l>>(*this, nextGuess, this->possibleSolutions);
   return next;
 }
 
@@ -47,6 +47,6 @@ Codeword<p, c> StrategyRandom<p, c, log>::selectNextGuess() {
 
 template <uint8_t p, uint8_t c, bool l>
 shared_ptr<Strategy<p, c, l>> StrategyRandom<p, c, l>::createNewMove(Score r, Codeword<p, c> nextGuess) {
-  auto next = make_shared<StrategyRandom<p, c, l>>(nextGuess, this->possibleSolutions);
+  auto next = make_shared<StrategyRandom<p, c, l>>(*this, nextGuess, this->possibleSolutions);
   return next;
 }

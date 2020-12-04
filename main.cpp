@@ -4,12 +4,13 @@
 // LICENSE file in the root directory of this source tree.
 
 #include "codeword.hpp"
+#include "compute_kernel_constants.h"
+#include "mastermind_config.h"
 #include "score.hpp"
 #include "simple_strategies.hpp"
 #include "strategy.hpp"
 #include "subsetting_strategies.hpp"
 #include "utils.hpp"
-#include "mastermind_config.h"
 
 using namespace std;
 
@@ -22,15 +23,6 @@ using namespace std;
 // tries needed across all of them.
 //
 // There are a few algorithms to play with. See the various Strategy class implementations for details.
-
-enum Algo {
-  FirstOne,      // Pick the first of the remaining choices.
-  Random,        // Pick any of the remaining choices.
-  Knuth,         // Pick the one that will eliminate the most remaining choices.
-  MostParts,     // Maximize the number of scores at each round.
-  ExpectedSize,  // Minimize the expected size of the remaining choices.
-  Entropy,       // Pick the maximum entropy guess.
-};
 
 // Config for a single game
 static constexpr bool playSingleGame = true;
@@ -250,8 +242,7 @@ int main(int argc, const char* argv[]) {
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 3, false>(a), s); },
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 4, false>(a), s); },
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 5, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 6, false>(a), s); }, //
-        //        x
+        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 6, false>(a), s); },  // x
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 7, false>(a), s); }, //
         //        x
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 8, false>(a), s); },
@@ -271,8 +262,8 @@ int main(int argc, const char* argv[]) {
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<5, 7, false>(a), s); },
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<5, 8, false>(a), s); }, //
         //        x
-        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<5, 9, false>(a), s); },
-        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<5, 10, false>(a), s); },
+        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<5, 9, false>(a), s); },
+        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<5, 10, false>(a), s); },
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<5, 11, false>(a), s); },
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<5, 12, false>(a), s); },
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<5, 13, false>(a), s); },
@@ -283,8 +274,8 @@ int main(int argc, const char* argv[]) {
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<6, 3, false>(a), s); },
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<6, 4, false>(a), s); },
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<6, 5, false>(a), s); },
-        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<6, 6, false>(a), s); },
-        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<6, 7, false>(a), s); },
+        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<6, 6, false>(a), s); },
+        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<6, 7, false>(a), s); },
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<6, 8, false>(a), s); },
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<6, 9, false>(a), s); },
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<6, 10, false>(a), s); },
@@ -297,8 +288,8 @@ int main(int argc, const char* argv[]) {
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<7, 2, false>(a), s); },
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<7, 3, false>(a), s); },
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<7, 4, false>(a), s); },
-        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<7, 5, false>(a), s); },
-        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<7, 6, false>(a), s); },
+        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<7, 5, false>(a), s); },
+        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<7, 6, false>(a), s); },
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<7, 7, false>(a), s); },
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<7, 8, false>(a), s); },
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<7, 9, false>(a), s); },
@@ -311,8 +302,8 @@ int main(int argc, const char* argv[]) {
 
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<8, 2, false>(a), s); },
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<8, 3, false>(a), s); },
-        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<8, 4, false>(a), s); },
-        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<8, 5, false>(a), s); },
+        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<8, 4, false>(a), s); },
+        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<8, 5, false>(a), s); },
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<8, 6, false>(a), s); },
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<8, 7, false>(a), s); },
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<8, 8, false>(a), s); },
@@ -339,7 +330,7 @@ int main(int argc, const char* argv[]) {
   istringstream ss(MASTERMIND_GIT_COMMIT_DATE);
   ss >> get_time(&t, "%Y-%m-%d %H:%M:%S");
   stringstream fs;
-  fs << "mastermind_run_stats_" << put_time(&t, "%Y%m%d_%H%M%S") << ".csv";
+  fs << "mastermind_run_stats_" << put_time(&t, "%Y%m%d_%H%M%S") << "_" << MASTERMIND_GIT_COMMIT_HASH << ".csv";
   statsRecorder.writeStats(fs.str());
 
   return 0;

@@ -21,6 +21,7 @@ class GPUInterfaceWrapper {
 
  public:
   GPUInterfaceWrapper(unsigned int pinCount, unsigned int totalCodewords, const char* kernelName);
+  ~GPUInterfaceWrapper();
 
   bool gpuAvailable() const { return wrapped != nullptr; }
 
