@@ -105,14 +105,26 @@ void Strategy<p, c, log>::removeImpossibleSolutions(Score r) {
 // codeword can fully discriminate all of the possible solutions (i.e., it produces a different score for each one),
 // then play it right away since it will tell us the winner.
 //
-// TODO: notes on speed improvements, selecting better guesses than some algs (prove it), tradeoff for the extra
-// overhead.
+// This is an interesting shortcut. It doesn't change the results of any of the subsetting algorithms at all: average
+// turns, max turns, max secret, and the full histograms all remain precisely the same. What does change is the number
+// of scores computed, and the runtime. For 5p8c games, CPU-only, we see these deltas:
+//
+// Algorithm        Elapsed S            Codewords Scored
+// -------------    -----------------    ---------------------
+// Knuth            -1.75849 (-20.4%)    -533,638,403 (-13.9%)
+// Most Parts       -1.54395 (-18.1%)    -472,952,414 (-12.4%)
+// Entropy          -8.1095  (-42.5%)    -496,779,481 (-13.3%)
+// Expected Size    -5.57572 (-39.0%)    -528,089,930 (-14.1%)
+//
+// That's a big difference. This skips a great deal of work in the inner loop for CPU scoring, where it is almost free
+// to compute. In the GPU version (not shown), it also skips some work in the inner loop of consuming GPU results, and
+// is very cheap to add to the overall GPU time. She shortcut applied in the outter loop saves both CPU and GPU schemes
+// quite a lot of work as well with a reasonable ration of wasted work to work saved.
+//
+// All-in-all, this is a very nice shortcut for all of these algorithms.
 
 template <uint8_t p, uint8_t c, bool log>
 Codeword<p, c> Strategy<p, c, log>::shortcutSmallSets() {
-  // TODO: skip this if totalCodewords is "too small", i.e., we won't save much work vs. the real thing.
-  //  - need to measure and figure out what the breakeven point is.
-
   int subsetSizes[maxScoreSlots];
   for (const auto &psa : possibleSolutions) {
     fill(begin(subsetSizes), end(subsetSizes), 0);

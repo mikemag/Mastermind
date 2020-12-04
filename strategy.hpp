@@ -97,11 +97,11 @@ struct StrategyRootData {
   uint64_t scoreCounterGPU = 0;
 
   // Optimization metrics -- measuring experimentation
-  constexpr static bool enableTwoPSMetrics = true;
+  constexpr static bool enableTwoPSMetrics = false;
   ExperimentCounter<enableTwoPSMetrics> twoPSShortcuts =
       ExperimentCounter<enableTwoPSMetrics>("Exp: Size 2 PS Shortcuts");
 
-  constexpr static bool enableSmallPSMetrics = true;
+  constexpr static bool enableSmallPSMetrics = false;
   ExperimentCounter<enableSmallPSMetrics> smallPSHighShortcuts =
       ExperimentCounter<enableSmallPSMetrics>("Exp: Small PS High Shortcuts");
   ExperimentCounter<enableSmallPSMetrics> smallPSHighWasted =
@@ -113,7 +113,7 @@ struct StrategyRootData {
   ExperimentCounter<enableSmallPSMetrics> smallPSInnerWasted =
       ExperimentCounter<enableSmallPSMetrics>("Exp: Small PS Inner Wasted");
   ExperimentCounter<enableSmallPSMetrics> smallPSInnerScoresSkipped =
-      ExperimentCounter<enableSmallPSMetrics>("Small PS Inner Scores Skipped");
+      ExperimentCounter<enableSmallPSMetrics>("Exp: Small PS Inner Scores Skipped");
 };
 
 #include "strategy.cpp"

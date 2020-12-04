@@ -167,20 +167,20 @@ void playAllGamesForStrategy(shared_ptr<Strategy<pinCount, colorCount, log>> str
 }
 
 template <uint8_t pinCount, uint8_t colorCount, bool log>
-shared_ptr<Strategy<pinCount, colorCount, log>> makeStrategyWithAlgo(Algo algorithm) {
+shared_ptr<Strategy<pinCount, colorCount, log>> makeStrategyWithAlgo(Algo algorithm, GPUMode mode = gpuMode) {
   switch (algorithm) {
     case FirstOne:
       return make_shared<StrategyFirstOne<pinCount, colorCount, log>>();
     case Random:
       return make_shared<StrategyRandom<pinCount, colorCount, log>>();
     case Knuth:
-      return make_shared<StrategyKnuth<pinCount, colorCount, log>>(gpuMode);
+      return make_shared<StrategyKnuth<pinCount, colorCount, log>>(mode);
     case MostParts:
-      return make_shared<StrategyMostParts<pinCount, colorCount, log>>(gpuMode);
+      return make_shared<StrategyMostParts<pinCount, colorCount, log>>(mode);
     case ExpectedSize:
-      return make_shared<StrategyExpectedSize<pinCount, colorCount, log>>(gpuMode);
+      return make_shared<StrategyExpectedSize<pinCount, colorCount, log>>(mode);
     case Entropy:
-      return make_shared<StrategyEntropy<pinCount, colorCount, log>>(gpuMode);
+      return make_shared<StrategyEntropy<pinCount, colorCount, log>>(mode);
   }
 };
 
@@ -242,9 +242,8 @@ int main(int argc, const char* argv[]) {
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 3, false>(a), s); },
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 4, false>(a), s); },
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 5, false>(a), s); },
-        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 6, false>(a), s); },  // x
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 7, false>(a), s); }, //
-        //        x
+        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 6, false>(a), s); },
+        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 7, false>(a), s); },
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 8, false>(a), s); },
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 9, false>(a), s); },
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 10, false>(a), s); },
@@ -260,8 +259,7 @@ int main(int argc, const char* argv[]) {
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<5, 5, false>(a), s); },
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<5, 6, false>(a), s); },
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<5, 7, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<5, 8, false>(a), s); }, //
-        //        x
+        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<5, 8, false>(a), s); },
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<5, 9, false>(a), s); },
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<5, 10, false>(a), s); },
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<5, 11, false>(a), s); },
@@ -316,9 +314,20 @@ int main(int argc, const char* argv[]) {
         //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<8, 15, false>(a), s); },
     };
 
+    static vector<void (*)(Algo, StatsRecorder&)> manyCommonGames = {
+        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 6, false>(a, CPU), s); },
+        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 7, false>(a, CPU), s); },
+        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<5, 8, false>(a, CPU), s); },
+#ifdef __MM_GPU_METAL__
+        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 6, false>(a, GPU), s); },
+        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 7, false>(a, GPU), s); },
+        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<5, 8, false>(a, GPU), s); },
+#endif
+    };
+
     static vector<Algo> interestingAlgos = {Knuth, MostParts, Entropy, ExpectedSize, FirstOne};
 
-    for (auto& f : manyGamesByAlgo) {
+    for (auto& f : manyCommonGames) {
       for (auto& a : interestingAlgos) {
         statsRecorder.newRun();
         f(a, statsRecorder);

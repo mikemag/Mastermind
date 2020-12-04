@@ -117,10 +117,9 @@ Codeword<p, c> StrategySubsettingGPU<p, c, log>::selectNextGuess() {
     // first one gives the first lexically ordered option.
     uint32_t discriminatingCount = 0;
     uint32_t *smallOptsOut = gpuRootData->gpuInterface->getFullyDiscriminatingCodewords(discriminatingCount);
-    auto &allCodewords = Codeword<p, c>::getAllCodewords();
     for (int i = 0; i < discriminatingCount; i++) {
       if (smallOptsOut[i] > 0) {
-        Codeword<p, c> g = allCodewords[smallOptsOut[i]];
+        Codeword<p, c> g = Codeword<p, c>::getAllCodewords()[smallOptsOut[i]];
         if (log) {
           cout << "Selecting fully discriminating guess from GPU: " << g
                << ", subsets: " << this->possibleSolutions.size()

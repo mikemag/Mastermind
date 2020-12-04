@@ -32,7 +32,7 @@ configure_file(
         "${PROJECT_SOURCE_DIR}/mastermind_config.h"
 )
 
-add_executable(mastermind_metal
+add_executable(mastermind
         gpu_interface_wrapper.hpp
         gpu_interface_wrapper.mm
         main.cpp

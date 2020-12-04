@@ -183,8 +183,6 @@
                      offset:0
                     atIndex:BufferIndexRemainingIsPossibleSolution];
 
-  // TODO: this is here just for the version that finds fully discriminating codewords. Will be ignored by the others.
-  // At some point I'll either keep this and make them all use it, or nuke it.
   memset(_mBufferFullyDiscriminatingCodewords.contents, 0, _mBufferFullyDiscriminatingCodewords.length);
   [computeEncoder setBuffer:_mBufferFullyDiscriminatingCodewords
                      offset:0

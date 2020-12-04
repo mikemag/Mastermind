@@ -149,10 +149,12 @@ class StrategySubsettingGPU : public StrategySubsetting<pinCount, c, l> {
     if (mode != CPU) {
       gpuRootData->gpuInterface =
           new GPUInterfaceWrapper(pinCount, (uint)Codeword<pinCount, c>::totalCodewords, kernelName);
-      copyAllCodewordsToGPU();
-    }
-    if (!gpuRootData->gpuInterface->gpuAvailable()) {
-      mode = CPU;
+
+      if (gpuRootData->gpuInterface->gpuAvailable()) {
+        copyAllCodewordsToGPU();
+      } else {
+        mode = CPU;
+      }
     }
   }
 };
