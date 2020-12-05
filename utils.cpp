@@ -19,13 +19,24 @@ string commaString(float f) {
 }
 
 void StatsRecorder::writeStats(const std::string &filename) {
+  if (runs.empty()) {
+    cout << "No stats to write" << endl;
+    return;
+  }
+
   cout << "Writing all game stats to " << filename << endl;
+
+  // Common data that we want to show up first, to make the files easier to read quickly.
+  vector<string> common = {
+      "Pin Count", "Color Count", "Strategy", "GPU Mode", "Initial Guess", "Average Turns", "Max Turns", "Elapsed (s)",
+  };
 
   // Some runs may include stats that others don't, so aggregate the headers from them all so every row as the same
   // number of columns in the same order.
   set<string> headers;
   for (const auto &run : runs) {
     for (const auto &s : run) {
+      if (find(begin(common), end(common), s.first) != common.end()) continue;
       headers.insert(s.first);
     }
   }
@@ -33,10 +44,13 @@ void StatsRecorder::writeStats(const std::string &filename) {
   ofstream ss(filename);
 
   // Write header row first
-  auto hit = headers.begin();
-  ss << *hit;
-  for (++hit; hit != headers.end(); ++hit) {
-    ss << "," << *hit;
+  auto cit = common.begin();
+  ss << *cit;
+  for (++cit; cit != common.end(); ++cit) {
+    ss << "," << *cit;
+  }
+  for (const auto &h : headers) {
+    ss << "," << h;
   }
   for (const auto &a : all) {
     ss << "," << a.first;
@@ -45,10 +59,13 @@ void StatsRecorder::writeStats(const std::string &filename) {
 
   // One row per game
   for (auto &run : runs) {
-    hit = headers.begin();
-    ss << run[*hit];
-    for (++hit; hit != headers.end(); ++hit) {
-      ss << "," << run[*hit];
+    cit = common.begin();
+    ss << run[*cit];
+    for (++cit; cit != common.end(); ++cit) {
+      ss << "," << run[*cit];
+    }
+    for (const auto &h : headers) {
+      ss << "," << run[h];
     }
     for (const auto &a : all) {
       ss << "," << a.second;

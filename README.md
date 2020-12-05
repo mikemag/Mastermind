@@ -25,7 +25,53 @@ for details, and Compiler Explorer links showing the generated code.
 
 ## Results
 
-TODO: add a table of results for different game sizes and algorithms, along with timings for CPU vs GPU.
+Using the GPU for larger games is much faster, as you would expect. 5p8c is a nice example:
+
+#### 5p8c
+
+|Strategy|Initial Guess|Max Turns|GPU Mode|Average Turns|Time (s)|CPU Scores|GPU Scores|GPU Kernels
+|:---:|:---:|:---:|:---:|:---:|---:|---:|---:|:---:|
+|First One|45678|10|CPU|5.9250|0.0315| 2,608,292 | | |
+|Knuth|11234|7|CPU|5.6142|6.7618| 3,307,924,999 | | |   
+| | | |Both|5.6142|0.9931| 2,518,787 | 3,466,395,648 | 2,850| 
+|Most Parts|11223|8|CPU|5.5491|6.9304| 3,327,257,765 | | |   
+| | | |Both|5.5491|1.3661| 2,742,071 | 3,471,933,440 | 2,795| 
+|Entropy|11234|8|CPU|5.4898|10.7578| 3,225,973,291 | | |   
+| | | |Both|5.4902|0.9179| 2,639,743 | 3,370,909,696 | 2,561| 
+|Expected Size|11234|7|CPU|5.5038|9.4489| 3,214,838,623 | | |   
+| | | |Both|5.5022|1.3006| 2,593,404 | 3,360,686,080 | 2,531| 
+
+There is overhead to using the GPU, of course, and there are tuning points for when you use the GPU vs. falling back to
+the CPU. But in general even for reasonable games like 4p6c the GPU is quite close. And you can see that for 4p7c the
+GPU is already pulling ahead on some algorithms. Because of this I really haven't played with tuning the cutoff much at all.
+
+#### 4p6c
+
+|Strategy|Initial Guess|Max Turns|GPU Mode|Average Turns|Time (s)|CPU Scores|GPU Scores|GPU Kernels
+|:---:|:---:|:---:|:---:|:---:|---:|---:|---:|:---:|
+|First One|3456|7|CPU|4.6211|0.0008| 55,417 | | |
+|Knuth|1122|5|CPU|4.4761|0.0085| 3,237,885 | | |   
+| | | |Both|4.4761|0.0142| 62,675 | 3,373,488 | 100| 
+|Most Parts|1123|6|CPU|4.3735|0.0082| 3,289,320 | | |   
+| | | |Both|4.3735|0.0168| 61,113 | 3,412,368 | 109| 
+|Entropy|1234|6|CPU|4.4159|0.0164| 3,320,344 | | |   
+| | | |Both|4.4151|0.0168| 58,489 | 3,443,472 | 106| 
+|Expected Size|1123|6|CPU|4.3935|0.0163| 3,256,505 | | |   
+| | | |Both|4.3951|0.0169| 62,062 | 3,346,272 | 106| 
+
+#### 4p7c
+
+|Strategy|Initial Guess|Max Turns|GPU Mode|Average Turns|Time (s)|CPU Scores|GPU Scores|GPU Kernels
+|:---:|:---:|:---:|:---:|:---:|---:|---:|---:|:---:|
+|First One|4567|8|CPU|5.0675|0.0017| 114,469 | | |
+|Knuth|1234|6|CPU|4.8367|0.0345| 13,577,917 | | |   
+| | | |Both|4.8367|0.0351| 116,345 | 14,478,030 | 267| 
+|Most Parts|1123|6|CPU|4.7430|0.0326| 13,470,924 | | |   
+| | | |Both|4.7430|0.0334| 121,453 | 14,245,133 | 257| 
+|Entropy|1234|6|CPU|4.7397|0.0573| 13,183,270 | | |   
+| | | |Both|4.7401|0.0337| 118,016 | 13,983,424 | 237| 
+|Expected Size|1234|6|CPU|4.7530|0.0459| 13,164,912 | | |   
+| | | |Both|4.7505|0.0331| 116,820 | 13,875,379 | 237| 
 
 ## Docs
 
@@ -41,7 +87,7 @@ I originally wrote similar code in Java, since I was first motivated by the APCS
 pretty straightforward, and it is an easier introduction to the problem than the optimized C++ code you'll find here.
 See https://github.com/mikemag/CS-Education/tree/master/APCS/Mastermind
 
-## Building
+## Building and Running
 
 This can be built two ways: CMake and XCode. If you build with just CMake then the GPU support is turned off, since I
 didn't feel like putting in the effort to make a proper cmake that includes building the Objective-C and Metal code
@@ -51,6 +97,12 @@ There is a CLion workspace included in the repo, so if you use CLion you can jus
 develop 95% of the code and the only thing missing is the GPU acceleration. Works with CLion 2020.2 and the bundled CMake.
 
 The XCode project works with XCode 12.2.
+
+This isn't an easy-to-use command line program; there are no command line options.
+Basic config is done by editing settings at the top of main.cpp. Multiple runs over different algorithms are done by changing
+the tables in main.cpp to include the specific instantiations you wish to test.
+Various experiment control flags are scattered throughout the Strategy classes.
+A CSV file with stats and run parameters is produced at the end.
 
 All development and tests done (so far) on a MacBook Pro (16-inch, 2019) running macOS Catalina 10.15.7. The GPU kernels
 have been tested on both GPUs in my laptop: the integrated Intel UHD Graphics 630 and the discrete AMD Radeon Pro 5500M.

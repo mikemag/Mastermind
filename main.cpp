@@ -25,15 +25,14 @@ using namespace std;
 // There are a few algorithms to play with. See the various Strategy class implementations for details.
 
 // Config for a single game
-static constexpr bool playSingleGame = true;
-static constexpr Algo algo = Algo::Knuth;
-static constexpr uint8_t pinCount = 5;    // 1-8, 4 is classic
-static constexpr uint8_t colorCount = 8;  // 1-15, 6 is classic
+static constexpr bool playSingleGame = false;
+static constexpr Algo singleGameAlgo = Algo::Knuth;
+static constexpr GPUMode singleGameGPUMode = Both;
+static constexpr uint8_t singleGamePinCount = 5;    // 1-8, 4 is classic
+static constexpr uint8_t singleGameColorCount = 8;  // 1-15, 6 is classic
 
-static constexpr bool playMultipleGames = false;  // Play a set of games defined below.
-static constexpr bool runTests = true;            // Run unit tests and play Knuth's game
-
-static constexpr GPUMode gpuMode = Both;
+static constexpr bool playMultipleGames = true;  // Play a set of games defined below.
+static constexpr bool runTests = true;           // Run unit tests and play Knuth's game
 
 void runUnitTests() {
   // Test cases from Miyoshi
@@ -71,7 +70,7 @@ void runKnuthTest() {
   printf("\n");
 }
 
-static constexpr uint histogramSize = 16;
+static constexpr uint histogramSize = 32;
 static vector<int> histogram(histogramSize, 0);
 static vector<string> histogramHeaders;
 
@@ -167,7 +166,7 @@ void playAllGamesForStrategy(shared_ptr<Strategy<pinCount, colorCount, log>> str
 }
 
 template <uint8_t pinCount, uint8_t colorCount, bool log>
-shared_ptr<Strategy<pinCount, colorCount, log>> makeStrategyWithAlgo(Algo algorithm, GPUMode mode = gpuMode) {
+shared_ptr<Strategy<pinCount, colorCount, log>> makeStrategy(Algo algorithm, GPUMode mode) {
   switch (algorithm) {
     case FirstOne:
       return make_shared<StrategyFirstOne<pinCount, colorCount, log>>();
@@ -201,138 +200,34 @@ int main(int argc, const char* argv[]) {
 
   if (playSingleGame) {
     statsRecorder.newRun();
-    auto strategy = makeStrategyWithAlgo<pinCount, colorCount, false>(algo);
+    auto strategy = makeStrategy<singleGamePinCount, singleGameColorCount, false>(singleGameAlgo, singleGameGPUMode);
     playAllGamesForStrategy(strategy, statsRecorder);
   }
 
   if (playMultipleGames) {
     // NB: the templating of all of this means that multiple copies of much of the code are created for each entry in
-    // this table. So only create it if we're actually playinig multiple games. This keeps build times lower during
+    // this table. So only create it if we're actually playing multiple games. This keeps build times lower during
     // development.
-    static vector<void (*)(Algo, StatsRecorder&)> manyGamesByAlgo = {
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<2, 2, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<2, 3, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<2, 4, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<2, 5, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<2, 6, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<2, 7, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<2, 8, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<2, 9, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<2, 10, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<2, 11, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<2, 12, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<2, 13, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<2, 14, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<2, 15, false>(a), s); },
-
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<3, 2, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<3, 3, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<3, 4, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<3, 5, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<3, 6, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<3, 7, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<3, 8, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<3, 9, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<3, 10, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<3, 11, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<3, 12, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<3, 13, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<3, 14, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<3, 15, false>(a), s); },
-
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 2, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 3, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 4, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 5, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 6, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 7, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 8, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 9, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 10, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 11, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 12, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 13, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 14, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 15, false>(a), s); },
-
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<5, 2, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<5, 3, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<5, 4, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<5, 5, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<5, 6, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<5, 7, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<5, 8, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<5, 9, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<5, 10, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<5, 11, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<5, 12, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<5, 13, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<5, 14, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<5, 15, false>(a), s); },
-
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<6, 2, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<6, 3, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<6, 4, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<6, 5, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<6, 6, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<6, 7, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<6, 8, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<6, 9, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<6, 10, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<6, 11, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<6, 12, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<6, 13, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<6, 14, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<6, 15, false>(a), s); },
-
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<7, 2, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<7, 3, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<7, 4, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<7, 5, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<7, 6, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<7, 7, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<7, 8, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<7, 9, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<7, 10, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<7, 11, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<7, 12, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<7, 13, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<7, 14, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<7, 15, false>(a), s); },
-
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<8, 2, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<8, 3, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<8, 4, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<8, 5, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<8, 6, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<8, 7, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<8, 8, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<8, 9, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<8, 10, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<8, 11, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<8, 12, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<8, 13, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<8, 14, false>(a), s); },
-        //        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<8, 15, false>(a), s); },
-    };
-
-    static vector<void (*)(Algo, StatsRecorder&)> manyCommonGames = {
-        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 6, false>(a, CPU), s); },
-        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 7, false>(a, CPU), s); },
-        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<5, 8, false>(a, CPU), s); },
-#ifdef __MM_GPU_METAL__
-        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 6, false>(a, GPU), s); },
-        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<4, 7, false>(a, GPU), s); },
-        [](Algo a, StatsRecorder& s) { playAllGamesForStrategy(makeStrategyWithAlgo<5, 8, false>(a, GPU), s); },
-#endif
+    static vector<void (*)(Algo, GPUMode, StatsRecorder&)> games = {
+        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<4, 6, false>(a, m), s); },
+        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<4, 7, false>(a, m), s); },
+        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<5, 8, false>(a, m), s); },
     };
 
     static vector<Algo> interestingAlgos = {Knuth, MostParts, Entropy, ExpectedSize, FirstOne};
 
-    for (auto& f : manyCommonGames) {
+#ifdef __MM_GPU_METAL__
+    static vector<GPUMode> gpuModes = {CPU, Both};
+#else
+    static vector<GPUMode> gpuModes = {CPU};
+#endif
+
+    for (auto& f : games) {
       for (auto& a : interestingAlgos) {
-        statsRecorder.newRun();
-        f(a, statsRecorder);
+        for (auto& m : gpuModes) {
+          statsRecorder.newRun();
+          f(a, m, statsRecorder);
+        }
       }
     }
   }
