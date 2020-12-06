@@ -43,7 +43,7 @@
       printf("Max buffer length: %lu\n", (unsigned long)device.maxBufferLength);
       printf("\n");
 
-      if ((_mDevice == nil) || !device.isLowPower) {
+      if ((_mDevice == nil) || (!device.isLowPower && [device supportsFamily:MTLGPUFamilyMac2])) {
         _mDevice = device;
       }
     }
@@ -54,6 +54,11 @@
     }
 
     printf("Using GPU: %s\n\n", _mDevice.name.UTF8String);
+
+    if (![_mDevice supportsFamily:MTLGPUFamilyMac2]) {
+      printf("WARNING: selected GPU does not support MTLGPUFamilyMac2, some opts will be disabled.\n\n");
+      kernelName = [kernelName stringByAppendingString:@"_no2"];
+    }
 
     id<MTLLibrary> defaultLibrary = [_mDevice newDefaultLibrary];
     if (defaultLibrary == nil) {
@@ -107,9 +112,13 @@
   _mBufferRemainingIsPossibleSolution = [_mDevice newBufferWithLength:maxCodewords * sizeof(bool)
                                                               options:MTLResourceStorageModeShared];
 
-  _mBufferFullyDiscriminatingCodewords =
-      [_mDevice newBufferWithLength:maxCodewords * (sizeof(uint32_t) / executionWidth + 1)
-                            options:MTLResourceStorageModeShared];
+  if ([_mDevice supportsFamily:MTLGPUFamilyMac2]) {
+    _mBufferFullyDiscriminatingCodewords =
+        [_mDevice newBufferWithLength:maxCodewords * (sizeof(uint32_t) / executionWidth + 1)
+                              options:MTLResourceStorageModeShared];
+  } else {
+    _mBufferFullyDiscriminatingCodewords = nil;
+  }
 }
 
 - (uint32_t *)getAllCodewordsBuffer {
@@ -183,10 +192,12 @@
                      offset:0
                     atIndex:BufferIndexRemainingIsPossibleSolution];
 
-  memset(_mBufferFullyDiscriminatingCodewords.contents, 0, _mBufferFullyDiscriminatingCodewords.length);
-  [computeEncoder setBuffer:_mBufferFullyDiscriminatingCodewords
-                     offset:0
-                    atIndex:BufferIndexFullyDiscriminatingCodewords];
+  if (_mBufferFullyDiscriminatingCodewords) {
+    memset(_mBufferFullyDiscriminatingCodewords.contents, 0, _mBufferFullyDiscriminatingCodewords.length);
+    [computeEncoder setBuffer:_mBufferFullyDiscriminatingCodewords
+                       offset:0
+                      atIndex:BufferIndexFullyDiscriminatingCodewords];
+  }
 
   MTLSize gridSize = MTLSizeMake(_mAllCodewordsCount, 1, 1);
 
@@ -215,8 +226,13 @@
 }
 
 - (uint32_t *)getFullyDiscriminatingCodewords:(uint32_t *)count {
-  *count = (uint32_t)(_mBufferFullyDiscriminatingCodewords.length / sizeof(uint32_t));
-  return (uint32_t *)_mBufferFullyDiscriminatingCodewords.contents;
+  if (_mBufferFullyDiscriminatingCodewords) {
+    *count = (uint32_t)(_mBufferFullyDiscriminatingCodewords.length / sizeof(uint32_t));
+    return (uint32_t *)_mBufferFullyDiscriminatingCodewords.contents;
+  } else {
+    *count = 0;
+    return NULL;
+  }
 }
 
 - (NSString *)getGPUName {

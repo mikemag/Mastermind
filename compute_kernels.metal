@@ -85,7 +85,7 @@ bool computeSubsetSizes(int totalScores, threadgroup uint32_t *scoreCounts, devi
 //
 // Finally, there's threadgroup memory for each thread with enough room for all of the intermediate subset sizes.
 // This is important: the first version held this in threadlocal memory and occupancy was terrible.
-template <uint32_t pinCount, Algo algo>
+template <uint32_t pinCount, Algo algo, bool supportFamilyMac2>
 kernel void subsettingAlgosKernel(
     device const uint32_t *allCodewords [[buffer(BufferIndexAllCodewords)]],
     device const uint4 *allCodewordsColors [[buffer(BufferIndexAllCodewordsColors)]],
@@ -150,126 +150,250 @@ kernel void subsettingAlgosKernel(
   // member of each SIMD group that finds such a solution vote on the minimum, and have the first of them write the
   // result. I could do a further reduction to a value per threadgroup, or a final single value, but for now I'll just
   // let the CPU take the first non-zero result and run with it.
-  if (totalUsedSubsets == possibleSolutionsCount) {
-    uint d = simd_min(tidGrid);
-    if (simd_is_first()) {
-      fullyDiscriminatingCodewords[tidGrid / threadsPerSIMDGroup] = d;
+  if (supportFamilyMac2) {
+    if (totalUsedSubsets == possibleSolutionsCount) {
+      uint d = simd_min(tidGrid);
+      if (simd_is_first()) {
+        fullyDiscriminatingCodewords[tidGrid / threadsPerSIMDGroup] = d;
+      }
     }
   }
 }
 
+// -----------------------------------------------------------------------------------
+// Explicit specializations with MTLGPUFamilyMac2 support
+
 // Explicit specializations Knuth
-template [[host_name("findKnuthGuessKernel_2")]] kernel void subsettingAlgosKernel<2, Knuth>(
+template [[host_name("findKnuthGuessKernel_2")]] kernel void subsettingAlgosKernel<2, Knuth, true>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findKnuthGuessKernel_3")]] kernel void subsettingAlgosKernel<3, Knuth>(
+template [[host_name("findKnuthGuessKernel_3")]] kernel void subsettingAlgosKernel<3, Knuth, true>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findKnuthGuessKernel_4")]] kernel void subsettingAlgosKernel<4, Knuth>(
+template [[host_name("findKnuthGuessKernel_4")]] kernel void subsettingAlgosKernel<4, Knuth, true>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findKnuthGuessKernel_5")]] kernel void subsettingAlgosKernel<5, Knuth>(
+template [[host_name("findKnuthGuessKernel_5")]] kernel void subsettingAlgosKernel<5, Knuth, true>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findKnuthGuessKernel_6")]] kernel void subsettingAlgosKernel<6, Knuth>(
+template [[host_name("findKnuthGuessKernel_6")]] kernel void subsettingAlgosKernel<6, Knuth, true>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findKnuthGuessKernel_7")]] kernel void subsettingAlgosKernel<7, Knuth>(
+template [[host_name("findKnuthGuessKernel_7")]] kernel void subsettingAlgosKernel<7, Knuth, true>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findKnuthGuessKernel_8")]] kernel void subsettingAlgosKernel<8, Knuth>(
+template [[host_name("findKnuthGuessKernel_8")]] kernel void subsettingAlgosKernel<8, Knuth, true>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
 // Explicit specializations Most Parts
-template [[host_name("findMostPartsGuessKernel_2")]] kernel void subsettingAlgosKernel<2, MostParts>(
+template [[host_name("findMostPartsGuessKernel_2")]] kernel void subsettingAlgosKernel<2, MostParts, true>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findMostPartsGuessKernel_3")]] kernel void subsettingAlgosKernel<3, MostParts>(
+template [[host_name("findMostPartsGuessKernel_3")]] kernel void subsettingAlgosKernel<3, MostParts, true>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findMostPartsGuessKernel_4")]] kernel void subsettingAlgosKernel<4, MostParts>(
+template [[host_name("findMostPartsGuessKernel_4")]] kernel void subsettingAlgosKernel<4, MostParts, true>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findMostPartsGuessKernel_5")]] kernel void subsettingAlgosKernel<5, MostParts>(
+template [[host_name("findMostPartsGuessKernel_5")]] kernel void subsettingAlgosKernel<5, MostParts, true>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findMostPartsGuessKernel_6")]] kernel void subsettingAlgosKernel<6, MostParts>(
+template [[host_name("findMostPartsGuessKernel_6")]] kernel void subsettingAlgosKernel<6, MostParts, true>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findMostPartsGuessKernel_7")]] kernel void subsettingAlgosKernel<7, MostParts>(
+template [[host_name("findMostPartsGuessKernel_7")]] kernel void subsettingAlgosKernel<7, MostParts, true>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findMostPartsGuessKernel_8")]] kernel void subsettingAlgosKernel<8, MostParts>(
+template [[host_name("findMostPartsGuessKernel_8")]] kernel void subsettingAlgosKernel<8, MostParts, true>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
 // Explicit specializations Entropy
-template [[host_name("findEntropyGuessKernel_2")]] kernel void subsettingAlgosKernel<2, Entropy>(
+template [[host_name("findEntropyGuessKernel_2")]] kernel void subsettingAlgosKernel<2, Entropy, true>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findEntropyGuessKernel_3")]] kernel void subsettingAlgosKernel<3, Entropy>(
+template [[host_name("findEntropyGuessKernel_3")]] kernel void subsettingAlgosKernel<3, Entropy, true>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findEntropyGuessKernel_4")]] kernel void subsettingAlgosKernel<4, Entropy>(
+template [[host_name("findEntropyGuessKernel_4")]] kernel void subsettingAlgosKernel<4, Entropy, true>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findEntropyGuessKernel_5")]] kernel void subsettingAlgosKernel<5, Entropy>(
+template [[host_name("findEntropyGuessKernel_5")]] kernel void subsettingAlgosKernel<5, Entropy, true>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findEntropyGuessKernel_6")]] kernel void subsettingAlgosKernel<6, Entropy>(
+template [[host_name("findEntropyGuessKernel_6")]] kernel void subsettingAlgosKernel<6, Entropy, true>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findEntropyGuessKernel_7")]] kernel void subsettingAlgosKernel<7, Entropy>(
+template [[host_name("findEntropyGuessKernel_7")]] kernel void subsettingAlgosKernel<7, Entropy, true>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findEntropyGuessKernel_8")]] kernel void subsettingAlgosKernel<8, Entropy>(
+template [[host_name("findEntropyGuessKernel_8")]] kernel void subsettingAlgosKernel<8, Entropy, true>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
 // Explicit specializations Expected Size
-template [[host_name("findExpectedSizeGuessKernel_2")]] kernel void subsettingAlgosKernel<2, ExpectedSize>(
+template [[host_name("findExpectedSizeGuessKernel_2")]] kernel void subsettingAlgosKernel<2, ExpectedSize, true>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findExpectedSizeGuessKernel_3")]] kernel void subsettingAlgosKernel<3, ExpectedSize>(
+template [[host_name("findExpectedSizeGuessKernel_3")]] kernel void subsettingAlgosKernel<3, ExpectedSize, true>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findExpectedSizeGuessKernel_4")]] kernel void subsettingAlgosKernel<4, ExpectedSize>(
+template [[host_name("findExpectedSizeGuessKernel_4")]] kernel void subsettingAlgosKernel<4, ExpectedSize, true>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findExpectedSizeGuessKernel_5")]] kernel void subsettingAlgosKernel<5, ExpectedSize>(
+template [[host_name("findExpectedSizeGuessKernel_5")]] kernel void subsettingAlgosKernel<5, ExpectedSize, true>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findExpectedSizeGuessKernel_6")]] kernel void subsettingAlgosKernel<6, ExpectedSize>(
+template [[host_name("findExpectedSizeGuessKernel_6")]] kernel void subsettingAlgosKernel<6, ExpectedSize, true>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findExpectedSizeGuessKernel_7")]] kernel void subsettingAlgosKernel<7, ExpectedSize>(
+template [[host_name("findExpectedSizeGuessKernel_7")]] kernel void subsettingAlgosKernel<7, ExpectedSize, true>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
 
-template [[host_name("findExpectedSizeGuessKernel_8")]] kernel void subsettingAlgosKernel<8, ExpectedSize>(
+template [[host_name("findExpectedSizeGuessKernel_8")]] kernel void subsettingAlgosKernel<8, ExpectedSize, true>(
+    device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
+
+// -----------------------------------------------------------------------------------
+// Explicit specializations *without* MTLGPUFamilyMac2 support
+
+// Explicit specializations Knuth
+template [[host_name("findKnuthGuessKernel_no2_2")]] kernel void subsettingAlgosKernel<2, Knuth, false>(
+    device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
+
+template [[host_name("findKnuthGuessKernel_no2_3")]] kernel void subsettingAlgosKernel<3, Knuth, false>(
+    device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
+
+template [[host_name("findKnuthGuessKernel_no2_4")]] kernel void subsettingAlgosKernel<4, Knuth, false>(
+    device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
+
+template [[host_name("findKnuthGuessKernel_no2_5")]] kernel void subsettingAlgosKernel<5, Knuth, false>(
+    device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
+
+template [[host_name("findKnuthGuessKernel_no2_6")]] kernel void subsettingAlgosKernel<6, Knuth, false>(
+    device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
+
+template [[host_name("findKnuthGuessKernel_no2_7")]] kernel void subsettingAlgosKernel<7, Knuth, false>(
+    device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
+
+template [[host_name("findKnuthGuessKernel_no2_8")]] kernel void subsettingAlgosKernel<8, Knuth, false>(
+    device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
+
+// Explicit specializations Most Parts
+template [[host_name("findMostPartsGuessKernel_no2_2")]] kernel void subsettingAlgosKernel<2, MostParts, false>(
+    device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
+
+template [[host_name("findMostPartsGuessKernel_no2_3")]] kernel void subsettingAlgosKernel<3, MostParts, false>(
+    device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
+
+template [[host_name("findMostPartsGuessKernel_no2_4")]] kernel void subsettingAlgosKernel<4, MostParts, false>(
+    device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
+
+template [[host_name("findMostPartsGuessKernel_no2_5")]] kernel void subsettingAlgosKernel<5, MostParts, false>(
+    device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
+
+template [[host_name("findMostPartsGuessKernel_no2_6")]] kernel void subsettingAlgosKernel<6, MostParts, false>(
+    device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
+
+template [[host_name("findMostPartsGuessKernel_no2_7")]] kernel void subsettingAlgosKernel<7, MostParts, false>(
+    device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
+
+template [[host_name("findMostPartsGuessKernel_no2_8")]] kernel void subsettingAlgosKernel<8, MostParts, false>(
+    device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
+
+// Explicit specializations Entropy
+template [[host_name("findEntropyGuessKernel_no2_2")]] kernel void subsettingAlgosKernel<2, Entropy, false>(
+    device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
+
+template [[host_name("findEntropyGuessKernel_no2_3")]] kernel void subsettingAlgosKernel<3, Entropy, false>(
+    device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
+
+template [[host_name("findEntropyGuessKernel_no2_4")]] kernel void subsettingAlgosKernel<4, Entropy, false>(
+    device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
+
+template [[host_name("findEntropyGuessKernel_no2_5")]] kernel void subsettingAlgosKernel<5, Entropy, false>(
+    device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
+
+template [[host_name("findEntropyGuessKernel_no2_6")]] kernel void subsettingAlgosKernel<6, Entropy, false>(
+    device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
+
+template [[host_name("findEntropyGuessKernel_no2_7")]] kernel void subsettingAlgosKernel<7, Entropy, false>(
+    device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
+
+template [[host_name("findEntropyGuessKernel_no2_8")]] kernel void subsettingAlgosKernel<8, Entropy, false>(
+    device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
+
+// Explicit specializations Expected Size
+template [[host_name("findExpectedSizeGuessKernel_no2_2")]] kernel void subsettingAlgosKernel<2, ExpectedSize, false>(
+    device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
+
+template [[host_name("findExpectedSizeGuessKernel_no2_3")]] kernel void subsettingAlgosKernel<3, ExpectedSize, false>(
+    device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
+
+template [[host_name("findExpectedSizeGuessKernel_no2_4")]] kernel void subsettingAlgosKernel<4, ExpectedSize, false>(
+    device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
+
+template [[host_name("findExpectedSizeGuessKernel_no2_5")]] kernel void subsettingAlgosKernel<5, ExpectedSize, false>(
+    device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
+
+template [[host_name("findExpectedSizeGuessKernel_no2_6")]] kernel void subsettingAlgosKernel<6, ExpectedSize, false>(
+    device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
+
+template [[host_name("findExpectedSizeGuessKernel_no2_7")]] kernel void subsettingAlgosKernel<7, ExpectedSize, false>(
+    device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
+    device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);
+
+template [[host_name("findExpectedSizeGuessKernel_no2_8")]] kernel void subsettingAlgosKernel<8, ExpectedSize, false>(
     device const uint32_t *, device const uint4 *, constant uint32_t &, constant uint32_t *, constant uint4 *,
     device uint32_t *, device bool *, device uint32_t *, threadgroup uint32_t *, const uint, const uint, const uint);

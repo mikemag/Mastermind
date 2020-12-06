@@ -25,14 +25,14 @@ using namespace std;
 // There are a few algorithms to play with. See the various Strategy class implementations for details.
 
 // Config for a single game
-static constexpr bool playSingleGame = false;
+static constexpr bool playSingleGame = true;
 static constexpr Algo singleGameAlgo = Algo::Knuth;
 static constexpr GPUMode singleGameGPUMode = Both;
 static constexpr uint8_t singleGamePinCount = 5;    // 1-8, 4 is classic
 static constexpr uint8_t singleGameColorCount = 8;  // 1-15, 6 is classic
 
-static constexpr bool playMultipleGames = true;  // Play a set of games defined below.
-static constexpr bool runTests = true;           // Run unit tests and play Knuth's game
+static constexpr bool playMultipleGames = false;  // Play a set of games defined below.
+static constexpr bool runTests = true;            // Run unit tests and play Knuth's game
 
 void runUnitTests() {
   // Test cases from Miyoshi
