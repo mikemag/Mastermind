@@ -114,8 +114,9 @@
 
   if ([_mDevice supportsFamily:MTLGPUFamilyMac2]) {
     _mBufferFullyDiscriminatingCodewords =
-        [_mDevice newBufferWithLength:maxCodewords * (sizeof(uint32_t) / executionWidth + 1)
+        [_mDevice newBufferWithLength:((maxCodewords / executionWidth) + 1) * sizeof(uint32_t)
                               options:MTLResourceStorageModeShared];
+    NSLog(@"FD size=%lu", _mBufferFullyDiscriminatingCodewords.length);
   } else {
     _mBufferFullyDiscriminatingCodewords = nil;
   }
@@ -172,7 +173,12 @@
   // Execute the command
   [commandBuffer commit];
 
-  [commandBuffer waitUntilCompleted];
+  [commandBuffer waitUntilCompleted]; // mmmfixme: how to tell if it may have failed??
+
+  MTLCommandBufferStatus s = [commandBuffer status];
+  if (s == MTLCommandBufferStatusError) {
+    NSLog(@"Compute kernel failed! PS Size=%d Error: %@", *((uint32_t *)_mBufferPossibleSolutionsCount.contents), [commandBuffer error]);
+  }
 
   if (capture) {
     MTLCaptureManager *captureManager = [MTLCaptureManager sharedCaptureManager];
