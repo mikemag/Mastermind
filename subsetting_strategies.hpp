@@ -120,8 +120,8 @@ class StrategySubsettingGPU : public StrategySubsetting<pinCount, c, l> {
     setupGPUInterface(kernelName);
   }
 
-  StrategySubsettingGPU(Codeword<pinCount, c> initialGuess, const char *kernelName)
-      : StrategySubsetting<pinCount, c, l>{initialGuess} {
+  StrategySubsettingGPU(Codeword<pinCount, c> initialGuess, const char *kernelName, GPUMode mode)
+      : StrategySubsetting<pinCount, c, l>{initialGuess}, mode(mode) {
     gpuRootData = make_shared<StrategySubsettingGPURootData>();
     setupGPUInterface(kernelName);
   }
@@ -186,7 +186,8 @@ class StrategyKnuth : public StrategySubsettingGPU<p, c, l> {
     this->guess = Codeword<p, c>(presetInitialGuess());
   }
 
-  explicit StrategyKnuth(Codeword<p, c> initialGuess) : StrategySubsettingGPU<p, c, l>{initialGuess, kernelName} {}
+  explicit StrategyKnuth(Codeword<p, c> initialGuess, GPUMode mode = Both)
+      : StrategySubsettingGPU<p, c, l>{initialGuess, kernelName, mode} {}
 
   StrategyKnuth(StrategySubsettingGPU<p, c, l> &parent, Codeword<p, c> nextGuess,
                 std::vector<Codeword<p, c>> &nextPossibleSolutions, std::vector<uint32_t> &nextUsedCodewords)
@@ -233,7 +234,8 @@ class StrategyMostParts : public StrategySubsettingGPU<p, c, l> {
     this->guess = Codeword<p, c>(presetInitialGuess());
   }
 
-  explicit StrategyMostParts(Codeword<p, c> initialGuess) : StrategySubsettingGPU<p, c, l>{initialGuess, kernelName} {}
+  explicit StrategyMostParts(Codeword<p, c> initialGuess, GPUMode mode = Both)
+      : StrategySubsettingGPU<p, c, l>{initialGuess, kernelName, mode} {}
 
   StrategyMostParts(StrategySubsettingGPU<p, c, l> &parent, Codeword<p, c> nextGuess,
                     std::vector<Codeword<p, c>> &nextPossibleSolutions, std::vector<uint32_t> &nextUsedCodewords)
@@ -288,8 +290,8 @@ class StrategyExpectedSize : public StrategySubsettingGPU<p, c, l> {
     this->guess = Codeword<p, c>(presetInitialGuess());
   }
 
-  explicit StrategyExpectedSize(Codeword<p, c> initialGuess)
-      : StrategySubsettingGPU<p, c, l>{initialGuess, kernelName} {}
+  explicit StrategyExpectedSize(Codeword<p, c> initialGuess, GPUMode mode = Both)
+      : StrategySubsettingGPU<p, c, l>{initialGuess, kernelName, mode} {}
 
   StrategyExpectedSize(StrategySubsettingGPU<p, c, l> &parent, Codeword<p, c> nextGuess,
                        std::vector<Codeword<p, c>> &nextPossibleSolutions, std::vector<uint32_t> &nextUsedCodewords)
@@ -339,7 +341,8 @@ class StrategyEntropy : public StrategySubsettingGPU<p, c, l> {
     this->guess = Codeword<p, c>(presetInitialGuess());
   }
 
-  explicit StrategyEntropy(Codeword<p, c> initialGuess) : StrategySubsettingGPU<p, c, l>{initialGuess, kernelName} {}
+  explicit StrategyEntropy(Codeword<p, c> initialGuess, GPUMode mode = Both)
+      : StrategySubsettingGPU<p, c, l>{initialGuess, kernelName, mode} {}
 
   StrategyEntropy(StrategySubsettingGPU<p, c, l> &parent, Codeword<p, c> nextGuess,
                   std::vector<Codeword<p, c>> &nextPossibleSolutions, std::vector<uint32_t> &nextUsedCodewords)

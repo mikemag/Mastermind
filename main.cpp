@@ -3,6 +3,8 @@
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree.
 
+#include <set>
+
 #include "codeword.hpp"
 #include "compute_kernel_constants.h"
 #include "mastermind_config.h"
@@ -25,14 +27,15 @@ using namespace std;
 // There are a few algorithms to play with. See the various Strategy class implementations for details.
 
 // Config for a single game
-static constexpr bool playSingleGame = true;
+static constexpr bool playSingleGame = false;
 static constexpr Algo singleGameAlgo = Algo::Knuth;
 static constexpr GPUMode singleGameGPUMode = Both;
 static constexpr uint8_t singleGamePinCount = 5;    // 1-8, 4 is classic
 static constexpr uint8_t singleGameColorCount = 8;  // 1-15, 6 is classic
 
 static constexpr bool playMultipleGames = false;  // Play a set of games defined below.
-static constexpr bool runTests = true;            // Run unit tests and play Knuth's game
+static constexpr bool runTests = false;           // Run unit tests and play Knuth's game
+static constexpr bool findBestFirstGuesses = true;
 
 void runUnitTests() {
   // Test cases from Miyoshi
@@ -185,6 +188,93 @@ shared_ptr<Strategy<pinCount, colorCount, log>> makeStrategy(Algo algorithm, GPU
   }
 };
 
+template <uint8_t pinCount, uint8_t colorCount, bool log>
+shared_ptr<Strategy<pinCount, colorCount, log>> makeStrategy(Algo algorithm, uint32_t initialGuessPacked,
+                                                             GPUMode mode) {
+  Codeword<pinCount, colorCount> initialGuess(initialGuessPacked);
+  switch (algorithm) {
+    case FirstOne:
+      return make_shared<StrategyFirstOne<pinCount, colorCount, log>>(initialGuess);
+    case Random:
+      return make_shared<StrategyRandom<pinCount, colorCount, log>>(initialGuess);
+    case Knuth:
+      return make_shared<StrategyKnuth<pinCount, colorCount, log>>(initialGuess, mode);
+    case MostParts:
+      return make_shared<StrategyMostParts<pinCount, colorCount, log>>(initialGuess, mode);
+    case ExpectedSize:
+      return make_shared<StrategyExpectedSize<pinCount, colorCount, log>>(initialGuess, mode);
+    case Entropy:
+      return make_shared<StrategyEntropy<pinCount, colorCount, log>>(initialGuess, mode);
+    default:
+      return nullptr;
+  }
+};
+
+// Find a unique set of initial guesses. Using different digits for the same pattern isn't useful, nor are shuffled
+// patterns. For 4p6c the unique initial guesses ae 1111, 1112, 1122, 1123, 1234. Repetitions of the same pattern, such
+// as 2222, 2111, 3456, 1223, etc. aren't useful as they yield the same information.
+//
+// This is pretty brute-force. I feel like I'm missing a clever algorithm or representation for these.
+template <uint8_t p, uint8_t c>
+set<uint32_t> buildInitialGuessSet() {
+  set<uint32_t> initialGuessSet;
+  auto& allCodewords = Codeword<p, c>::getAllCodewords();
+  for (auto& codeword : allCodewords) {
+    auto packed = codeword.packedCodeword();
+
+    // Count the colors.
+    vector<uint8_t> colorCounts(16, 0);
+    while (packed != 0) {
+      uint8_t d = packed & 0xFu;
+      colorCounts[d]++;
+      packed >>= 4u;
+    }
+
+    // Sort the counts in reverse. Gives us the pattern we'll use next.
+    sort(begin(colorCounts), end(colorCounts), greater<>());
+
+    if (colorCounts[0] == p) {
+      // Never a good choice, so just skip it even though it is valid.
+      continue;
+    }
+
+    // Form up a new codeword using the pattern in colorCounts.
+    uint32_t uniquePacked = 0;
+    uint8_t nextDigit = 1;
+    for (auto count : colorCounts) {
+      for (int i = 0; i < count; i++) {
+        uniquePacked = (uniquePacked << 4u) | nextDigit;
+      }
+      nextDigit++;
+    }
+
+    // Toss it in a set to uniquify them
+    initialGuessSet.insert(uniquePacked);
+
+    if (colorCounts[0] == 1) {
+      // Once we hit all unique digits we can stop. Subsequent codewords are guaranteed to be dups.
+      break;
+    }
+  }
+
+  printf("Unique initial guesses: ");
+  for (auto cp : initialGuessSet) {
+    printf("%x, ", cp);
+  }
+  printf("\n\n");
+
+  return initialGuessSet;
+}
+
+template <uint8_t p, uint8_t c>
+void runWithAllInitialGuesses(Algo a, StatsRecorder& s) {
+  set<uint32_t> igs = buildInitialGuessSet<p, c>();
+  for (auto ig : igs) {
+    s.newRun();
+    playAllGamesForStrategy(makeStrategy<p, c, false>(a, ig, Both), s);
+  }
+}
+
 int main(int argc, const char* argv[]) {
   setupHistogramHeaders();
 
@@ -208,10 +298,85 @@ int main(int argc, const char* argv[]) {
     // NB: the templating of all of this means that multiple copies of much of the code are created for each entry in
     // this table. So only create it if we're actually playing multiple games. This keeps build times lower during
     // development.
+
+    //    static vector<void (*)(Algo, GPUMode, StatsRecorder&)> games = {
+    //        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<4, 6, false>(a, m), s); },
+    //        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<4, 7, false>(a, m), s); },
+    //        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<5, 8, false>(a, m), s); },
+    //    };
+
     static vector<void (*)(Algo, GPUMode, StatsRecorder&)> games = {
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<4, 6, false>(a, m), s); },
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<4, 7, false>(a, m), s); },
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<5, 8, false>(a, m), s); },
+        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<5, 11, false>(a, m), s); },
+        //        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<5, 12, false>(a, m),
+        //        s); },
+        //        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<5, 13, false>(a, m),
+        //        s); },
+        //        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<5, 14, false>(a, m),
+        //        s); },
+        //        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<5, 15, false>(a, m),
+        //        s); },
+
+        //        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<6, 8, false>(a, m), s);
+        //        },
+        //        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<6, 9, false>(a, m), s);
+        //        },
+        //        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<6, 10, false>(a, m),
+        //        s); },
+        //        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<6, 11, false>(a, m),
+        //        s); },
+        //        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<6, 12, false>(a, m),
+        //        s); },
+        //        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<6, 13, false>(a, m),
+        //        s); },
+        //        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<6, 14, false>(a, m),
+        //        s); },
+        //        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<6, 15, false>(a, m),
+        //        s); },
+
+        //      [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<7, 6, false>(a, m), s);
+        //      },
+        //      [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<7, 7, false>(a, m), s);
+        //      },
+        //      [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<7, 8, false>(a, m), s);
+        //      },
+        //      [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<7, 9, false>(a, m), s);
+        //      },
+        //      [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<7, 10, false>(a, m), s);
+        //      },
+        //      [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<7, 11, false>(a, m), s);
+        //      },
+        //      [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<7, 12, false>(a, m), s);
+        //      },
+        //      [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<7, 13, false>(a, m), s);
+        //      },
+        //      [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<7, 14, false>(a, m), s);
+        //      },
+        //      [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<7, 15, false>(a, m), s);
+        //      },
+
+        //      [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<8, 5, false>(a, m), s);
+        //      },
+        //      [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<8, 6, false>(a, m), s);
+        //      },
+        //      [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<8, 7, false>(a, m), s);
+        //      },
+        //      [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<8, 8, false>(a, m), s);
+        //      },
+        //      [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<8, 9, false>(a, m), s);
+        //      },
+        //      [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<8, 10, false>(a, m), s);
+        //      },
+        //      [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<8, 11, false>(a, m), s);
+        //      },
+        //      [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<8, 12, false>(a, m), s);
+        //      },
+        //      [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<8, 13, false>(a, m), s);
+        //      },
+        //      [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<8, 14, false>(a, m), s);
+        //      },
+        //      [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<8, 15, false>(a, m), s);
+        //      },
+
     };
 
     static vector<Algo> interestingAlgos = {Knuth, MostParts, Entropy, ExpectedSize, FirstOne};
@@ -228,6 +393,33 @@ int main(int argc, const char* argv[]) {
           statsRecorder.newRun();
           f(a, m, statsRecorder);
         }
+      }
+    }
+  }
+
+  if (findBestFirstGuesses) {
+    constexpr static uint8_t pc = 6;
+    static vector<void (*)(Algo, StatsRecorder&)> games = {
+        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 2>(a, s); },
+        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 3>(a, s); },
+        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 4>(a, s); },
+        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 5>(a, s); },
+        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 6>(a, s); },
+        //        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 7>(a, s); },
+        //        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 8>(a, s); },
+        //        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 9>(a, s); },
+        //        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 10>(a, s); },
+        //        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 11>(a, s); },
+        //        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 12>(a, s); },
+        //        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 13>(a, s); },
+        //        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 14>(a, s); },
+        //        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 15>(a, s); },
+    };
+    static vector<Algo> interestingAlgos = {Knuth, MostParts, Entropy, ExpectedSize, FirstOne};
+
+    for (auto& f : games) {
+      for (auto& a : interestingAlgos) {
+        f(a, statsRecorder);
       }
     }
   }

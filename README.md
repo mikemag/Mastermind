@@ -77,6 +77,7 @@ GPU is already pulling ahead on some algorithms. Because of this I really haven'
 
 * [Packed Indices for Mastermind Scores](docs/Score_Ordinals.md)
 * [Score Caching Considered Harmful](docs/Score_Cache.md)
+* [Initial Guesses](docs/initial_guesses/Initial_Guesses.md)
 
 *TODO: I'll be adding more details on the tradeoffs in various parts of the implementation, the GPU algorithms, performance work,
 etc. over time.*
