@@ -27,15 +27,15 @@ using namespace std;
 // There are a few algorithms to play with. See the various Strategy class implementations for details.
 
 // Config for a single game
-static constexpr bool playSingleGame = true;
+static constexpr bool playSingleGame = false;
 static constexpr Algo singleGameAlgo = Algo::Entropy;
 static constexpr GPUMode singleGameGPUMode = Both;
-static constexpr uint8_t singleGamePinCount = 5;    // 1-8, 4 is classic
+static constexpr uint8_t singleGamePinCount = 5;     // 1-8, 4 is classic
 static constexpr uint8_t singleGameColorCount = 11;  // 1-15, 6 is classic
 
 static constexpr bool playMultipleGames = false;  // Play a set of games defined below.
 static constexpr bool runTests = false;           // Run unit tests and play Knuth's game
-static constexpr bool findBestFirstGuesses = false;
+static constexpr bool findBestFirstGuesses = true;
 
 void runUnitTests() {
   // Test cases from Miyoshi
@@ -398,15 +398,15 @@ int main(int argc, const char* argv[]) {
   }
 
   if (findBestFirstGuesses) {
-    constexpr static uint8_t pc = 7;
+    constexpr static uint8_t pc = 6;
     static vector<void (*)(Algo, StatsRecorder&)> games = {
-        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 2>(a, s); },
-        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 3>(a, s); },
-        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 4>(a, s); },
-        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 5>(a, s); },
-        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 6>(a, s); },
+        //        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 2>(a, s); },
+        //        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 3>(a, s); },
+        //        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 4>(a, s); },
+        //        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 5>(a, s); },
+        //        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 6>(a, s); },
         //        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 7>(a, s); },
-        //        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 8>(a, s); },
+        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 8>(a, s); },
         //        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 9>(a, s); },
         //        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 10>(a, s); },
         //        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 11>(a, s); },
@@ -428,7 +428,8 @@ int main(int argc, const char* argv[]) {
   istringstream ss(MASTERMIND_GIT_COMMIT_DATE);
   ss >> get_time(&t, "%Y-%m-%d %H:%M:%S");
   stringstream fs;
-  fs << "mastermind_run_stats_find_ig_7p_6_" << put_time(&t, "%Y%m%d_%H%M%S") << "_" << MASTERMIND_GIT_COMMIT_HASH << ".csv";
+  fs << "mastermind_run_stats_find_ig_6p_8_" << put_time(&t, "%Y%m%d_%H%M%S") << "_" << MASTERMIND_GIT_COMMIT_HASH
+     << ".csv";
   statsRecorder.writeStats(fs.str());
 
   return 0;

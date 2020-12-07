@@ -102,11 +102,12 @@ def process_results():
 
     result_files = [
         '../mastermind_run_stats_find_ig_3p_20201205_175810_6bacb03.csv',
-        '../mastermind_run_stats_find_ig_6p_6_20201205_175810_6bacb03.csv',
+        '../mastermind_run_stats_find_ig_6p_8_20201205_175810_6bacb03.csv',
         '../mastermind_run_stats_find_ig_4p_20201205_175810_6bacb03.csv',
         '../mastermind_run_stats_find_ig_7p_6_20201205_175810_6bacb03.csv',
         '../mastermind_run_stats_find_ig_2p_20201205_175810_6bacb03.csv',
         '../mastermind_run_stats_find_ig_5p_20201205_175810_6bacb03.csv',
+        '../mastermind_run_stats_find_ig_8p_4_20201206_163908_9f2053f.csv',
     ]
 
     for f in result_files:

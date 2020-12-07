@@ -38,6 +38,9 @@ constexpr uint32_t presetInitialGuessKnuth() {
       return 0x112233;
     case 0x66:
       return 0x111234;
+    case 0x67:
+    case 0x68:
+      return 0x112234;
     case 0x42:
       return 0x1112;
     case 0x43:
@@ -96,6 +99,12 @@ constexpr uint32_t presetInitialGuessKnuth() {
     case 0x5b:
     case 0x5c:
       return 0x12345;
+    case 0x82:
+      return 0x11111222;
+    case 0x83:
+      return 0x11122233;
+    case 0x84:
+      return 0x11122334;
     default:
       return (Codeword<p, c>::onePins >> p / 2 * 4) + Codeword<p, c>::onePins;
   }
@@ -126,6 +135,8 @@ constexpr uint32_t presetInitialGuessMostParts() {
     case 0x65:
       return 0x111223;
     case 0x66:
+    case 0x67:
+    case 0x68:
       return 0x112233;
     case 0x42:
       return 0x1112;
@@ -184,6 +195,12 @@ constexpr uint32_t presetInitialGuessMostParts() {
     case 0x5b:
     case 0x5c:
       return 0x11234;
+    case 0x82:
+      return 0x11112222;
+    case 0x83:
+      return 0x11112223;
+    case 0x84:
+      return 0x11122233;
     default:
       return (Codeword<p, c>::onePins >> p / 2 * 4) + Codeword<p, c>::onePins;
   }
@@ -214,7 +231,10 @@ constexpr uint32_t presetInitialGuessEntropy() {
     case 0x66:
       return 0x111223;
     case 0x65:
+    case 0x68:
       return 0x112233;
+    case 0x67:
+      return 0x112234;
     case 0x42:
       return 0x1112;
     case 0x43:
@@ -271,6 +291,12 @@ constexpr uint32_t presetInitialGuessEntropy() {
     case 0x5b:
     case 0x5c:
       return 0x11234;
+    case 0x82:
+      return 0x11111222;
+    case 0x83:
+      return 0x11122233;
+    case 0x84:
+      return 0x11112234;
     default:
       return (Codeword<p, c>::onePins >> p / 2 * 4) + Codeword<p, c>::onePins;
   }
@@ -303,6 +329,9 @@ constexpr uint32_t presetInitialGuessExpectedSize() {
     case 0x65:
     case 0x66:
       return 0x112233;
+    case 0x67:
+    case 0x68:
+      return 0x112234;
     case 0x42:
       return 0x1112;
     case 0x43:
@@ -359,6 +388,12 @@ constexpr uint32_t presetInitialGuessExpectedSize() {
     case 0x5a:
     case 0x5c:
       return 0x11234;
+    case 0x82:
+      return 0x11111222;
+    case 0x83:
+      return 0x11112223;
+    case 0x84:
+      return 0x11122233;
     default:
       return (Codeword<p, c>::onePins >> p / 2 * 4) + Codeword<p, c>::onePins;
   }
@@ -385,11 +420,13 @@ constexpr uint32_t presetInitialGuessFirstOne() {
     case 0x62:
       return 0x111222;
     case 0x63:
+    case 0x68:
       return 0x112233;
     case 0x64:
     case 0x65:
       return 0x111223;
     case 0x66:
+    case 0x67:
       return 0x123456;
     case 0x42:
     case 0x44:
@@ -449,6 +486,12 @@ constexpr uint32_t presetInitialGuessFirstOne() {
     case 0x59:
     case 0x5a:
       return 0x11234;
+    case 0x82:
+      return 0x11112222;
+    case 0x83:
+      return 0x11122233;
+    case 0x84:
+      return 0x11223344;
     default:
       return (Codeword<p, c>::onePins >> p / 2 * 4) + Codeword<p, c>::onePins;
   }
