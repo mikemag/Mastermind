@@ -52,6 +52,7 @@
 		274B56CB257472460058882F /* utils.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = utils.hpp; sourceTree = "<group>"; };
 		274B56CC257472460058882F /* README.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		278FA71425609AE9001C553E /* Mastermind */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Mastermind; sourceTree = BUILT_PRODUCTS_DIR; };
+		27C366FC257E2EA8001851EB /* preset_initial_guesses.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = preset_initial_guesses.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -77,6 +78,7 @@
 		278FA70B25609AE9001C553E = {
 			isa = PBXGroup;
 			children = (
+				27C366FC257E2EA8001851EB /* preset_initial_guesses.h */,
 				274B56C8257472460058882F /* codeword.cpp */,
 				274B56C6257472460058882F /* codeword.hpp */,
 				274AB9F82576F300008AD945 /* compute_kernel_constants.h */,

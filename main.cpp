@@ -317,9 +317,7 @@ int main(int argc, const char* argv[]) {
     //    };
 
     // TODO:
-    // - 6p8c -- Both only
-    // - 7p6c -- Both only
-    // - 8p4c -- Both only
+    // - how many of the next size up can we get in a reasonable amount of time?
     csvTag = "6_7_8_smalls_";
     static vector<void (*)(Algo, GPUMode, StatsRecorder&)> games = {
         [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<6, 2, false>(a, m), s); },
@@ -329,16 +327,20 @@ int main(int argc, const char* argv[]) {
         [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<6, 6, false>(a, m), s); },
         [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<6, 7, false>(a, m), s); },
         [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<6, 8, false>(a, m), s); },
+//        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<6, 9, false>(a, m), s); },
+//        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<6, 10, false>(a, m), s); },
 
         [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<7, 2, false>(a, m), s); },
         [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<7, 3, false>(a, m), s); },
         [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<7, 4, false>(a, m), s); },
         [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<7, 5, false>(a, m), s); },
         [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<7, 6, false>(a, m), s); },
+//        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<7, 7, false>(a, m), s); },
 
         [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<8, 2, false>(a, m), s); },
         [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<8, 3, false>(a, m), s); },
         [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<8, 4, false>(a, m), s); },
+//        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<8, 5, false>(a, m), s); },
     };
 
     static vector<Algo> interestingAlgos = {Knuth, MostParts, Entropy, ExpectedSize, FirstOne};
