@@ -63,7 +63,7 @@ def process_results(metric, metric_format, header):
         print('### ' + a)
         print()
         print('', ' ', *[str(c) + 'c' for c in range(2, 16)], '', sep='|')
-        print('|:---:' * 15, '|', sep='')
+        print('|---:' * 15, '|', sep='')
 
         for p in range(2, 9):
             any_printed = False

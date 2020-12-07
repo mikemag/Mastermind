@@ -316,30 +316,36 @@ int main(int argc, const char* argv[]) {
     //        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<5, 8, false>(a, m), s); },
     //    };
 
-    csvTag = "5_smalls_";
-    constexpr static uint8_t pc = 5;
+    // TODO:
+    // - 6p8c -- Both only
+    // - 7p6c -- Both only
+    // - 8p4c -- Both only
+    csvTag = "6_7_8_smalls_";
     static vector<void (*)(Algo, GPUMode, StatsRecorder&)> games = {
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<pc, 2, false>(a, m), s); },
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<pc, 3, false>(a, m), s); },
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<pc, 4, false>(a, m), s); },
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<pc, 5, false>(a, m), s); },
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<pc, 6, false>(a, m), s); },
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<pc, 7, false>(a, m), s); },
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<pc, 8, false>(a, m), s); },
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<pc, 9, false>(a, m), s); },
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<pc, 10, false>(a, m), s); },
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<pc, 11, false>(a, m), s); },
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<pc, 12, false>(a, m), s); },
-//        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<pc, 13, false>(a, m), s); },
-//        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<pc, 14, false>(a, m), s); },
-//        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<pc, 15, false>(a, m), s); },
+        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<6, 2, false>(a, m), s); },
+        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<6, 3, false>(a, m), s); },
+        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<6, 4, false>(a, m), s); },
+        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<6, 5, false>(a, m), s); },
+        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<6, 6, false>(a, m), s); },
+        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<6, 7, false>(a, m), s); },
+        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<6, 8, false>(a, m), s); },
 
+        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<7, 2, false>(a, m), s); },
+        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<7, 3, false>(a, m), s); },
+        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<7, 4, false>(a, m), s); },
+        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<7, 5, false>(a, m), s); },
+        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<7, 6, false>(a, m), s); },
+
+        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<8, 2, false>(a, m), s); },
+        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<8, 3, false>(a, m), s); },
+        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<8, 4, false>(a, m), s); },
     };
 
     static vector<Algo> interestingAlgos = {Knuth, MostParts, Entropy, ExpectedSize, FirstOne};
 
 #ifdef __MM_GPU_METAL__
-    static vector<GPUMode> gpuModes = {CPU, Both};
+    //static vector<GPUMode> gpuModes = {CPU, Both};
+    static vector<GPUMode> gpuModes = {Both};
 #else
     static vector<GPUMode> gpuModes = {CPU};
 #endif
