@@ -25,53 +25,20 @@ for details, and Compiler Explorer links showing the generated code.
 
 ## Results
 
+More results and data are in the [results directory](results/). 
 Using the GPU for larger games is much faster, as you would expect. 5p8c is a nice example:
 
-#### 5p8c
-
 |Strategy|Initial Guess|Max Turns|GPU Mode|Average Turns|Time (s)|CPU Scores|GPU Scores|GPU Kernels
 |:---:|:---:|:---:|:---:|:---:|---:|---:|---:|:---:|
-|First One|45678|10|CPU|5.9250|0.0315| 2,608,292 | | |
-|Knuth|11234|7|CPU|5.6142|6.7618| 3,307,924,999 | | |   
-| | | |Both|5.6142|0.9931| 2,518,787 | 3,466,395,648 | 2,850| 
-|Most Parts|11223|8|CPU|5.5491|6.9304| 3,327,257,765 | | |   
-| | | |Both|5.5491|1.3661| 2,742,071 | 3,471,933,440 | 2,795| 
-|Entropy|11234|8|CPU|5.4898|10.7578| 3,225,973,291 | | |   
-| | | |Both|5.4902|0.9179| 2,639,743 | 3,370,909,696 | 2,561| 
-|Expected Size|11234|7|CPU|5.5038|9.4489| 3,214,838,623 | | |   
-| | | |Both|5.5022|1.3006| 2,593,404 | 3,360,686,080 | 2,531| 
-
-There is overhead to using the GPU, of course, and there are tuning points for when you use the GPU vs. falling back to
-the CPU. But in general even for reasonable games like 4p6c the GPU is quite close. And you can see that for 4p7c the
-GPU is already pulling ahead on some algorithms. Because of this I really haven't played with tuning the cutoff much at all.
-
-#### 4p6c
-
-|Strategy|Initial Guess|Max Turns|GPU Mode|Average Turns|Time (s)|CPU Scores|GPU Scores|GPU Kernels
-|:---:|:---:|:---:|:---:|:---:|---:|---:|---:|:---:|
-|First One|3456|7|CPU|4.6211|0.0008| 55,417 | | |
-|Knuth|1122|5|CPU|4.4761|0.0085| 3,237,885 | | |   
-| | | |Both|4.4761|0.0142| 62,675 | 3,373,488 | 100| 
-|Most Parts|1123|6|CPU|4.3735|0.0082| 3,289,320 | | |   
-| | | |Both|4.3735|0.0168| 61,113 | 3,412,368 | 109| 
-|Entropy|1234|6|CPU|4.4159|0.0164| 3,320,344 | | |   
-| | | |Both|4.4151|0.0168| 58,489 | 3,443,472 | 106| 
-|Expected Size|1123|6|CPU|4.3935|0.0163| 3,256,505 | | |   
-| | | |Both|4.3951|0.0169| 62,062 | 3,346,272 | 106| 
-
-#### 4p7c
-
-|Strategy|Initial Guess|Max Turns|GPU Mode|Average Turns|Time (s)|CPU Scores|GPU Scores|GPU Kernels
-|:---:|:---:|:---:|:---:|:---:|---:|---:|---:|:---:|
-|First One|4567|8|CPU|5.0675|0.0017| 114,469 | | |
-|Knuth|1234|6|CPU|4.8367|0.0345| 13,577,917 | | |   
-| | | |Both|4.8367|0.0351| 116,345 | 14,478,030 | 267| 
-|Most Parts|1123|6|CPU|4.7430|0.0326| 13,470,924 | | |   
-| | | |Both|4.7430|0.0334| 121,453 | 14,245,133 | 257| 
-|Entropy|1234|6|CPU|4.7397|0.0573| 13,183,270 | | |   
-| | | |Both|4.7401|0.0337| 118,016 | 13,983,424 | 237| 
-|Expected Size|1234|6|CPU|4.7530|0.0459| 13,164,912 | | |   
-| | | |Both|4.7505|0.0331| 116,820 | 13,875,379 | 237| 
+|First One|87654|9|CPU|5.9092|0.0393|2,596,79|
+|Knuth|11223|7|CPU|5.6084|6.6558|3,296,841,082|
+| | | |Both|5.6084|1.0228| 2,541,260.00|3,455,090,688|2,824|
+|Most Parts|11223|8|CPU|5.5491|6.7347|3,327,257,765|
+| | | |Both|5.5491|1.2146| 2,742,071.00|3,471,933,440|2,795|
+|Entropy|11223|7|CPU|5.4846|10.6226|3,212,855,854|
+| | |7|Both|5.4855|1.1068| 2,671,408.00|3,359,539,200|2,523|
+|Expected Size|11223|7|CPU|5.5016|8.4684|3,218,686,624|
+| | | |Both|5.4995|0.9620| 2,624,778.00|3,358,359,552|2,550|
 
 ## Docs
 
@@ -107,23 +74,7 @@ A CSV file with stats and run parameters is produced at the end.
 
 All development and tests done (so far) on a MacBook Pro (16-inch, 2019) running macOS Catalina 10.15.7. The GPU kernels
 have been tested on both GPUs in my laptop: the integrated Intel UHD Graphics 630 and the discrete AMD Radeon Pro 5500M.
-The program will tell you about the GPUs on your system and which one it selected when you run:
-
-```
-GPU devices available:
-
-GPU name: AMD Radeon Pro 5500M
-Max threads per threadgroup: 1024
-Max threadgroup memory length: 65536
-Max buffer length: 3758096384
-
-GPU name: Intel(R) UHD Graphics 630
-Max threads per threadgroup: 1024
-Max threadgroup memory length: 65536
-Max buffer length: 2147483648
-
-Using GPU: AMD Radeon Pro 5500M
-``` 
+The program will tell you about the GPUs on your system and which one it selected when you run.
 
 ## License
 
