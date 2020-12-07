@@ -9,6 +9,7 @@
 
 #include "gpu_interface_wrapper.hpp"
 #include "strategy.hpp"
+#include "preset_initial_guesses.h"
 
 // These strategies all rely on splitting the remaining possible guesses into groups or subsets based on their scores
 // vs each other.
@@ -199,16 +200,7 @@ class StrategyKnuth : public StrategySubsettingGPU<p, c, l> {
   std::shared_ptr<Strategy<p, c, l>> createNewMove(Score r, Codeword<p, c> nextGuess) override;
 
   constexpr uint32_t presetInitialGuess() {
-    switch (Strategy<p, c, l>::packedPinsAndColors) {
-      case 0x46:
-        return 0x1122;
-      case 0x47:
-        return 0x1234;
-      case 0x58:
-        return 0x11234;
-      default:
-        return Strategy<p, c, l>::genericInitialGuess;
-    }
+    return presetInitialGuessKnuth<p,c,l>();
   }
 };
 
@@ -247,15 +239,7 @@ class StrategyMostParts : public StrategySubsettingGPU<p, c, l> {
   std::shared_ptr<Strategy<p, c, l>> createNewMove(Score r, Codeword<p, c> nextGuess) override;
 
   constexpr uint32_t presetInitialGuess() {
-    switch (Strategy<p, c, l>::packedPinsAndColors) {
-      case 0x46:
-      case 0x47:
-        return 0x1123;
-      case 0x58:
-        return 0x11223;
-      default:
-        return Strategy<p, c, l>::genericInitialGuess;
-    }
+    return presetInitialGuessMostParts<p,c,l>();
   }
 };
 
@@ -303,16 +287,7 @@ class StrategyExpectedSize : public StrategySubsettingGPU<p, c, l> {
   std::shared_ptr<Strategy<p, c, l>> createNewMove(Score r, Codeword<p, c> nextGuess) override;
 
   constexpr uint32_t presetInitialGuess() {
-    switch (Strategy<p, c, l>::packedPinsAndColors) {
-      case 0x46:
-        return 0x1123;
-      case 0x47:
-        return 0x1234;
-      case 0x58:
-        return 0x11234;
-      default:
-        return Strategy<p, c, l>::genericInitialGuess;
-    }
+    return presetInitialGuessExpectedSize<p,c,l>();
   }
 };
 
@@ -354,14 +329,7 @@ class StrategyEntropy : public StrategySubsettingGPU<p, c, l> {
   std::shared_ptr<Strategy<p, c, l>> createNewMove(Score r, Codeword<p, c> nextGuess) override;
 
   constexpr uint32_t presetInitialGuess() {
-    switch (p) {
-      case 4:
-        return 0x1234;
-      case 5:
-        return 0x11234;
-      default:
-        return Strategy<p, c, l>::genericInitialGuess;
-    }
+    return presetInitialGuessEntropy<p,c,l>();
   }
 };
 

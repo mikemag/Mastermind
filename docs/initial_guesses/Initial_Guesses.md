@@ -3,11 +3,8 @@
 All Mastermind algorithms are sensitive to the first guess chosen. Guessing 1111 first gives far less information about
 the secret than 1234. There are a limited set of different choices for every combination of pin and color counts. 
 
-I've run all games for each deterministic algorithm with each possible initial guess. Raw results are in this 
-directory.
-
-TODO: add results for 6p, 7p, and 8p games.
-TODO: add tables with results for each algorithm.
+I've run all games for each deterministic algorithm with each possible initial guess. Raw results are in the .csv files in this 
+directory. Tables below give what most people want: the one that yields the best average turns.
 
 ## Patterns of initial guesses
 
@@ -23,6 +20,74 @@ exactly the same amount of information.
 Sure, for some secrets one might give a lot more information than another. For instance, if the secret is 2222 then
 certainly guessing 2222 first is a big win. But over all games, with all digits equally likely, nothing is gained from
 picking variations on the same pattern.
+
+## The best initial guesses for each algorithm
+
+Each table shows the first guess which gives the **lowest number of average turns** over all games, which also
+usually yields the smallest maximum number of turns. However, this is not always the case, and entries marked with
+an asterisk(*) mean that there is an alternate first guess which yields a smaller maximum number of turns at the expense
+of a slightly worse average. This can be found in the relevant .csv files in this directory; it wasn't worth the clutter
+in the tables to list both.
+
+### Knuth
+
+| |2c|3c|4c|5c|6c|7c|8c|9c|10c|11c|12c|13c|14c|15c|
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+|2p|11|12|12|12|12|12|12|12|12|12|12|12|12|12|
+|3p|112|112|112|112|123|123|123|123|123|123|123|123|123|123|
+|4p|1112|1123|1123|1123|1122|1234|1234|1234|1234|1234|1234|1234|1234|1234*|
+|5p|11122|11122|11223|11223|11223|11223|11223|11234|12345|12345|12345|
+|6p|111222|111223|112233|112233|111234|
+|7p|1111222|1112233|1112233|1112234|1122334|
+|
+
+### Most Parts
+
+| |2c|3c|4c|5c|6c|7c|8c|9c|10c|11c|12c|13c|14c|15c|
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+|2p|11|12|12|12|12|12|12|12|12|12|12|12|12|12|
+|3p|112|112|112|123|123|123|123|123|123|123|123|123|123|123|
+|4p|1112|1123|1123|1123|1123|1123|1234|1234|1234|1234*|1234|1234|1234|1234|
+|5p|11122|11123|11223|11223|11223*|11223|11223|11234|11234|11234|11234|
+|6p|111122|111223|111223|111223|112233|
+|7p|1111222|1111223|1112223|1112233|1112233|
+|
+
+### Entropy
+
+| |2c|3c|4c|5c|6c|7c|8c|9c|10c|11c|12c|13c|14c|15c|
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+|2p|11|12|12|12|12|12|12|12|12|12|12|12|12|12|
+|3p|112|112|112|123|123|123|123|123|123|123|123|123|123|123|
+|4p|1112|1123|1123|1123|1123|1123|1234|1234|1234|1234|1234|1234|1234|1234|
+|5p|11122|11123|11223|11223|11223*|11223|11223|11234|11234|11234|11234|
+|6p|111122|111223|111223|112233*|111223|
+|7p|1111222|1112223|1112233|1112233|1112233|
+|
+
+### Expected Size
+
+| |2c|3c|4c|5c|6c|7c|8c|9c|10c|11c|12c|13c|14c|15c|
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+|2p|11|12|12|12|12|12|12|12|12|12|12|12|12|12|
+|3p|112|112|112|123|123|123|123|123|123|123|123|123|123|123|
+|4p|1112|1123|1123|1123|1123*|1234|1234|1234|1234*|1234|1234|1234|1234|1234|
+|5p|11122|11123|11223|11223|11223|11223|11223|11234|11234|11223|11234|
+|6p|111122|111223|111234|112233*|112233|
+|7p|1111222|1112223|1112233|1112233|1112233|
+|
+
+### First One
+
+| |2c|3c|4c|5c|6c|7c|8c|9c|10c|11c|12c|13c|14c|15c|
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+|2p|11|12|12|12|12|12|12|12|12|12|12|12|12|12|
+|3p|112|112|112|112|123*|123*|123*|123*|123*|123*|123*|123*|123*|123*|
+|4p|1122|1123|1122|1122|1123|1123|1123|1123|1234*|1234*|1234*|1234*|1234*|1234*|
+|5p|11122|11223|11223*|12345|11122*|11223*|11223*|11234|11234|12345*|12345*|
+|6p|111222|112233*|111223|111223|123456*|
+|7p|1111222|1112223|1122334|1111223|1112233*|
+|
 
 ## Unique initial guess patterns for various game sizes:
 

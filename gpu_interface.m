@@ -116,7 +116,6 @@
     _mBufferFullyDiscriminatingCodewords =
         [_mDevice newBufferWithLength:((maxCodewords / executionWidth) + 1) * sizeof(uint32_t)
                               options:MTLResourceStorageModeShared];
-    NSLog(@"FD size=%lu", _mBufferFullyDiscriminatingCodewords.length);
   } else {
     _mBufferFullyDiscriminatingCodewords = nil;
   }
@@ -173,11 +172,13 @@
   // Execute the command
   [commandBuffer commit];
 
-  [commandBuffer waitUntilCompleted]; // mmmfixme: how to tell if it may have failed??
+  [commandBuffer waitUntilCompleted];
 
   MTLCommandBufferStatus s = [commandBuffer status];
   if (s == MTLCommandBufferStatusError) {
-    NSLog(@"Compute kernel failed! PS Size=%d Error: %@", *((uint32_t *)_mBufferPossibleSolutionsCount.contents), [commandBuffer error]);
+    NSLog(@"Compute kernel failed! PS Size=%d Error: %@", *((uint32_t *)_mBufferPossibleSolutionsCount.contents),
+          [commandBuffer error]);
+    exit(-1);
   }
 
   if (capture) {

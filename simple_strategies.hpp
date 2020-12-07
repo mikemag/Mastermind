@@ -6,6 +6,7 @@
 #pragma once
 
 #include "strategy.hpp"
+#include "preset_initial_guesses.h"
 
 // All of these are very simple gameplay strategies which are very fast and easy to understand.
 
@@ -40,16 +41,7 @@ class StrategyFirstOne : public Strategy<p, c, l> {
   std::shared_ptr<Strategy<p, c, l>> createNewMove(Score r, Codeword<p, c> nextGuess) override;
 
   constexpr uint32_t presetInitialGuess() {
-    switch (Strategy<p, c, l>::packedPinsAndColors) {
-      case 0x46:
-        return 0x3456;
-      case 0x47:
-        return 0x4567;
-      case 0x58:
-        return 0x45678;
-      default:
-        return Strategy<p, c, l>::genericInitialGuess;
-    }
+    return presetInitialGuessFirstOne<p,c,l>();
   }
 };
 

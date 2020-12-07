@@ -69,10 +69,6 @@ class Strategy {
   virtual Codeword<p, c> selectNextGuess() = 0;
   virtual std::shared_ptr<Strategy<p, c, l>> createNewMove(Score r, Codeword<p, c> nextGuess) = 0;
 
-  // Knuth's algorithm uses 1122 to start. Generalize that to half 1's and half 2's for any number of pins.
-  constexpr static uint32_t genericInitialGuess = (Codeword<p, c>::onePins >> p / 2 * 4) + Codeword<p, c>::onePins;
-
-  constexpr static uint8_t packedPinsAndColors = (p << 4u) | c;
   constexpr static uint32_t maxScoreSlots = (p << 4u) + 1;
   constexpr static int totalScores = (p * (p + 3)) / 2;
 

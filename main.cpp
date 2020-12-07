@@ -398,7 +398,7 @@ int main(int argc, const char* argv[]) {
   }
 
   if (findBestFirstGuesses) {
-    constexpr static uint8_t pc = 6;
+    constexpr static uint8_t pc = 7;
     static vector<void (*)(Algo, StatsRecorder&)> games = {
         [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 2>(a, s); },
         [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 3>(a, s); },
@@ -428,7 +428,7 @@ int main(int argc, const char* argv[]) {
   istringstream ss(MASTERMIND_GIT_COMMIT_DATE);
   ss >> get_time(&t, "%Y-%m-%d %H:%M:%S");
   stringstream fs;
-  fs << "mastermind_run_stats_" << put_time(&t, "%Y%m%d_%H%M%S") << "_" << MASTERMIND_GIT_COMMIT_HASH << ".csv";
+  fs << "mastermind_run_stats_find_ig_7p_6_" << put_time(&t, "%Y%m%d_%H%M%S") << "_" << MASTERMIND_GIT_COMMIT_HASH << ".csv";
   statsRecorder.writeStats(fs.str());
 
   return 0;
