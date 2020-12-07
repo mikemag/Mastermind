@@ -20,6 +20,8 @@ def load_csv(filename, results, metric):
         avg_turns_col = header.index('Average Turns')
         max_turns_col = header.index('Max Turns')
         time_col = header.index('Elapsed (s)')
+        cpu_scores_col = header.index('CPU Scores')
+        gpu_scores_col = header.index('GPU Scores')
 
         for row in r:
             ar = results.setdefault(row[algo_col], {})
@@ -29,7 +31,8 @@ def load_csv(filename, results, metric):
                     'avg': 9999.9,
                     'ig': '',
                     'max': 9999,
-                    'time': 99999.9
+                    'time': 99999.9,
+                    'scores': 999_999_999_999_999,
                 },
             })
 
@@ -38,6 +41,7 @@ def load_csv(filename, results, metric):
                 'avg': float(row[avg_turns_col]),
                 'max': int(row[max_turns_col]),
                 'time': float(row[time_col]),
+                'scores': int(row[cpu_scores_col]) + int(row[gpu_scores_col]),
             }
 
             if d[metric] < gr['best'][metric] or row[gpu_mode_col] == 'GPU':
@@ -62,6 +66,7 @@ def process_results(metric, metric_format, header):
         print('|:---:' * 15, '|', sep='')
 
         for p in range(2, 9):
+            any_printed = False
             if p in pd:
                 cd = pd[p]
                 print('|' + str(p) + 'p', end='')
@@ -69,13 +74,16 @@ def process_results(metric, metric_format, header):
                     if c in cd:
                         gd = cd[c]
                         ba = gd['best']
-                        print('|' + metric_format % ba[metric], end='')
-            print('|')
+                        print('|' + metric_format.format(ba[metric]), end='')
+                        any_printed = True
+            if any_printed:
+                print('|')
         print()
 
 
 if __name__ == '__main__':
-    process_results('avg', '%0.4f', 'Average turns over all games')
-    # process_results('ig', '%s', 'Best initial guess')
-    process_results('max', '%d', 'Max turns over all games')
-    process_results('time', '%0.5fs', 'Run time')
+    process_results('avg', '{:,.4f}', 'Average turns over all games')
+    # process_results('ig', '{}', 'Best initial guess')
+    process_results('max', '{:,d}', 'Max turns over all games')
+    process_results('time', '{:,.5f}s', 'Run time')
+    process_results('scores', '{:,d}', 'Codeword scores performed')
