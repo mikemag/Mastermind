@@ -316,8 +316,8 @@ int main(int argc, const char* argv[]) {
     //        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<5, 8, false>(a, m), s); },
     //    };
 
-    csvTag = "6_smalls_";
-    constexpr static uint8_t pc = 6;
+    csvTag = "5_smalls_";
+    constexpr static uint8_t pc = 5;
     static vector<void (*)(Algo, GPUMode, StatsRecorder&)> games = {
         [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<pc, 2, false>(a, m), s); },
         [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<pc, 3, false>(a, m), s); },
@@ -326,10 +326,10 @@ int main(int argc, const char* argv[]) {
         [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<pc, 6, false>(a, m), s); },
         [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<pc, 7, false>(a, m), s); },
         [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<pc, 8, false>(a, m), s); },
-//        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<pc, 9, false>(a, m), s); },
-//        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<pc, 10, false>(a, m), s); },
-//        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<pc, 11, false>(a, m), s); },
-//        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<pc, 12, false>(a, m), s); },
+        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<pc, 9, false>(a, m), s); },
+        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<pc, 10, false>(a, m), s); },
+        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<pc, 11, false>(a, m), s); },
+        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<pc, 12, false>(a, m), s); },
 //        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<pc, 13, false>(a, m), s); },
 //        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<pc, 14, false>(a, m), s); },
 //        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<pc, 15, false>(a, m), s); },
