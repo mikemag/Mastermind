@@ -27,16 +27,16 @@ using namespace std;
 // There are a few algorithms to play with. See the various Strategy class implementations for details.
 
 // Config for a single game
-static constexpr bool playSingleGame = false;
-static constexpr Algo singleGameAlgo = Algo::Entropy;
+static constexpr bool playSingleGame = true;
+static constexpr Algo singleGameAlgo = Algo::Knuth;
 static constexpr GPUMode singleGameGPUMode = Both;
-static constexpr uint8_t singleGamePinCount = 5;     // 1-8, 4 is classic
-static constexpr uint8_t singleGameColorCount = 11;  // 1-15, 6 is classic
+static constexpr uint8_t singleGamePinCount = 4;    // 1-8, 4 is classic
+static constexpr uint8_t singleGameColorCount = 6;  // 1-15, 6 is classic
 
-static constexpr bool playMultipleGames = true;      // Play a set of games defined below.
-static constexpr bool runTests = false;              // Run unit tests and play Knuth's game
+static constexpr bool playMultipleGames = false;     // Play a set of games defined below.
+static constexpr bool runTests = true;               // Run unit tests and play Knuth's game
 static constexpr bool findBestFirstGuesses = false;  // Initial guess exploration
-static constexpr bool writeStratFiles = false;
+static constexpr bool writeStratFiles = true;
 
 void runUnitTests() {
   // Test cases from Miyoshi
@@ -309,45 +309,21 @@ int main(int argc, const char* argv[]) {
     // NB: the templating of all of this means that multiple copies of much of the code are created for each entry in
     // this table. So only create it if we're actually playing multiple games. This keeps build times lower during
     // development.
-
-    //    static vector<void (*)(Algo, GPUMode, StatsRecorder&)> games = {
-    //        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<4, 6, false>(a, m), s); },
-    //        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<4, 7, false>(a, m), s); },
-    //        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<5, 8, false>(a, m), s); },
-    //    };
-
-    // TODO:
-    // - how many of the next size up can we get in a reasonable amount of time?
-    csvTag = "6_7_8_smalls_";
+    csvTag = "6_7_8_med_";
     static vector<void (*)(Algo, GPUMode, StatsRecorder&)> games = {
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<6, 2, false>(a, m), s); },
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<6, 3, false>(a, m), s); },
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<6, 4, false>(a, m), s); },
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<6, 5, false>(a, m), s); },
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<6, 6, false>(a, m), s); },
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<6, 7, false>(a, m), s); },
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<6, 8, false>(a, m), s); },
-//        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<6, 9, false>(a, m), s); },
-//        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<6, 10, false>(a, m), s); },
+        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<6, 9, false>(a, m), s); },
+        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<6, 10, false>(a, m), s); },
 
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<7, 2, false>(a, m), s); },
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<7, 3, false>(a, m), s); },
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<7, 4, false>(a, m), s); },
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<7, 5, false>(a, m), s); },
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<7, 6, false>(a, m), s); },
-//        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<7, 7, false>(a, m), s); },
+        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<7, 7, false>(a, m), s); },
 
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<8, 2, false>(a, m), s); },
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<8, 3, false>(a, m), s); },
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<8, 4, false>(a, m), s); },
-//        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<8, 5, false>(a, m), s); },
+        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<8, 5, false>(a, m), s); },
+        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<8, 6, false>(a, m), s); },
     };
 
     static vector<Algo> interestingAlgos = {Knuth, MostParts, Entropy, ExpectedSize, FirstOne};
 
 #ifdef __MM_GPU_METAL__
-    //static vector<GPUMode> gpuModes = {CPU, Both};
-    static vector<GPUMode> gpuModes = {Both};
+     static vector<GPUMode> gpuModes = {CPU, Both};
 #else
     static vector<GPUMode> gpuModes = {CPU};
 #endif
