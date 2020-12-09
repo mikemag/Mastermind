@@ -23,6 +23,15 @@ for details, and Compiler Explorer links showing the generated code.
    - This is implemented using Apple's Metal API and is only slightly tailored to the AMD Radeon Pro 5500M in my MacBook Pro.
  - Various gameplay optimizations from Ville[2].
 
+## Docs
+
+* [Packed Indices for Mastermind Scores](docs/Score_Ordinals.md)
+* [Score Caching Considered Harmful](docs/Score_Cache.md)
+* [Initial Guesses](docs/initial_guesses/Initial_Guesses.md)
+
+*TODO: I'll be adding more details on the tradeoffs in various parts of the implementation, the GPU algorithms, performance work,
+etc. over time.*
+
 ## Results
 
 More results and data are in the [results directory](results/). 
@@ -40,14 +49,13 @@ Using the GPU for larger games is much faster, as you would expect. 5p8c is a ni
 |Expected Size|11223|7|CPU|5.5016|8.4684|3,218,686,624|
 | | | |Both|5.4995|0.9620| 2,624,778.00|3,358,359,552|2,550|
 
-## Docs
+## Strategy Output
 
-* [Packed Indices for Mastermind Scores](docs/Score_Ordinals.md)
-* [Score Caching Considered Harmful](docs/Score_Cache.md)
-* [Initial Guesses](docs/initial_guesses/Initial_Guesses.md)
+Gameplay is accelerated by building a strategy as we go, so that previous work is reused. These strategies are output
+as GraphViz graphs which can be rendered with any of the standard GraphViz engines. See the [results directory](results/)
+for examples.
 
-*TODO: I'll be adding more details on the tradeoffs in various parts of the implementation, the GPU algorithms, performance work,
-etc. over time.*
+![](results/mastermind_strategy_knuth_4p.gif)
 
 ## Easier Implementations
 
