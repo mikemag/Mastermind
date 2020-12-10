@@ -38,7 +38,7 @@ slice as temporary storage.
 ## Compact Scores
 
 Threadgroup memory is quite limited in Metal on macOS: just 32kb. In order to do a reasonable amount of work per threadgroup,
-we use the compact score values described in [Packed Indices for Mastermind Scores](docs/Score_Ordinals.md). These 
+we use the compact score values described in [Packed Indices for Mastermind Scores](Score_Ordinals.md). These 
 score values cost a little more to compute, but it's very minor. And these strange score values never escape the GPU,
 only being used to indices into the subset sizes, so it's okay that they're completely different from scores used
 elsewhere in the program. This allows us to easily have enough threadgroup memory for large games with 64 threads per group.
