@@ -25,12 +25,11 @@ for details, and Compiler Explorer links showing the generated code.
 
 ## Docs
 
+* [Mastermind on the GPU](docs/Mastermind_on_the_GPU.md)
+* [Efficient Scoring Functions](docs/Scoring_Functions.md)
 * [Packed Indices for Mastermind Scores](docs/Score_Ordinals.md)
 * [Score Caching Considered Harmful](docs/Score_Cache.md)
 * [Initial Guesses](docs/initial_guesses/Initial_Guesses.md)
-
-*TODO: I'll be adding more details on the tradeoffs in various parts of the implementation, the GPU algorithms, performance work,
-etc. over time.*
 
 ## Results
 
@@ -52,10 +51,10 @@ Using the GPU for larger games is much faster, as you would expect. 5p8c is a ni
 ## Strategy Output
 
 Gameplay is accelerated by building a strategy as we go, so that previous work is reused. These strategies are output
-as GraphViz graphs which can be rendered with any of the standard GraphViz engines. See the [results directory](results/)
-for examples.
+as [GraphViz](https://graphviz.org/) graphs which can be rendered with any of the standard GraphViz engines. 
+See the [results directory](results/) for examples.
 
-![](results/mastermind_strategy_knuth_4p.gif)
+![4p 3-15c games w/ Knuth's algorithm](results/mastermind_strategy_knuth_4p.gif)
 
 ## Easier Implementations
 
