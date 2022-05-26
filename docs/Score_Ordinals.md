@@ -14,7 +14,7 @@ would be `0x21`.
 These are reasonable representations, but Mastermind scores are sparse. Here are the possible packed scores for a 4 pin
 game:
 
-    00 01 02 03 04  10 11 12 13  20 21 22  30  40
+$$[00, 01, 02, 03, 04]\ [10, 11, 12, 13]\ [20, 21, 22]\  [30]\ [40]$$
 
 It is common for algorithms to want to record, say, the total number of guesses which produce each score. See, for
 example, Knuth's algorithm in [1]. One could use a 2D array and index with `[b][w]`, resulting in 25 cells for a 4 pin
