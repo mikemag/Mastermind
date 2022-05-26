@@ -1,19 +1,19 @@
 # Efficient Scoring Functions
 
 This implementation has four variations on the scoring function. The original, somewhat obvious version (though still a bit optimized)
-consumes roughly 4.4948s for all scores necessary to apply Knuth's algorithm to a 4p6c game. The most optimized version
+consumes roughly 4.4948s for all scores necessary to apply Knuth's algorithm to a $4p6c$ game. The most optimized version
 here requires just 0.9237s.
 
-I'm not going to describe the details of each varation. There are comments above each one in [codeword.cpp](../codeword.cpp).
+I'm not going to describe the details of each variation. There are comments above each one in [codeword.cpp](../codeword.cpp).
 Instead, I'll just describe the final one here.
 
 ## Scoring
 
-Mastermind guesses are evaluated against the secret and given a score made up of a number of black (*b*) and white (*w*) hits.
+Mastermind guesses are evaluated against the secret and given a score made up of a number of black $b$ and white $w$ hits.
 Black hits are awarded for every correct color in the correct position, and white hits are awarded for every correct
 color in the wrong position. Each colored pin in the secret can be used only once. Scores are typically represented
-by the two numbers *b* and *w*, either as separate values or packed together into a single value.
-Games have a number of pins *p* and colors *c*.
+by the two numbers $b$ and $w$, either as separate values or packed together into a single value.
+Games have a number of pins $p$ and colors $c$.
 
 This can be a little tricky to understand and get right the first time. Knuth describes the scoring function well in [1].
 
@@ -63,7 +63,7 @@ time a codeword is scored. For this variation of the function, the counts are ea
 
 ### Computing B in Constant Time
 
-To compute the number of black hits *b* we simply need to count each place where pairs of pins in the same position match.
+To compute the number of black hits $b$ we simply need to count each place where pairs of pins in the same position match.
 We can take a quick step towards getting our answer using xor: every nibble where pins match will be 0, and every nibble
 were they were different will be non-zero.
 
@@ -73,7 +73,7 @@ every zero nibble and thus every matched pin as follows, acting on every nibble 
 
 * zero the high bit in the nibble
 * add 7 to the nibble. If it was 0, it will be 7 now and the high bit will still be clear. If it was anything else, it will 
-be > 8 now and the high bit will be set.
+be $\ge 8$ now and thus the high bit will be set.
 * put the original high bits back. Now every nibble that was non-zero has the high bit set.
 * set the three low bits in every nibble. Now ever nibble that was non-zero has all bits set, and every nibble which was zero has only the high bit clear.
 * invert the result: we now have a single bit set for every nibble which was zero, i.e., every matched pin between the codewords.
@@ -87,9 +87,9 @@ or immediates. Each op is quite fast, and they schedule well with other work.
   
 ## Hand Vectorization FTW
 
-Computing *w* in constant time starts with compuing the total of all hits, *b* and *w*, by using the color counts.
+Computing $w$ in constant time starts with compuing the total of all hits, $b$ and $w$, by using the color counts.
 Taking the min of each color count between the codewords, then summing them gives us all hits. We can then just subtract
-*b* to get *w*.
+$b$ to get $w$.
 
 This is done by loading the 128 bit groups of color counts into vector registers, then applying a parallel minimum 
 operation across all pairs of bytes with `_mm_min_epu8`.

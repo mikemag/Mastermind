@@ -8,10 +8,10 @@ directory. Tables below give what most people want: the one that yields the best
 
 ## Patterns of initial guesses
 
-Using different digits for the same pattern isn't useful, nor are shuffled patterns. For example, for a 4p6c game 
+Using different digits for the same pattern isn't useful, nor are shuffled patterns. For example, for a $4p6c$ game 
 these are the unique initial guesses:
 
-    1111, 1112, 1122, 1123, 1234
+$$[1111, 1112, 1122, 1123, 1234]$$
 
 Repetitions of the same pattern, such as 2222, 2111, 3456, 1223, etc. aren't useful as they yield the same information.
 It should be easy to see that for a first guess, all codewords with the same color (i.e., 1111, 2222, 3333, etc.) give
@@ -91,7 +91,7 @@ in the tables to list both.
 
 ## Unique initial guess patterns for various game sizes:
 
-The sets remain constant once *c == p*.
+The sets remain constant once $c = p$.
 
 ````
 2p2c: 11, 12

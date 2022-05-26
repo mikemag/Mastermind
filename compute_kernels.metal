@@ -145,7 +145,7 @@ kernel void subsettingAlgosKernel(
       break;
   }
 
-  // If we find some guesses which are fully descriminating, we want to pick the first one lexically to play. tidGrid is
+  // If we find some guesses which are fully discriminating, we want to pick the first one lexically to play. tidGrid is
   // the same as the ordinal for each member of allCodewords, so we can simply take the min tidGrid. We'll have every
   // member of each SIMD group that finds such a solution vote on the minimum, and have the first of them write the
   // result. I could do a further reduction to a value per threadgroup, or a final single value, but for now I'll just
