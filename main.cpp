@@ -12,7 +12,6 @@
 #include "simple_strategies.hpp"
 #include "strategy.hpp"
 #include "subsetting_strategies.hpp"
-#include "utils.hpp"
 
 using namespace std;
 

@@ -10,10 +10,10 @@
 		271B925D2563A6B50084A744 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 271B925C2563A6B50084A744 /* CoreGraphics.framework */; };
 		274B56CD257472460058882F /* score.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 274B56B9257472460058882F /* score.cpp */; };
 		274B56CE257472460058882F /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 274B56BB257472460058882F /* main.cpp */; };
-		274B56CF257472460058882F /* gpu_interface_wrapper.mm in Sources */ = {isa = PBXBuildFile; fileRef = 274B56BD257472460058882F /* gpu_interface_wrapper.mm */; };
 		274B56D0257472460058882F /* compute_kernels.metal in Sources */ = {isa = PBXBuildFile; fileRef = 274B56BE257472460058882F /* compute_kernels.metal */; };
 		274B56D2257472460058882F /* utils.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 274B56C1257472460058882F /* utils.cpp */; };
-		274B56D5257472460058882F /* gpu_interface.m in Sources */ = {isa = PBXBuildFile; fileRef = 274B56C9257472460058882F /* gpu_interface.m */; };
+		27FAD988284DDF4E007A4F4D /* metal_gpu_interface_wrapper.mm in Sources */ = {isa = PBXBuildFile; fileRef = 2755AD1E284D8C4900CCCD34 /* metal_gpu_interface_wrapper.mm */; };
+		27FAD989284DDF63007A4F4D /* metal_gpu_interface.m in Sources */ = {isa = PBXBuildFile; fileRef = 2755AD1A284D8C4900CCCD34 /* metal_gpu_interface.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -32,25 +32,26 @@
 		271B925C2563A6B50084A744 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
 		274AB9F82576F300008AD945 /* compute_kernel_constants.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = compute_kernel_constants.h; sourceTree = "<group>"; };
 		274B56B9257472460058882F /* score.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = score.cpp; sourceTree = "<group>"; };
-		274B56BA257472460058882F /* gpu_interface.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = gpu_interface.h; sourceTree = "<group>"; };
 		274B56BB257472460058882F /* main.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		274B56BC257472460058882F /* score.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = score.hpp; sourceTree = "<group>"; };
-		274B56BD257472460058882F /* gpu_interface_wrapper.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = gpu_interface_wrapper.mm; sourceTree = "<group>"; };
 		274B56BE257472460058882F /* compute_kernels.metal */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.metal; path = compute_kernels.metal; sourceTree = "<group>"; };
 		274B56BF257472460058882F /* simple_strategies.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = simple_strategies.cpp; sourceTree = "<group>"; };
 		274B56C0257472460058882F /* subsetting_strategies.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = subsetting_strategies.hpp; sourceTree = "<group>"; };
 		274B56C1257472460058882F /* utils.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = utils.cpp; sourceTree = "<group>"; };
-		274B56C2257472460058882F /* gpu_interface_wrapper.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = gpu_interface_wrapper.hpp; sourceTree = "<group>"; };
 		274B56C3257472460058882F /* simple_strategies.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = simple_strategies.hpp; sourceTree = "<group>"; };
 		274B56C4257472460058882F /* strategy.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = strategy.cpp; sourceTree = "<group>"; };
 		274B56C5257472460058882F /* LICENSE */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
 		274B56C6257472460058882F /* codeword.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = codeword.hpp; sourceTree = "<group>"; };
 		274B56C7257472460058882F /* strategy.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = strategy.hpp; sourceTree = "<group>"; };
 		274B56C8257472460058882F /* codeword.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = codeword.cpp; sourceTree = "<group>"; };
-		274B56C9257472460058882F /* gpu_interface.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = gpu_interface.m; sourceTree = "<group>"; };
 		274B56CA257472460058882F /* subsetting_strategies.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = subsetting_strategies.cpp; sourceTree = "<group>"; };
 		274B56CB257472460058882F /* utils.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = utils.hpp; sourceTree = "<group>"; };
 		274B56CC257472460058882F /* README.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		2755AD19284D8C4900CCCD34 /* metal_gpu_interface_wrapper.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = metal_gpu_interface_wrapper.hpp; sourceTree = "<group>"; };
+		2755AD1A284D8C4900CCCD34 /* metal_gpu_interface.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = metal_gpu_interface.m; sourceTree = "<group>"; };
+		2755AD1C284D8C4900CCCD34 /* gpu_interface.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = gpu_interface.hpp; sourceTree = "<group>"; };
+		2755AD1D284D8C4900CCCD34 /* metal_gpu_interface.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = metal_gpu_interface.h; sourceTree = "<group>"; };
+		2755AD1E284D8C4900CCCD34 /* metal_gpu_interface_wrapper.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = metal_gpu_interface_wrapper.mm; sourceTree = "<group>"; };
 		278FA71425609AE9001C553E /* Mastermind */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Mastermind; sourceTree = BUILT_PRODUCTS_DIR; };
 		27C366FC257E2EA8001851EB /* preset_initial_guesses.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = preset_initial_guesses.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -78,16 +79,17 @@
 		278FA70B25609AE9001C553E = {
 			isa = PBXGroup;
 			children = (
+				2755AD1C284D8C4900CCCD34 /* gpu_interface.hpp */,
+				2755AD19284D8C4900CCCD34 /* metal_gpu_interface_wrapper.hpp */,
+				2755AD1E284D8C4900CCCD34 /* metal_gpu_interface_wrapper.mm */,
+				2755AD1D284D8C4900CCCD34 /* metal_gpu_interface.h */,
+				2755AD1A284D8C4900CCCD34 /* metal_gpu_interface.m */,
 				27C366FC257E2EA8001851EB /* preset_initial_guesses.h */,
 				274B56C8257472460058882F /* codeword.cpp */,
 				274B56C6257472460058882F /* codeword.hpp */,
 				274AB9F82576F300008AD945 /* compute_kernel_constants.h */,
 				274B56BE257472460058882F /* compute_kernels.metal */,
 				271B925B2563A6B50084A744 /* Frameworks */,
-				274B56C2257472460058882F /* gpu_interface_wrapper.hpp */,
-				274B56BD257472460058882F /* gpu_interface_wrapper.mm */,
-				274B56BA257472460058882F /* gpu_interface.h */,
-				274B56C9257472460058882F /* gpu_interface.m */,
 				274B56C5257472460058882F /* LICENSE */,
 				274B56BB257472460058882F /* main.cpp */,
 				278FA71525609AE9001C553E /* Products */,
@@ -139,7 +141,7 @@
 		278FA70C25609AE9001C553E /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				LastUpgradeCheck = 1220;
+				LastUpgradeCheck = 1340;
 				TargetAttributes = {
 					278FA71325609AE9001C553E = {
 						CreatedOnToolsVersion = 12.2;
@@ -169,11 +171,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				274B56CF257472460058882F /* gpu_interface_wrapper.mm in Sources */,
-				274B56D5257472460058882F /* gpu_interface.m in Sources */,
 				274B56CE257472460058882F /* main.cpp in Sources */,
 				274B56D0257472460058882F /* compute_kernels.metal in Sources */,
+				27FAD988284DDF4E007A4F4D /* metal_gpu_interface_wrapper.mm in Sources */,
 				274B56D2257472460058882F /* utils.cpp in Sources */,
+				27FAD989284DDF63007A4F4D /* metal_gpu_interface.m in Sources */,
 				274B56CD257472460058882F /* score.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -307,6 +309,7 @@
 		278FA71C25609AE9001C553E /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 5EJ69V684U;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -317,6 +320,7 @@
 		278FA71D25609AE9001C553E /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 5EJ69V684U;
 				ENABLE_HARDENED_RUNTIME = YES;

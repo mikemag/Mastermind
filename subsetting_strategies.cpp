@@ -96,7 +96,7 @@ Codeword<p, c> StrategySubsettingGPU<p, c, log>::selectNextGuess() {
   // Pull out the codewords and colors into individual arrays
   // TODO: if this were separated into these two arrays throughout the Strategy then we could use a target-optimized
   //  memcpy to blit them into the buffers, which would be much faster.
-  uint32_t *psw = gpuRootData->gpuInterface->getPossibleSolutionssBuffer();
+  uint32_t *psw = gpuRootData->gpuInterface->getPossibleSolutionsBuffer();
   unsigned __int128 *psc = gpuRootData->gpuInterface->getPossibleSolutionsColorsBuffer();
   for (int i = 0; i < this->possibleSolutions.size(); i++) {
     psw[i] = this->possibleSolutions[i].packedCodeword();
@@ -164,7 +164,7 @@ void StrategySubsettingGPU<p, c, l>::copyAllCodewordsToGPU() {
     return;
   }
 
-  // Pull out the codewords and color into individual arrays
+  // Pull out the codewords and colors into individual arrays
   uint32_t *acw = gpuRootData->gpuInterface->getAllCodewordsBuffer();
   unsigned __int128 *acc = gpuRootData->gpuInterface->getAllCodewordsColorsBuffer();
   for (int i = 0; i < Codeword<p, c>::getAllCodewords().size(); i++) {

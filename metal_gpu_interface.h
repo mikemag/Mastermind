@@ -8,7 +8,7 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface GPUInterface : NSObject
+@interface MetalGPUInterface : NSObject
 - (instancetype)initWithPinCount:(uint)pinCount totalCodewords:(uint)totalCodewords kernelName:(NSString *)kernelName;
 
 - (uint32_t *)getAllCodewordsBuffer;

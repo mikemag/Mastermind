@@ -1,8 +1,11 @@
 cmake_minimum_required(VERSION 3.17)
-project(mastermind)
+#project(mastermind CXX CUDA)
+project(mastermind CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+
+set(CMAKE_CUDA_STANDARD 20)
 
 include_directories(.)
 
@@ -33,8 +36,15 @@ configure_file(
 )
 
 add_executable(mastermind
-        gpu_interface_wrapper.cpp
         main.cpp
         score.cpp
         utils.hpp
-        utils.cpp)
+        utils.cpp
+#        cuda_gpu_interface.cu
+        )
+
+set_target_properties(mastermind PROPERTIES
+        CUDA_SEPARABLE_COMPILATION ON
+        CUDA_ARCHITECTURES "86")
+
+# https://developer.nvidia.com/blog/building-cuda-applications-cmake/

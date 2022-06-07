@@ -77,7 +77,7 @@ Score Codeword<pinCount, c>::scoreCountingScalar(const Codeword &guess) const {
   uint32_t v = this->codeword ^ guess.codeword;  // Matched pins are now 0.
   v |= unusedPinsMask;                           // Ensure that any unused pin positions are non-zero.
   uint32_t r = ~((((v & 0x77777777u) + 0x77777777u) | v) | 0x77777777u);  // Yields 1 bit per matched pin
-  uint8_t b = std::popcount(r);
+  uint8_t b = _mm_popcnt_u32(r);
 
   int allHits = 0;
   uint64_t scc = this->colorCounts4;
@@ -109,7 +109,7 @@ Score Codeword<pinCount, c>::scoreCountingAutoVec(const Codeword &guess) const {
   uint32_t v = this->codeword ^ guess.codeword;  // Matched pins are now 0.
   v |= unusedPinsMask;                           // Ensure that any unused pin positions are non-zero.
   uint32_t r = ~((((v & 0x77777777u) + 0x77777777u) | v) | 0x77777777u);  // Yields 1 bit per matched pin
-  uint8_t b = std::popcount(r);
+  uint8_t b = _mm_popcnt_u32(r);
 
   int allHits = 0;
   auto *scc = (uint8_t *)&(this->colorCounts8);
@@ -133,7 +133,7 @@ Score Codeword<pinCount, c>::scoreCountingHandVec(const Codeword &guess) const {
   uint32_t v = this->codeword ^ guess.codeword;  // Matched pins are now 0.
   v |= unusedPinsMask;                           // Ensure that any unused pin positions are non-zero.
   uint32_t r = ~((((v & 0x77777777u) + 0x77777777u) | v) | 0x77777777u);  // Yields 1 bit per matched pin
-  uint8_t b = std::popcount(r);
+  uint8_t b = _mm_popcnt_u32(r);
 
   // Load the 128-bit color counts into vector registers. Each one is 16 8-bit counters.
   __m128i_u secretColorsVec = _mm_loadu_si128((__m128i_u *)&this->colorCounts8);
