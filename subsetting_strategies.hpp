@@ -153,8 +153,8 @@ class StrategySubsettingGPU : public StrategySubsetting<pinCount, c, l> {
 #elif __NVCC__
       gpuRootData->gpuInterface = new CUDAGPUInterface<pinCount, c, a, l>();
 #else
-            gpuRootData->gpuInterface = new NoGPUInterface();
-//      gpuRootData->gpuInterface = new CUDAGPUInterface<pinCount, c, a, l>();
+//            gpuRootData->gpuInterface = new NoGPUInterface();
+      gpuRootData->gpuInterface = new CUDAGPUInterface<pinCount, c, a, l>();
 #endif
 
       if (gpuRootData->gpuInterface->gpuAvailable()) {

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.17)
-#project(mastermind CXX CUDA)
-project(mastermind CXX)
+project(mastermind CXX CUDA)
+#project(mastermind CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
@@ -40,7 +40,7 @@ add_executable(mastermind
         score.cpp
         utils.hpp
         utils.cpp
-#        cuda_gpu_interface.cu
+        cuda_gpu_interface.cu
         )
 
 set_target_properties(mastermind PROPERTIES

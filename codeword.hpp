@@ -18,12 +18,12 @@
 template <uint8_t p, uint8_t c>
 class Codeword {
  public:
-  constexpr Codeword() noexcept : codeword(-1), colorCounts4(0), colorCounts8(0) {}
+  constexpr Codeword() noexcept : codeword(0xFFFFFFFF), colorCounts4(0), colorCounts8(0) {}
 
   constexpr explicit Codeword(uint32_t codeword) noexcept
       : codeword(codeword), colorCounts4(computeColorCounts4(codeword)), colorCounts8(computeColorCounts8(codeword)) {}
 
-  bool isInvalid() const { return codeword == -1; }
+  bool isInvalid() const { return codeword == -0xFFFFFFFF; }
 
   bool operator==(const Codeword other) const { return codeword == other.codeword; }
 

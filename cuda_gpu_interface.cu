@@ -16,11 +16,34 @@
 
 using namespace std;
 
+// The core of Knuth's Mastermind algorithm, and others, as CUDA compute kernels.
+//
+// Scores here are not the classic combination of black hits and white hits. A score's ordinal is (b(p + 1) - ((b -
+// 1)b) / 2) + w. See docs/Score_Ordinals.md for details. By using the score's ordinal we can have densely packed set
+// of counters to form the subset counts as we go. These scores never escape the GPU, so it doesn't matter that they
+// don't match any other forms of scores in the rest of the program.
+
+// Mastermind scoring function
+//
+// This mirrors the scalar version very closely. It's the full counting method from Knuth, plus some fun bit twiddling
+// hacks and SWAR action. This is O(1) using warp SIMD intrinsics
+//
+// Find black hits with xor, which leaves zero nibbles on matches, then count the zeros in the result. This is a
+// variation on determining if a word has a zero byte from https://graphics.stanford.edu/~seander/bithacks.html. This
+// part ends with using the GPU's SIMD popcount() to count the zero nibbles.
+//
+// Next, color counts come from the parallel buffer, and we can run over them and add up total hits, per Knuth[1], by
+// aggregating min color counts between the secret and guess.
+//
+// Templated w/ pinCount and explicitly specialized below. We look up the correct version to use by name during startup.
+
+// https://godbolt.org/z/ea7YjEPqf
+
 static __inline__ __host__ __device__ uchar4 make_uchar4(unsigned int i) { return *reinterpret_cast<uchar4 *>(&i); }
 
-// https://godbolt.org/z/36735xfqa
 template <uint pinCount>
-__device__ uint scoreCodewords(const uint32_t &secret, const uint4 &secretColors, uint32_t &guess, uint4 &guessColors) {
+__device__ uint scoreCodewords(const uint32_t secret, const uint4 secretColors, const uint32_t guess,
+                               const uint4 guessColors) {
   constexpr uint unusedPinsMask = 0xFFFFFFFFu & ~((1lu << pinCount * 4u) - 1);
   uint v = secret ^ guess;  // Matched pins are now 0.
   v |= unusedPinsMask;      // Ensure that any unused pin positions are non-zero.
@@ -36,16 +59,15 @@ __device__ uint scoreCodewords(const uint32_t &secret, const uint4 &secretColors
 
   // Given w = ah - b, simplify to i = bp - ((b - 1)b) / 2) + ah. I wonder if the compiler noticed that.
   // https://godbolt.org/z/ab5vTn -- gcc 10.2 notices and simplifies, clang 11.0.0 misses it.
-  //  printf("%d %d\n", b, allHits - b);
   return b * pinCount - ((b - 1) * b) / 2 + allHits;
 }
 
 // The common portion of the kernels which scores all possible solutions against a given guess and computes subset
 // sizes and whether or not the guess is a possible solution.
 template <uint32_t pinCount>
-__device__ bool computeSubsetSizes(int totalScores, uint32_t *scoreCounts, const uint32_t &secret,
-                                   const uint4 &secretColors, /*constant*/ uint32_t &possibleSolutionsCount,
-                                   uint32_t *possibleSolutions, uint4 *possibleSolutionsColors) {
+__device__ bool computeSubsetSizes(int totalScores, uint32_t *scoreCounts, const uint32_t secret,
+                                   const uint4 secretColors, const uint32_t possibleSolutionsCount,
+                                   const uint32_t *possibleSolutions, const uint4 *possibleSolutionsColors) {
   bool isPossibleSolution = false;
   for (int i = 0; i < totalScores; i++) scoreCounts[i] = 0;
 
@@ -68,17 +90,16 @@ __device__ bool computeSubsetSizes(int totalScores, uint32_t *scoreCounts, const
 // The possible solutions set changes each time, both content and length, but reuses the same buffers.
 //
 // Output is two arrays with elements for each of the all codewords set: one with the score, and one bool
-// for whether or not the codeword is a possible solution.
+// for whether the codeword is a possible solution.
 //
-// Finally, there's threadgroup memory for each thread with enough room for all of the intermediate subset sizes.
-// This is important: the first version held this in threadlocal memory and occupancy was terrible.
+// Finally, there's shared block memory for each thread with enough room for all the intermediate subset sizes.
 
 extern __shared__ uint32_t tgScoreCounts[];
 
-template <uint32_t pinCount, Algo algo, bool supportFamilyMac2>
+template <uint32_t pinCount, Algo algo>
 __global__ void subsettingAlgosKernel(const uint32_t *allCodewords, const uint4 *allCodewordsColors,
-                                      uint32_t possibleSolutionsCount, uint32_t *possibleSolutions,
-                                      uint4 *possibleSolutionsColors, uint32_t *scores,
+                                      uint32_t possibleSolutionsCount, const uint32_t *possibleSolutions,
+                                      const uint4 *possibleSolutionsColors, uint32_t *scores,
                                       bool *remainingIsPossibleSolution, uint32_t *fullyDiscriminatingCodewords) {
   uint tidGrid = blockDim.x * blockIdx.x + threadIdx.x;
   // Total scores = (p * (p + 3)) / 2, but +1 for imperfect packing.
@@ -144,55 +165,54 @@ __global__ void subsettingAlgosKernel(const uint32_t *allCodewords, const uint4 
 
 template <uint8_t p, uint8_t c, Algo a, bool l>
 CUDAGPUInterface<p, c, a, l>::CUDAGPUInterface() {
+  // mmmfixme: print GPU info and which one we've selected.
   cout << "CUDA!" << endl;
 
   const uint64_t totalCodewords = Codeword<p, c>::totalCodewords;
   threadsPerBlock = std::min(128lu, totalCodewords);
-  // nb: round up!
-  numBlocks = (totalCodewords + threadsPerBlock - 1) / threadsPerBlock;
+  numBlocks = (totalCodewords + threadsPerBlock - 1) / threadsPerBlock;  // nb: round up!
   uint32_t roundedTotalCodewords = numBlocks * threadsPerBlock;
 
   // NB: matches the def in the compute kernel.
   const int totalScores = ((p * (p + 3)) / 2) + 1;
   sharedMemSize = sizeof(uint32_t) * totalScores * threadsPerBlock;
 
-  cudaError_t err = cudaSuccess;
+  auto mallocManaged = [](auto devPtr, auto size) {
+    cudaError_t err = cudaMallocManaged(devPtr, size);
+    if (err != cudaSuccess) {
+      fprintf(stderr, "Failed to allocate managed memory (error code %s)!\n", cudaGetErrorString(err));
+      exit(EXIT_FAILURE);
+    }
+  };
 
-  // mmmfixme: error handling
-  err = cudaMallocManaged((void **)&dAllCodewords, sizeof(*dAllCodewords) * roundedTotalCodewords);
-  err = cudaMallocManaged((void **)&dAllCodewordsColors, sizeof(*dAllCodewordsColors) * roundedTotalCodewords);
-  err = cudaMallocManaged((void **)&dPossibleSolutions, sizeof(*dPossibleSolutions) * roundedTotalCodewords);
-  err =
-      cudaMallocManaged((void **)&dPossibleSolutionsColors, sizeof(*dPossibleSolutionsColors) * roundedTotalCodewords);
-  err = cudaMallocManaged((void **)&dScores, sizeof(*dScores) * roundedTotalCodewords);
-  err = cudaMallocManaged((void **)&dRemainingIsPossibleSolution,
-                          sizeof(*dRemainingIsPossibleSolution) * roundedTotalCodewords);
+  mallocManaged((void **)&dAllCodewords, sizeof(*dAllCodewords) * roundedTotalCodewords);
+  mallocManaged((void **)&dAllCodewordsColors, sizeof(*dAllCodewordsColors) * roundedTotalCodewords);
+  mallocManaged((void **)&dPossibleSolutions, sizeof(*dPossibleSolutions) * roundedTotalCodewords);
+  mallocManaged((void **)&dPossibleSolutionsColors, sizeof(*dPossibleSolutionsColors) * roundedTotalCodewords);
+  mallocManaged((void **)&dScores, sizeof(*dScores) * roundedTotalCodewords);
+  mallocManaged((void **)&dRemainingIsPossibleSolution, sizeof(*dRemainingIsPossibleSolution) * roundedTotalCodewords);
 
   fdCount = (roundedTotalCodewords / 32) + 1;
-  err = cudaMallocManaged((void **)&dFullyDiscriminatingCodewords, sizeof(*dFullyDiscriminatingCodewords) * fdCount);
-
-  if (err != cudaSuccess) {
-    fprintf(stderr, "Failed to allocate device vector A (error code %s)!\n", cudaGetErrorString(err));
-    exit(EXIT_FAILURE);
-  }
+  mallocManaged((void **)&dFullyDiscriminatingCodewords, sizeof(*dFullyDiscriminatingCodewords) * fdCount);
 }
 
 template <uint8_t p, uint8_t c, Algo a, bool l>
 CUDAGPUInterface<p, c, a, l>::~CUDAGPUInterface() {
-  // Free device global memory
-  cudaError_t err = cudaSuccess;
-  err = cudaFree(dAllCodewords);
-  err = cudaFree(dAllCodewordsColors);
-  err = cudaFree(dPossibleSolutions);
-  err = cudaFree(dPossibleSolutionsColors);
-  err = cudaFree(dScores);
-  err = cudaFree(dRemainingIsPossibleSolution);
-  err = cudaFree(dFullyDiscriminatingCodewords);
+  auto freeManaged = [](auto devPtr) {
+    cudaError_t err = cudaFree(devPtr);
+    if (err != cudaSuccess) {
+      fprintf(stderr, "Failed to free managed memory (error code %s)!\n", cudaGetErrorString(err));
+      exit(EXIT_FAILURE);
+    }
+  };
 
-  if (err != cudaSuccess) {
-    fprintf(stderr, "Failed to free device vector A (error code %s)!\n", cudaGetErrorString(err));
-    exit(EXIT_FAILURE);
-  }
+  freeManaged(dAllCodewords);
+  freeManaged(dAllCodewordsColors);
+  freeManaged(dPossibleSolutions);
+  freeManaged(dPossibleSolutionsColors);
+  freeManaged(dScores);
+  freeManaged(dRemainingIsPossibleSolution);
+  freeManaged(dFullyDiscriminatingCodewords);
 }
 
 template <uint8_t p, uint8_t c, Algo a, bool l>
@@ -211,12 +231,12 @@ unsigned __int128 *CUDAGPUInterface<p, c, a, l>::getAllCodewordsColorsBuffer() {
 
 template <uint8_t p, uint8_t c, Algo a, bool l>
 void CUDAGPUInterface<p, c, a, l>::setAllCodewordsCount(uint32_t count) {
-  // mmmfixme: redundant
+  // TODO: this is redundant for this impl, and likely for the Metal impl too. Need to fix this up.
 }
 
 template <uint8_t p, uint8_t c, Algo a, bool l>
 void CUDAGPUInterface<p, c, a, l>::syncAllCodewords(uint32_t count) {
-  // mmmfixme: let it page fault for now, come back and add movement hints if necessary.
+  // TODO: let it page fault for now, come back and add movement hints if necessary.
 }
 
 template <uint8_t p, uint8_t c, Algo a, bool l>
@@ -236,19 +256,27 @@ void CUDAGPUInterface<p, c, a, l>::setPossibleSolutionsCount(uint32_t count) {
 template <uint8_t p, uint8_t c, Algo a, bool l>
 void CUDAGPUInterface<p, c, a, l>::sendComputeCommand() {
   cudaError_t err = cudaSuccess;
-  cudaMemset(dFullyDiscriminatingCodewords, 0, sizeof(*dFullyDiscriminatingCodewords) * fdCount);
-  subsettingAlgosKernel<p, a, false><<<numBlocks, threadsPerBlock, sharedMemSize>>>(
+  err = cudaMemset(dFullyDiscriminatingCodewords, 0, sizeof(*dFullyDiscriminatingCodewords) * fdCount);
+  if (err != cudaSuccess) {
+    fprintf(stderr, "Failed to clear FDC buffer (error code %s)!\n", cudaGetErrorString(err));
+    exit(EXIT_FAILURE);
+  }
+
+  subsettingAlgosKernel<p, a><<<numBlocks, threadsPerBlock, sharedMemSize>>>(
       dAllCodewords, reinterpret_cast<const uint4 *>(dAllCodewordsColors), possibleSolutionsCount, dPossibleSolutions,
       reinterpret_cast<uint4 *>(dPossibleSolutionsColors), dScores, dRemainingIsPossibleSolution,
       dFullyDiscriminatingCodewords);
   err = cudaGetLastError();
-
   if (err != cudaSuccess) {
-    fprintf(stderr, "Failed to launch vectorAdd kernel (error code %s)!\n", cudaGetErrorString(err));
+    fprintf(stderr, "Failed to launch subsettingAlgosKernel kernel (error code %s)!\n", cudaGetErrorString(err));
     exit(EXIT_FAILURE);
   }
 
   err = cudaDeviceSynchronize();
+  if (err != cudaSuccess) {
+    fprintf(stderr, "Failed to sync device (error code %s)!\n", cudaGetErrorString(err));
+    exit(EXIT_FAILURE);
+  }
 }
 
 template <uint8_t p, uint8_t c, Algo a, bool l>
@@ -263,9 +291,6 @@ bool *CUDAGPUInterface<p, c, a, l>::getRemainingIsPossibleSolution() {
 
 template <uint8_t p, uint8_t c, Algo a, bool l>
 uint32_t *CUDAGPUInterface<p, c, a, l>::getFullyDiscriminatingCodewords(uint32_t &count) {
-  //  return dFullyDiscriminatingCodewords;
-//  count = 0;
-//  return nullptr;
   count = fdCount;
   return dFullyDiscriminatingCodewords;
 }
@@ -276,47 +301,43 @@ std::string CUDAGPUInterface<p, c, a, l>::getGPUName() {
   return "NEED GPU NAME";
 }
 
-#define SPEC(p, c, l)                                           \
+// -----------------------------------------------------------------------------------
+// Explicit specializations
+//
+// TODO: I ought to be able to get rid of these, but I need to try to wrangle the
+//   conditional build stuff and compiler used for each file all the way up to main to allow
+//   the templates to be included everywhere.
+
+#define INST_PCL(p, c, l)                                       \
   template class CUDAGPUInterface<p, c, Algo::Knuth, l>;        \
   template class CUDAGPUInterface<p, c, Algo::MostParts, l>;    \
   template class CUDAGPUInterface<p, c, Algo::ExpectedSize, l>; \
   template class CUDAGPUInterface<p, c, Algo::Entropy, l>;
 
-SPEC(4, 6, true)
-SPEC(4, 6, false)
-SPEC(5, 8, false)
-SPEC(8, 4, false)
-SPEC(8, 5, false)
-SPEC(8, 6, false)
-SPEC(8, 7, false)
+#define INST_CL(c, l) \
+  INST_PCL(2, c, l)   \
+  INST_PCL(3, c, l)   \
+  INST_PCL(4, c, l)   \
+  INST_PCL(5, c, l)   \
+  INST_PCL(6, c, l)   \
+  INST_PCL(7, c, l)   \
+  INST_PCL(8, c, l)
 
-// Starting search for secret 3632, initial guess is 1122 with 1,296 possibilities.
-//
-// Tried guess 1122 against secret 3632 => 10
-// Removing inconsistent possibilities... 256 remain.
-// Selecting best guess: 1344	score: 212 (GPU)
-//
-// Tried guess 1344 against secret 3632 => 01
-// Removing inconsistent possibilities... 44 remain.
-// Selecting best guess: 3526	score: 37 (GPU)
-//
-// Tried guess 3526 against secret 3632 => 12
-// Removing inconsistent possibilities... 7 remain.
-// Selecting best guess: 1462	score: 6 (GPU)
-//
-// Tried guess 1462 against secret 3632 => 11
-// Removing inconsistent possibilities... 1 remain.
-// Only remaining solution must be correct: 3632
-//
-// Tried guess 3632 against secret 3632 => 40
-// Solution found after 5 moves.
-//
-// Playing all 4 pin 6 color games using algorithm 'Knuth' for every possible secret...
-// Total codewords: 1,296
-// Initial guess: 1122
-// Average number of turns was 4.4761
-// Maximum number of turns over all possible secrets was 5 with secret 1116
-// Elapsed time 0.0836s, average search 0.0645ms
-// Codeword comparisons: CPU = 3,237,885, GPU = 0, total = 3,237,885
-//
-//  1: 1  2: 6  3: 62  4: 533  5: 694
+#define INST_L(l) \
+  INST_CL(2, l)   \
+  INST_CL(3, l)   \
+  INST_CL(4, l)   \
+  INST_CL(5, l)   \
+  INST_CL(6, l)   \
+  INST_CL(7, l)   \
+  INST_CL(8, l)   \
+  INST_CL(9, l)   \
+  INST_CL(10, l)  \
+  INST_CL(11, l)  \
+  INST_CL(12, l)  \
+  INST_CL(13, l)  \
+  INST_CL(14, l)  \
+  INST_CL(15, l)
+
+INST_L(true)
+INST_L(false)

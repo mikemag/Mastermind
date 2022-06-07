@@ -9,7 +9,7 @@
 
 using namespace metal;
 
-// The core of Knuth's Mastermind algorithm, and others, as a Metal compute kernels.
+// The core of Knuth's Mastermind algorithm, and others, as Metal compute kernels.
 //
 // Scores here are not the classic combination of black hits and white hits. A score's ordinal is (b(p + 1) - ((b -
 // 1)b) / 2) + w. See docs/Score_Ordinals.md for details. By using the score's ordinal we can have densely packed set
