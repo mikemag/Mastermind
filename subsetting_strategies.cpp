@@ -81,8 +81,8 @@ int StrategySubsetting<p, c, log>::computeTotalSubsets() {
 // --------------------------------------------------------------------------------------------------------------------
 // Base for all subsetting GPU strategies
 
-template <uint8_t p, uint8_t c, bool log>
-Codeword<p, c> StrategySubsettingGPU<p, c, log>::selectNextGuess() {
+template <uint8_t p, uint8_t c, bool log, class Derived>
+Codeword<p, c> StrategySubsettingGPU<p, c, log, Derived>::selectNextGuess() {
   // Cut off "small" work and just do it on the CPU.
   if (mode == CPU ||
       (mode == Both && Codeword<p, c>::getAllCodewords().size() * this->possibleSolutions.size() < 4 * 1024)) {
@@ -158,8 +158,8 @@ Codeword<p, c> StrategySubsettingGPU<p, c, log>::selectNextGuess() {
 
 // This moves all the codewords into the correct device-private buffers just once, since it's a) read only and b)
 // quite large.
-template <uint8_t p, uint8_t c, bool l>
-void StrategySubsettingGPU<p, c, l>::copyAllCodewordsToGPU() {
+template <uint8_t p, uint8_t c, bool l, class Derived>
+void StrategySubsettingGPU<p, c, l, Derived>::copyAllCodewordsToGPU() {
   if (!gpuRootData->gpuInterface->gpuAvailable()) {
     return;
   }
@@ -178,8 +178,8 @@ void StrategySubsettingGPU<p, c, l>::copyAllCodewordsToGPU() {
   gpuRootData->gpuInterface->syncAllCodewords((uint32_t)Codeword<p, c>::getAllCodewords().size());
 }
 
-template <uint8_t p, uint8_t c, bool l>
-void StrategySubsettingGPU<p, c, l>::printStats(chrono::duration<float, milli> elapsedMS) {
+template <uint8_t p, uint8_t c, bool l, class Derived>
+void StrategySubsettingGPU<p, c, l, Derived>::printStats(chrono::duration<float, milli> elapsedMS) {
   StrategySubsetting<p, c, l>::printStats(elapsedMS);
   if (mode != CPU && gpuRootData->gpuInterface->gpuAvailable()) {
     cout << "GPU kernels executed: " << commaString(gpuRootData->kernelsExecuted)
@@ -187,9 +187,9 @@ void StrategySubsettingGPU<p, c, l>::printStats(chrono::duration<float, milli> e
   }
 }
 
-template <uint8_t p, uint8_t c, bool l>
-void StrategySubsettingGPU<p, c, l>::recordStats(StatsRecorder &sr,
-                                                 std::chrono::duration<float, std::milli> elapsedMS) {
+template <uint8_t p, uint8_t c, bool l, class Derived>
+void StrategySubsettingGPU<p, c, l, Derived>::recordStats(StatsRecorder &sr,
+                                                          std::chrono::duration<float, std::milli> elapsedMS) {
   StrategySubsetting<p, c, l>::recordStats(sr, elapsedMS);
   sr.add("GPU Mode", GPUModeNames[mode]);
   sr.add("GPU Kernels", gpuRootData->kernelsExecuted);
@@ -220,13 +220,6 @@ size_t StrategyKnuth<p, c, l>::computeSubsetScore() {
   return this->possibleSolutions.size() - largestSubsetSize;
 }
 
-template <uint8_t p, uint8_t c, bool l>
-shared_ptr<Strategy<p, c, l>> StrategyKnuth<p, c, l>::createNewMove(Score r, Codeword<p, c> nextGuess) {
-  auto next = make_shared<StrategyKnuth<p, c, l>>(*this, nextGuess, this->possibleSolutions, this->usedCodewords);
-  next->mode = this->mode;
-  return next;
-}
-
 // --------------------------------------------------------------------------------------------------------------------
 // Most Parts
 
@@ -240,13 +233,6 @@ size_t StrategyMostParts<p, c, l>::computeSubsetScore() {
     s = 0;
   }
   return totalUsedSubsets;
-}
-
-template <uint8_t p, uint8_t c, bool l>
-shared_ptr<Strategy<p, c, l>> StrategyMostParts<p, c, l>::createNewMove(Score r, Codeword<p, c> nextGuess) {
-  auto next = make_shared<StrategyMostParts<p, c, l>>(*this, nextGuess, this->possibleSolutions, this->usedCodewords);
-  next->mode = this->mode;
-  return next;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -264,14 +250,6 @@ size_t StrategyExpectedSize<p, c, l>::computeSubsetScore() {
   return -round(expectedSize * 10'000'000'000'000'000.0);  // 16 digits of precision
 }
 
-template <uint8_t p, uint8_t c, bool l>
-shared_ptr<Strategy<p, c, l>> StrategyExpectedSize<p, c, l>::createNewMove(Score r, Codeword<p, c> nextGuess) {
-  auto next =
-      make_shared<StrategyExpectedSize<p, c, l>>(*this, nextGuess, this->possibleSolutions, this->usedCodewords);
-  next->mode = this->mode;
-  return next;
-}
-
 // --------------------------------------------------------------------------------------------------------------------
 // Entropy
 
@@ -286,11 +264,4 @@ size_t StrategyEntropy<p, c, l>::computeSubsetScore() {
     s = 0;
   }
   return round(entropySum * 10'000'000'000'000'000.0);  // 16 digits of precision
-}
-
-template <uint8_t p, uint8_t c, bool l>
-shared_ptr<Strategy<p, c, l>> StrategyEntropy<p, c, l>::createNewMove(Score r, Codeword<p, c> nextGuess) {
-  auto next = make_shared<StrategyEntropy<p, c, l>>(*this, nextGuess, this->possibleSolutions, this->usedCodewords);
-  next->mode = this->mode;
-  return next;
 }

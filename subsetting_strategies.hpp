@@ -11,7 +11,6 @@
 #include "gpu_interface.hpp"
 #include "metal_gpu_interface_wrapper.hpp"
 #include "no_gpu_interface.hpp"
-#include "preset_initial_guesses.h"
 #include "strategy.hpp"
 
 // These strategies all rely on splitting the remaining possible guesses into groups or subsets based on their scores
@@ -45,12 +44,6 @@
 template <uint8_t p, uint8_t c, bool l>
 class StrategySubsetting : public Strategy<p, c, l> {
  public:
-  StrategySubsetting() : Strategy<p, c, l>{} {
-    for (auto &s : subsetSizes) {
-      s = 0;
-    }
-  }
-
   explicit StrategySubsetting(Codeword<p, c> initialGuess) : Strategy<p, c, l>{initialGuess} {
     for (auto &s : subsetSizes) {
       s = 0;
@@ -115,24 +108,25 @@ struct StrategySubsettingGPURootData {
   ~StrategySubsettingGPURootData();
 };
 
-template <uint8_t pinCount, uint8_t c, bool l>
+template <uint8_t pinCount, uint8_t c, bool l, class Derived>
 class StrategySubsettingGPU : public StrategySubsetting<pinCount, c, l> {
  public:
-  StrategySubsettingGPU(const char *kernelName, GPUMode mode = Both)
-      : StrategySubsetting<pinCount, c, l>{}, mode(mode) {
-    gpuRootData = make_shared<StrategySubsettingGPURootData>();
-  }
-
-  StrategySubsettingGPU(Codeword<pinCount, c> initialGuess, const char *kernelName, GPUMode mode)
+  StrategySubsettingGPU(Codeword<pinCount, c> initialGuess, GPUMode mode)
       : StrategySubsetting<pinCount, c, l>{initialGuess}, mode(mode) {
     gpuRootData = make_shared<StrategySubsettingGPURootData>();
   }
 
-  StrategySubsettingGPU(StrategySubsettingGPU<pinCount, c, l> &parent, Codeword<pinCount, c> nextGuess,
+  StrategySubsettingGPU(StrategySubsettingGPU<pinCount, c, l, Derived> &parent, Codeword<pinCount, c> nextGuess,
                         std::vector<Codeword<pinCount, c>> &nextPossibleSolutions,
                         std::vector<uint32_t> &nextUsedCodewords)
       : StrategySubsetting<pinCount, c, l>(parent, nextGuess, nextPossibleSolutions, nextUsedCodewords) {
     gpuRootData = parent.gpuRootData;
+  }
+
+  std::shared_ptr<Strategy<pinCount, c, l>> createNewMove(Score r, Codeword<pinCount, c> nextGuess) override {
+    auto next = make_shared<Derived>(*this, nextGuess, this->possibleSolutions, this->usedCodewords);
+    next->mode = this->mode;
+    return next;
   }
 
   Codeword<pinCount, c> selectNextGuess() override;
@@ -187,31 +181,24 @@ class StrategySubsettingGPU : public StrategySubsetting<pinCount, c, l> {
 // These results match those presented in [2], Tables 3, 4, & 5.
 
 template <uint8_t p, uint8_t c, bool l>
-class StrategyKnuth : public StrategySubsettingGPU<p, c, l> {
+class StrategyKnuth : public StrategySubsettingGPU<p, c, l, StrategyKnuth<p, c, l>> {
  private:
   constexpr static auto kernelName = "findKnuthGuessKernel";
 
  public:
-  StrategyKnuth(GPUMode mode = Both) : StrategySubsettingGPU<p, c, l>{kernelName, mode} {
-    this->guess = Codeword<p, c>(presetInitialGuess());
-    this->template setupGPUInterface<Algo::Knuth>(kernelName);
-  }
-
   explicit StrategyKnuth(Codeword<p, c> initialGuess, GPUMode mode = Both)
-      : StrategySubsettingGPU<p, c, l>{initialGuess, kernelName, mode} {
+      : StrategySubsettingGPU<p, c, l, StrategyKnuth<p, c, l>>{initialGuess, mode} {
     this->template setupGPUInterface<Algo::Knuth>(kernelName);
   }
 
-  StrategyKnuth(StrategySubsettingGPU<p, c, l> &parent, Codeword<p, c> nextGuess,
+  StrategyKnuth(StrategySubsettingGPU<p, c, l, StrategyKnuth<p, c, l>> &parent, Codeword<p, c> nextGuess,
                 std::vector<Codeword<p, c>> &nextPossibleSolutions, std::vector<uint32_t> &nextUsedCodewords)
-      : StrategySubsettingGPU<p, c, l>(parent, nextGuess, nextPossibleSolutions, nextUsedCodewords) {}
+      : StrategySubsettingGPU<p, c, l, StrategyKnuth<p, c, l>>(parent, nextGuess, nextPossibleSolutions,
+                                                               nextUsedCodewords) {}
 
   std::string getName() const override { return "Knuth"; }
 
   size_t computeSubsetScore() override;
-  std::shared_ptr<Strategy<p, c, l>> createNewMove(Score r, Codeword<p, c> nextGuess) override;
-
-  constexpr uint32_t presetInitialGuess() { return presetInitialGuessKnuth<p, c, l>(); }
 };
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -227,31 +214,24 @@ class StrategyKnuth : public StrategySubsettingGPU<p, c, l> {
 // 9 in Table 5.
 
 template <uint8_t p, uint8_t c, bool l>
-class StrategyMostParts : public StrategySubsettingGPU<p, c, l> {
+class StrategyMostParts : public StrategySubsettingGPU<p, c, l, StrategyMostParts<p, c, l>> {
  private:
   constexpr static auto kernelName = "findMostPartsGuessKernel";
 
  public:
-  StrategyMostParts(GPUMode mode = Both) : StrategySubsettingGPU<p, c, l>{kernelName, mode} {
-    this->guess = Codeword<p, c>(presetInitialGuess());
-    this->template setupGPUInterface<Algo::MostParts>(kernelName);
-  }
-
   explicit StrategyMostParts(Codeword<p, c> initialGuess, GPUMode mode = Both)
-      : StrategySubsettingGPU<p, c, l>{initialGuess, kernelName, mode} {
+      : StrategySubsettingGPU<p, c, l, StrategyMostParts<p, c, l>>{initialGuess, mode} {
     this->template setupGPUInterface<Algo::MostParts>(kernelName);
   }
 
-  StrategyMostParts(StrategySubsettingGPU<p, c, l> &parent, Codeword<p, c> nextGuess,
+  StrategyMostParts(StrategySubsettingGPU<p, c, l, StrategyMostParts<p, c, l>> &parent, Codeword<p, c> nextGuess,
                     std::vector<Codeword<p, c>> &nextPossibleSolutions, std::vector<uint32_t> &nextUsedCodewords)
-      : StrategySubsettingGPU<p, c, l>(parent, nextGuess, nextPossibleSolutions, nextUsedCodewords) {}
+      : StrategySubsettingGPU<p, c, l, StrategyMostParts<p, c, l>>(parent, nextGuess, nextPossibleSolutions,
+                                                                   nextUsedCodewords) {}
 
   std::string getName() const override { return "Most Parts"; }
 
   size_t computeSubsetScore() override;
-  std::shared_ptr<Strategy<p, c, l>> createNewMove(Score r, Codeword<p, c> nextGuess) override;
-
-  constexpr uint32_t presetInitialGuess() { return presetInitialGuessMostParts<p, c, l>(); }
 };
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -276,31 +256,24 @@ class StrategyMostParts : public StrategySubsettingGPU<p, c, l> {
 // different result for each run. 4.3951 for 4p6c for instance.
 
 template <uint8_t p, uint8_t c, bool l>
-class StrategyExpectedSize : public StrategySubsettingGPU<p, c, l> {
+class StrategyExpectedSize : public StrategySubsettingGPU<p, c, l, StrategyExpectedSize<p, c, l>> {
  private:
   constexpr static auto kernelName = "findExpectedSizeGuessKernel";
 
  public:
-  StrategyExpectedSize(GPUMode mode = Both) : StrategySubsettingGPU<p, c, l>{kernelName, mode} {
-    this->guess = Codeword<p, c>(presetInitialGuess());
-    this->template setupGPUInterface<Algo::ExpectedSize>(kernelName);
-  }
-
   explicit StrategyExpectedSize(Codeword<p, c> initialGuess, GPUMode mode = Both)
-      : StrategySubsettingGPU<p, c, l>{initialGuess, kernelName, mode} {
+      : StrategySubsettingGPU<p, c, l, StrategyExpectedSize<p, c, l>>{initialGuess, mode} {
     this->template setupGPUInterface<Algo::ExpectedSize>(kernelName);
   }
 
-  StrategyExpectedSize(StrategySubsettingGPU<p, c, l> &parent, Codeword<p, c> nextGuess,
+  StrategyExpectedSize(StrategySubsettingGPU<p, c, l, StrategyExpectedSize<p, c, l>> &parent, Codeword<p, c> nextGuess,
                        std::vector<Codeword<p, c>> &nextPossibleSolutions, std::vector<uint32_t> &nextUsedCodewords)
-      : StrategySubsettingGPU<p, c, l>(parent, nextGuess, nextPossibleSolutions, nextUsedCodewords) {}
+      : StrategySubsettingGPU<p, c, l, StrategyExpectedSize<p, c, l>>(parent, nextGuess, nextPossibleSolutions,
+                                                                      nextUsedCodewords) {}
 
   std::string getName() const override { return "Expected Size"; }
 
   size_t computeSubsetScore() override;
-  std::shared_ptr<Strategy<p, c, l>> createNewMove(Score r, Codeword<p, c> nextGuess) override;
-
-  constexpr uint32_t presetInitialGuess() { return presetInitialGuessExpectedSize<p, c, l>(); }
 };
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -319,31 +292,24 @@ class StrategyExpectedSize : public StrategySubsettingGPU<p, c, l> {
 // different result for each run. 4.4151 for 4p6c for instance.
 
 template <uint8_t p, uint8_t c, bool l>
-class StrategyEntropy : public StrategySubsettingGPU<p, c, l> {
+class StrategyEntropy : public StrategySubsettingGPU<p, c, l, StrategyEntropy<p, c, l>> {
  private:
   constexpr static auto kernelName = "findEntropyGuessKernel";
 
  public:
-  StrategyEntropy(GPUMode mode = Both) : StrategySubsettingGPU<p, c, l>{kernelName, mode} {
-    this->guess = Codeword<p, c>(presetInitialGuess());
-    this->template setupGPUInterface<Algo::Entropy>(kernelName);
-  }
-
   explicit StrategyEntropy(Codeword<p, c> initialGuess, GPUMode mode = Both)
-      : StrategySubsettingGPU<p, c, l>{initialGuess, kernelName, mode} {
+      : StrategySubsettingGPU<p, c, l, StrategyEntropy<p, c, l>>{initialGuess, mode} {
     this->template setupGPUInterface<Algo::Entropy>(kernelName);
   }
 
-  StrategyEntropy(StrategySubsettingGPU<p, c, l> &parent, Codeword<p, c> nextGuess,
+  StrategyEntropy(StrategySubsettingGPU<p, c, l, StrategyEntropy<p, c, l>> &parent, Codeword<p, c> nextGuess,
                   std::vector<Codeword<p, c>> &nextPossibleSolutions, std::vector<uint32_t> &nextUsedCodewords)
-      : StrategySubsettingGPU<p, c, l>(parent, nextGuess, nextPossibleSolutions, nextUsedCodewords) {}
+      : StrategySubsettingGPU<p, c, l, StrategyEntropy<p, c, l>>(parent, nextGuess, nextPossibleSolutions,
+                                                                 nextUsedCodewords) {}
 
   std::string getName() const override { return "Entropy"; }
 
   size_t computeSubsetScore() override;
-  std::shared_ptr<Strategy<p, c, l>> createNewMove(Score r, Codeword<p, c> nextGuess) override;
-
-  constexpr uint32_t presetInitialGuess() { return presetInitialGuessEntropy<p, c, l>(); }
 };
 
 #include "subsetting_strategies.cpp"

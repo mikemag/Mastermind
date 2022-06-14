@@ -8,6 +8,7 @@
 #include "codeword.hpp"
 #include "compute_kernel_constants.h"
 #include "mastermind_config.h"
+#include "preset_initial_guesses.h"
 #include "score.hpp"
 #include "simple_strategies.hpp"
 #include "strategy.hpp"
@@ -174,17 +175,22 @@ template <uint8_t pinCount, uint8_t colorCount, bool log>
 shared_ptr<Strategy<pinCount, colorCount, log>> makeStrategy(Algo algorithm, GPUMode mode) {
   switch (algorithm) {
     case FirstOne:
-      return make_shared<StrategyFirstOne<pinCount, colorCount, log>>();
+      return make_shared<StrategyFirstOne<pinCount, colorCount, log>>(
+          presetInitialGuessFirstOne<pinCount, colorCount>());
     case Random:
-      return make_shared<StrategyRandom<pinCount, colorCount, log>>();
+      return make_shared<StrategyRandom<pinCount, colorCount, log>>(Codeword<pinCount, colorCount>::onePins);
     case Knuth:
-      return make_shared<StrategyKnuth<pinCount, colorCount, log>>(mode);
+      return make_shared<StrategyKnuth<pinCount, colorCount, log>>(presetInitialGuessKnuth<pinCount, colorCount>(),
+                                                                   mode);
     case MostParts:
-      return make_shared<StrategyMostParts<pinCount, colorCount, log>>(mode);
+      return make_shared<StrategyMostParts<pinCount, colorCount, log>>(
+          presetInitialGuessMostParts<pinCount, colorCount>(), mode);
     case ExpectedSize:
-      return make_shared<StrategyExpectedSize<pinCount, colorCount, log>>(mode);
+      return make_shared<StrategyExpectedSize<pinCount, colorCount, log>>(
+          presetInitialGuessExpectedSize<pinCount, colorCount>(), mode);
     case Entropy:
-      return make_shared<StrategyEntropy<pinCount, colorCount, log>>(mode);
+      return make_shared<StrategyEntropy<pinCount, colorCount, log>>(presetInitialGuessEntropy<pinCount, colorCount>(),
+                                                                     mode);
     default:
       return nullptr;
   }
@@ -322,7 +328,7 @@ int main(int argc, const char* argv[]) {
     static vector<Algo> interestingAlgos = {Knuth, MostParts, Entropy, ExpectedSize, FirstOne};
 
 #ifdef __MM_GPU_METAL__
-     static vector<GPUMode> gpuModes = {CPU, Both};
+    static vector<GPUMode> gpuModes = {CPU, Both};
 #else
     static vector<GPUMode> gpuModes = {CPU};
 #endif

@@ -20,7 +20,7 @@ class Codeword {
  public:
   constexpr Codeword() noexcept : codeword(0xFFFFFFFF), colorCounts4(0), colorCounts8(0) {}
 
-  constexpr explicit Codeword(uint32_t codeword) noexcept
+  constexpr Codeword(uint32_t codeword) noexcept
       : codeword(codeword), colorCounts4(computeColorCounts4(codeword)), colorCounts8(computeColorCounts8(codeword)) {}
 
   bool isInvalid() const { return codeword == -0xFFFFFFFF; }

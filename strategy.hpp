@@ -29,8 +29,6 @@ struct StrategyRootData;
 template <uint8_t p, uint8_t c, bool l>
 class Strategy {
  public:
-  Strategy() : savedPossibleSolutions(Codeword<p, c>::getAllCodewords()) { rootData = make_shared<StrategyRootData>(); }
-
   explicit Strategy(Codeword<p, c> guess) : savedPossibleSolutions(Codeword<p, c>::getAllCodewords()) {
     this->guess = guess;
     rootData = make_shared<StrategyRootData>();

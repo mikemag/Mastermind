@@ -6,7 +6,6 @@
 #pragma once
 
 #include "strategy.hpp"
-#include "preset_initial_guesses.h"
 
 // All of these are very simple gameplay strategies which are very fast and easy to understand.
 
@@ -28,7 +27,6 @@
 template <uint8_t p, uint8_t c, bool l>
 class StrategyFirstOne : public Strategy<p, c, l> {
  public:
-  StrategyFirstOne() : Strategy<p, c, l>{} { this->guess = Codeword<p, c>(presetInitialGuess()); }
   explicit StrategyFirstOne(Codeword<p, c> initialGuess) : Strategy<p, c, l>{initialGuess} {}
 
   StrategyFirstOne(Strategy<p, c, l> &parent, Codeword<p, c> nextGuess,
@@ -39,10 +37,6 @@ class StrategyFirstOne : public Strategy<p, c, l> {
 
   Codeword<p, c> selectNextGuess() override;
   std::shared_ptr<Strategy<p, c, l>> createNewMove(Score r, Codeword<p, c> nextGuess) override;
-
-  constexpr uint32_t presetInitialGuess() {
-    return presetInitialGuessFirstOne<p,c,l>();
-  }
 };
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -54,7 +48,6 @@ class StrategyFirstOne : public Strategy<p, c, l> {
 template <uint8_t p, uint8_t c, bool l>
 class StrategyRandom : public Strategy<p, c, l> {
  public:
-  StrategyRandom() : Strategy<p, c, l>{} {}
   explicit StrategyRandom(Codeword<p, c> initialGuess) : Strategy<p, c, l>{initialGuess} {}
 
   StrategyRandom(Strategy<p, c, l> &parent, Codeword<p, c> nextGuess,

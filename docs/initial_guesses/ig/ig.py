@@ -71,7 +71,7 @@ def generate_cxx(filename, results):
         f.write('\n')
 
         for a, pd in results.items():
-            f.write('template <uint8_t p, uint8_t c, bool l>\n')
+            f.write('template <uint8_t p, uint8_t c>\n')
             f.write('constexpr uint32_t presetInitialGuess%s() {\n' %
                     a.replace(' ', ''))
             f.write('  switch ((p << 4u) | c) {\n')
