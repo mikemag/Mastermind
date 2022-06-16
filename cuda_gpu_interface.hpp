@@ -38,6 +38,11 @@ class CUDAGPUInterface : public GPUInterface {
   std::string getGPUName() override;
 
  private:
+  void dumpDeviceInfo();
+
+  // Total scores = (p * (p + 3)) / 2, but +1 for imperfect packing.
+  static constexpr int totalScores = ((p * (p + 3)) / 2) + 1;
+
   uint32_t* dAllCodewords;
   unsigned __int128* dAllCodewordsColors;
   uint32_t* dPossibleSolutions;
@@ -51,7 +56,9 @@ class CUDAGPUInterface : public GPUInterface {
 
   uint32_t threadsPerBlock;
   uint32_t numBlocks;
-  size_t sharedMemSize;
+  size_t sharedMemSize = 0;
+
+  string deviceName;
 };
 
 //#include "cuda_gpu_interface.cu"

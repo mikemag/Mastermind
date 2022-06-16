@@ -26,7 +26,7 @@ using namespace std;
 // Mastermind scoring function
 //
 // This mirrors the scalar version very closely. It's the full counting method from Knuth, plus some fun bit twiddling
-// hacks and SWAR action. This is O(1) using warp SIMD intrinsics
+// hacks and SWAR action. This is O(1) using warp SIMD intrinsics.
 //
 // Find black hits with xor, which leaves zero nibbles on matches, then count the zeros in the result. This is a
 // variation on determining if a word has a zero byte from https://graphics.stanford.edu/~seander/bithacks.html. This
@@ -34,12 +34,8 @@ using namespace std;
 //
 // Next, color counts come from the parallel buffer, and we can run over them and add up total hits, per Knuth[1], by
 // aggregating min color counts between the secret and guess.
-//
-// Templated w/ pinCount and explicitly specialized below. We look up the correct version to use by name during startup.
 
-// https://godbolt.org/z/ea7YjEPqf
-
-static __inline__ __host__ __device__ uchar4 make_uchar4(unsigned int i) { return *reinterpret_cast<uchar4 *>(&i); }
+// TODO: early draft https://godbolt.org/z/ea7YjEPqf
 
 template <uint pinCount>
 __device__ uint scoreCodewords(const uint32_t secret, const uint4 secretColors, const uint32_t guess,
@@ -54,8 +50,10 @@ __device__ uint scoreCodewords(const uint32_t secret, const uint4 secretColors, 
   uint mins2 = __vminu4(secretColors.y, guessColors.y);
   uint mins3 = __vminu4(secretColors.z, guessColors.z);
   uint mins4 = __vminu4(secretColors.w, guessColors.w);
-  uchar4 totals = make_uchar4(__vadd4(mins1, mins2) + __vadd4(mins3, mins4));
-  uint allHits = (totals.x + totals.y) + (totals.z + totals.w);
+  uint allHits = __vsadu4(mins1, 0);
+  allHits += __vsadu4(mins2, 0);
+  allHits += __vsadu4(mins3, 0);
+  allHits += __vsadu4(mins4, 0);
 
   // Given w = ah - b, simplify to i = bp - ((b - 1)b) / 2) + ah. I wonder if the compiler noticed that.
   // https://godbolt.org/z/ab5vTn -- gcc 10.2 notices and simplifies, clang 11.0.0 misses it.
@@ -63,22 +61,22 @@ __device__ uint scoreCodewords(const uint32_t secret, const uint4 secretColors, 
 }
 
 // The common portion of the kernels which scores all possible solutions against a given guess and computes subset
-// sizes and whether or not the guess is a possible solution.
-template <uint32_t pinCount>
-__device__ bool computeSubsetSizes(int totalScores, uint32_t *scoreCounts, const uint32_t secret,
-                                   const uint4 secretColors, const uint32_t possibleSolutionsCount,
-                                   const uint32_t *possibleSolutions, const uint4 *possibleSolutionsColors) {
-  bool isPossibleSolution = false;
-  for (int i = 0; i < totalScores; i++) scoreCounts[i] = 0;
+// sizes.
+typedef uint32_t ScoreCounter;
 
+template <uint32_t pinCount, Algo algo>
+__device__ void computeSubsetSizes(ScoreCounter *__restrict__ scoreCounts, const uint32_t secret,
+                                   const uint4 secretColors, const uint32_t possibleSolutionsCount,
+                                   const uint32_t *__restrict__ possibleSolutions,
+                                   const uint4 *__restrict__ possibleSolutionsColors) {
   for (uint32_t i = 0; i < possibleSolutionsCount; i++) {
     uint score = scoreCodewords<pinCount>(secret, secretColors, possibleSolutions[i], possibleSolutionsColors[i]);
-    scoreCounts[score]++;
-    if (score == totalScores - 1) {  // The last score is the winning score
-      isPossibleSolution = true;
+    if (algo == Algo::MostParts) {
+      scoreCounts[score] = 1;
+    } else {
+      scoreCounts[score]++;
     }
   }
-  return isPossibleSolution;
 }
 
 // This takes two sets of codewords: the "all codewords" set, which is every possible codeword, and the "possible
@@ -94,22 +92,23 @@ __device__ bool computeSubsetSizes(int totalScores, uint32_t *scoreCounts, const
 //
 // Finally, there's shared block memory for each thread with enough room for all the intermediate subset sizes.
 
-extern __shared__ uint32_t tgScoreCounts[];
+extern __shared__ ScoreCounter tgScoreCounts[];
 
-template <uint32_t pinCount, Algo algo>
-__global__ void subsettingAlgosKernel(const uint32_t *allCodewords, const uint4 *allCodewordsColors,
-                                      uint32_t possibleSolutionsCount, const uint32_t *possibleSolutions,
-                                      const uint4 *possibleSolutionsColors, uint32_t *scores,
-                                      bool *remainingIsPossibleSolution, uint32_t *fullyDiscriminatingCodewords) {
+template <uint32_t pinCount, Algo algo, int totalScores>
+__global__ void subsettingAlgosKernel(const uint32_t *__restrict__ allCodewords,
+                                      const uint4 *__restrict__ allCodewordsColors, uint32_t possibleSolutionsCount,
+                                      const uint32_t *__restrict__ possibleSolutions,
+                                      const uint4 *__restrict__ possibleSolutionsColors, uint32_t *__restrict__ scores,
+                                      bool *__restrict__ remainingIsPossibleSolution,
+                                      uint32_t *__restrict__ fullyDiscriminatingCodewords) {
   uint tidGrid = blockDim.x * blockIdx.x + threadIdx.x;
-  // Total scores = (p * (p + 3)) / 2, but +1 for imperfect packing.
-  constexpr int totalScores = ((pinCount * (pinCount + 3)) / 2) + 1;
-  uint32_t *scoreCounts = &tgScoreCounts[threadIdx.x * totalScores];
+  ScoreCounter *scoreCounts = &tgScoreCounts[threadIdx.x * totalScores];
+  for (int i = 0; i < totalScores; i++) scoreCounts[i] = 0;
 
-  bool isPossibleSolution =
-      computeSubsetSizes<pinCount>(totalScores, scoreCounts, allCodewords[tidGrid], allCodewordsColors[tidGrid],
-                                   possibleSolutionsCount, possibleSolutions, possibleSolutionsColors);
-  remainingIsPossibleSolution[tidGrid] = isPossibleSolution;
+  computeSubsetSizes<pinCount, algo>(scoreCounts, allCodewords[tidGrid], allCodewordsColors[tidGrid],
+                                     possibleSolutionsCount, possibleSolutions, possibleSolutionsColors);
+
+  remainingIsPossibleSolution[tidGrid] = scoreCounts[totalScores - 1] > 0;
 
   uint32_t largestSubsetSize = 0;
   uint32_t totalUsedSubsets = 0;
@@ -165,17 +164,13 @@ __global__ void subsettingAlgosKernel(const uint32_t *allCodewords, const uint4 
 
 template <uint8_t p, uint8_t c, Algo a, bool l>
 CUDAGPUInterface<p, c, a, l>::CUDAGPUInterface() {
-  // mmmfixme: print GPU info and which one we've selected.
-  cout << "CUDA!" << endl;
+  dumpDeviceInfo();
 
   const uint64_t totalCodewords = Codeword<p, c>::totalCodewords;
   threadsPerBlock = std::min(128lu, totalCodewords);
   numBlocks = (totalCodewords + threadsPerBlock - 1) / threadsPerBlock;  // nb: round up!
   uint32_t roundedTotalCodewords = numBlocks * threadsPerBlock;
-
-  // NB: matches the def in the compute kernel.
-  const int totalScores = ((p * (p + 3)) / 2) + 1;
-  sharedMemSize = sizeof(uint32_t) * totalScores * threadsPerBlock;
+  sharedMemSize = sizeof(ScoreCounter) * totalScores * threadsPerBlock;
 
   auto mallocManaged = [](auto devPtr, auto size) {
     cudaError_t err = cudaMallocManaged(devPtr, size);
@@ -262,7 +257,7 @@ void CUDAGPUInterface<p, c, a, l>::sendComputeCommand() {
     exit(EXIT_FAILURE);
   }
 
-  subsettingAlgosKernel<p, a><<<numBlocks, threadsPerBlock, sharedMemSize>>>(
+  subsettingAlgosKernel<p, a, totalScores><<<numBlocks, threadsPerBlock, sharedMemSize>>>(
       dAllCodewords, reinterpret_cast<const uint4 *>(dAllCodewordsColors), possibleSolutionsCount, dPossibleSolutions,
       reinterpret_cast<uint4 *>(dPossibleSolutionsColors), dScores, dRemainingIsPossibleSolution,
       dFullyDiscriminatingCodewords);
@@ -297,8 +292,163 @@ uint32_t *CUDAGPUInterface<p, c, a, l>::getFullyDiscriminatingCodewords(uint32_t
 
 template <uint8_t p, uint8_t c, Algo a, bool l>
 std::string CUDAGPUInterface<p, c, a, l>::getGPUName() {
-  // mmmfixme
-  return "NEED GPU NAME";
+  return deviceName;
+}
+
+// ------------------------------------------------------------------------------------------------------------
+// Dumping device info from https://github.com/NVIDIA/cuda-samples/tree/master/Samples/1_Utilities/deviceQuery
+
+inline int _ConvertSMVer2Cores(int major, int minor) {
+  // Defines for GPU Architecture types (using the SM version to determine
+  // the # of cores per SM
+  typedef struct {
+    int SM;  // 0xMm (hexidecimal notation), M = SM Major version,
+    // and m = SM minor version
+    int Cores;
+  } sSMtoCores;
+
+  sSMtoCores nGpuArchCoresPerSM[] = {{0x30, 192}, {0x32, 192}, {0x35, 192}, {0x37, 192}, {0x50, 128}, {0x52, 128},
+                                     {0x53, 128}, {0x60, 64},  {0x61, 128}, {0x62, 128}, {0x70, 64},  {0x72, 64},
+                                     {0x75, 64},  {0x80, 64},  {0x86, 128}, {0x87, 128}, {-1, -1}};
+
+  int index = 0;
+
+  while (nGpuArchCoresPerSM[index].SM != -1) {
+    if (nGpuArchCoresPerSM[index].SM == ((major << 4) + minor)) {
+      return nGpuArchCoresPerSM[index].Cores;
+    }
+    index++;
+  }
+
+  // If we don't find the values, we default use the previous one to run properly
+  printf("MapSMtoCores for SM %d.%d is undefined.  Default to use %d Cores/SM\n", major, minor,
+         nGpuArchCoresPerSM[index - 1].Cores);
+  return nGpuArchCoresPerSM[index - 1].Cores;
+}
+
+template <uint8_t p, uint8_t c, Algo a, bool l>
+void CUDAGPUInterface<p, c, a, l>::dumpDeviceInfo() {
+  int nDevices;
+
+  cudaGetDeviceCount(&nDevices);
+  if (nDevices == 0) {
+    printf("There are no available device(s) that support CUDA\n");
+    exit(EXIT_FAILURE);
+  }
+
+  for (int dev = 0; dev < nDevices; dev++) {
+    cudaSetDevice(dev);
+    cudaDeviceProp deviceProp;
+    cudaGetDeviceProperties(&deviceProp, dev);
+
+    printf("\nDevice %d: \"%s\"\n", dev, deviceProp.name);
+    deviceName = string(deviceProp.name);
+
+    int driverVersion = 0, runtimeVersion = 0;
+    cudaDriverGetVersion(&driverVersion);
+    cudaRuntimeGetVersion(&runtimeVersion);
+    printf("  CUDA Driver Version / Runtime Version          %d.%d / %d.%d\n", driverVersion / 1000,
+           (driverVersion % 100) / 10, runtimeVersion / 1000, (runtimeVersion % 100) / 10);
+    printf("  CUDA Capability Major/Minor version number:    %d.%d\n", deviceProp.major, deviceProp.minor);
+
+    char msg[256];
+#if defined(WIN32) || defined(_WIN32) || defined(WIN64) || defined(_WIN64)
+    sprintf_s(msg, sizeof(msg),
+              "  Total amount of global memory:                 %.0f MBytes "
+              "(%llu bytes)\n",
+              static_cast<float>(deviceProp.totalGlobalMem / 1048576.0f),
+              (unsigned long long)deviceProp.totalGlobalMem);
+#else
+    snprintf(msg, sizeof(msg), "  Total amount of global memory:                 %.0f MBytes (%llu bytes)\n",
+             static_cast<float>(deviceProp.totalGlobalMem / 1048576.0f), (unsigned long long)deviceProp.totalGlobalMem);
+#endif
+    printf("%s", msg);
+
+    printf("  (%03d) Multiprocessors, (%03d) CUDA Cores/MP:    %d CUDA Cores\n", deviceProp.multiProcessorCount,
+           _ConvertSMVer2Cores(deviceProp.major, deviceProp.minor),
+           _ConvertSMVer2Cores(deviceProp.major, deviceProp.minor) * deviceProp.multiProcessorCount);
+    printf("  GPU Max Clock rate:                            %.0f MHz (%0.2f GHz)\n", deviceProp.clockRate * 1e-3f,
+           deviceProp.clockRate * 1e-6f);
+
+#if CUDART_VERSION >= 5000
+    // This is supported in CUDA 5.0 (runtime API device properties)
+    printf("  Memory Clock rate:                             %.0f Mhz\n", deviceProp.memoryClockRate * 1e-3f);
+    printf("  Memory Bus Width:                              %d-bit\n", deviceProp.memoryBusWidth);
+
+    if (deviceProp.l2CacheSize) {
+      printf("  L2 Cache Size:                                 %d bytes\n", deviceProp.l2CacheSize);
+    }
+
+#else
+    // This only available in CUDA 4.0-4.2 (but these were only exposed in the
+    // CUDA Driver API)
+    int memoryClock;
+    getCudaAttribute<int>(&memoryClock, CU_DEVICE_ATTRIBUTE_MEMORY_CLOCK_RATE, dev);
+    printf("  Memory Clock rate:                             %.0f Mhz\n", memoryClock * 1e-3f);
+    int memBusWidth;
+    getCudaAttribute<int>(&memBusWidth, CU_DEVICE_ATTRIBUTE_GLOBAL_MEMORY_BUS_WIDTH, dev);
+    printf("  Memory Bus Width:                              %d-bit\n", memBusWidth);
+    int L2CacheSize;
+    getCudaAttribute<int>(&L2CacheSize, CU_DEVICE_ATTRIBUTE_L2_CACHE_SIZE, dev);
+
+    if (L2CacheSize) {
+      printf("  L2 Cache Size:                                 %d bytes\n", L2CacheSize);
+    }
+
+#endif
+
+    printf("  Maximum Texture Dimension Size (x,y,z)         1D=(%d), 2D=(%d, %d), 3D=(%d, %d, %d)\n",
+           deviceProp.maxTexture1D, deviceProp.maxTexture2D[0], deviceProp.maxTexture2D[1], deviceProp.maxTexture3D[0],
+           deviceProp.maxTexture3D[1], deviceProp.maxTexture3D[2]);
+    printf("  Maximum Layered 1D Texture Size, (num) layers  1D=(%d), %d layers\n", deviceProp.maxTexture1DLayered[0],
+           deviceProp.maxTexture1DLayered[1]);
+    printf("  Maximum Layered 2D Texture Size, (num) layers  2D=(%d, %d), %d layers\n",
+           deviceProp.maxTexture2DLayered[0], deviceProp.maxTexture2DLayered[1], deviceProp.maxTexture2DLayered[2]);
+
+    printf("  Total amount of constant memory:               %zu bytes\n", deviceProp.totalConstMem);
+    printf("  Total amount of shared memory per block:       %zu bytes\n", deviceProp.sharedMemPerBlock);
+    printf("  Total shared memory per multiprocessor:        %zu bytes\n", deviceProp.sharedMemPerMultiprocessor);
+    printf("  Total number of registers available per block: %d\n", deviceProp.regsPerBlock);
+    printf("  Warp size:                                     %d\n", deviceProp.warpSize);
+    printf("  Maximum number of threads per multiprocessor:  %d\n", deviceProp.maxThreadsPerMultiProcessor);
+    printf("  Maximum number of threads per block:           %d\n", deviceProp.maxThreadsPerBlock);
+    printf("  Max dimension size of a thread block (x,y,z): (%d, %d, %d)\n", deviceProp.maxThreadsDim[0],
+           deviceProp.maxThreadsDim[1], deviceProp.maxThreadsDim[2]);
+    printf("  Max dimension size of a grid size    (x,y,z): (%d, %d, %d)\n", deviceProp.maxGridSize[0],
+           deviceProp.maxGridSize[1], deviceProp.maxGridSize[2]);
+    printf("  Maximum memory pitch:                          %zu bytes\n", deviceProp.memPitch);
+    printf("  Texture alignment:                             %zu bytes\n", deviceProp.textureAlignment);
+    printf("  Concurrent copy and kernel execution:          %s with %d copy engine(s)\n",
+           (deviceProp.deviceOverlap ? "Yes" : "No"), deviceProp.asyncEngineCount);
+    printf("  Run time limit on kernels:                     %s\n", deviceProp.kernelExecTimeoutEnabled ? "Yes" : "No");
+    printf("  Integrated GPU sharing Host Memory:            %s\n", deviceProp.integrated ? "Yes" : "No");
+    printf("  Support host page-locked memory mapping:       %s\n", deviceProp.canMapHostMemory ? "Yes" : "No");
+    printf("  Alignment requirement for Surfaces:            %s\n", deviceProp.surfaceAlignment ? "Yes" : "No");
+    printf("  Device has ECC support:                        %s\n", deviceProp.ECCEnabled ? "Enabled" : "Disabled");
+#if defined(WIN32) || defined(_WIN32) || defined(WIN64) || defined(_WIN64)
+    printf("  CUDA Device Driver Mode (TCC or WDDM):         %s\n",
+           deviceProp.tccDriver ? "TCC (Tesla Compute Cluster Driver)" : "WDDM (Windows Display Driver Model)");
+#endif
+    printf("  Device supports Unified Addressing (UVA):      %s\n", deviceProp.unifiedAddressing ? "Yes" : "No");
+    printf("  Device supports Managed Memory:                %s\n", deviceProp.managedMemory ? "Yes" : "No");
+    printf("  Device supports Compute Preemption:            %s\n",
+           deviceProp.computePreemptionSupported ? "Yes" : "No");
+    printf("  Supports Cooperative Kernel Launch:            %s\n", deviceProp.cooperativeLaunch ? "Yes" : "No");
+    printf("  Supports MultiDevice Co-op Kernel Launch:      %s\n",
+           deviceProp.cooperativeMultiDeviceLaunch ? "Yes" : "No");
+    printf("  Device PCI Domain ID / Bus ID / location ID:   %d / %d / %d\n", deviceProp.pciDomainID,
+           deviceProp.pciBusID, deviceProp.pciDeviceID);
+
+    const char *sComputeMode[] = {
+        "Default (multiple host threads can use ::cudaSetDevice() with device simultaneously)",
+        "Exclusive (only one host thread in one process is able to use ::cudaSetDevice() with this device)",
+        "Prohibited (no host thread can use ::cudaSetDevice() with this device)",
+        "Exclusive Process (many threads in one process is able to use ::cudaSetDevice() with this device)",
+        "Unknown",
+        NULL};
+    printf("  Compute Mode:\n");
+    printf("     < %s >\n", sComputeMode[deviceProp.computeMode]);
+  }
 }
 
 // -----------------------------------------------------------------------------------

@@ -47,4 +47,10 @@ set_target_properties(mastermind PROPERTIES
         CUDA_SEPARABLE_COMPILATION ON
         CUDA_ARCHITECTURES "86")
 
+target_compile_options(mastermind PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:
+        --generate-line-info
+        --use_fast_math
+        --relocatable-device-code=true
+        >)
+
 # https://developer.nvidia.com/blog/building-cuda-applications-cmake/
