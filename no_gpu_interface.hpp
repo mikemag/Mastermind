@@ -25,12 +25,20 @@ class NoGPUInterface : public GPUInterface {
   unsigned __int128* getPossibleSolutionsColorsBuffer() override { return nullptr; }
   void setPossibleSolutionsCount(uint32_t count) override {}
 
+  uint32_t* getUsedCodewordsBuffer() override { return nullptr; }
+  void setUsedCodewordsCount(uint32_t count) override {}
+
   void sendComputeCommand() override {}
 
   uint32_t* getScores() override { return nullptr; }
   bool* getRemainingIsPossibleSolution() override { return nullptr; }
 
   uint32_t* getFullyDiscriminatingCodewords(uint32_t& count) override { return nullptr; }
+  uint32_t getFDGuess() override { return UINT32_MAX; }
+  IndexAndScore getBestGuess(uint32_t allCodewordsCount, std::vector<uint32_t>& usedCodewords,
+                             uint32_t (*codewordGetter)(uint32_t)) override {
+    return {UINT32_MAX, 0, false};
+  }
 
   std::string getGPUName() override { return "None"; }
 };

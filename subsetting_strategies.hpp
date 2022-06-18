@@ -58,7 +58,7 @@ class StrategySubsetting : public Strategy<p, c, l> {
   virtual size_t computeSubsetScore() = 0;
 
  protected:
-  // Adds a set of codewords we've already guessed so we can ignore them from the set of all codewords when looking
+  // Adds a set of codewords we've already guessed, so we can ignore them from the set of all codewords when looking
   // for possibly inconsistent moves. You'd imagine an unordered_set<> would be best here, but the list is so short
   // that it's actually slower than a simple vector w/ linear search.
   const std::vector<uint32_t> savedUsedCodewords;

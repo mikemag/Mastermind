@@ -7,6 +7,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include "gpu_interface.hpp"
 
@@ -36,12 +37,51 @@ class MetalGPUInterfaceWrapper : public GPUInterface {
   unsigned __int128* getPossibleSolutionsColorsBuffer() override;
   void setPossibleSolutionsCount(uint32_t count) override;
 
+  uint32_t* getUsedCodewordsBuffer() override { return nullptr; }
+  void setUsedCodewordsCount(uint32_t count) {}
+
   void sendComputeCommand() override;
 
   uint32_t* getScores() override;
   bool* getRemainingIsPossibleSolution() override;
 
   uint32_t* getFullyDiscriminatingCodewords(uint32_t& count) override;
+
+  uint32_t getFDGuess() override {
+    // TODO: impl for Metal
+    uint32_t discriminatingCount = 0;
+    uint32_t* smallOptsOut = getFullyDiscriminatingCodewords(discriminatingCount);
+    for (int i = 0; i < discriminatingCount; i++) {
+      if (smallOptsOut[i] > 0) {
+        return smallOptsOut[i];
+      }
+    }
+    return UINT32_MAX;
+  }
+
+  IndexAndScore getBestGuess(uint32_t allCodewordsCount, std::vector<uint32_t>& usedCodewords,
+                             uint32_t (*codewordGetter)(uint32_t)) override {
+    // TODO: impl for Metal
+    uint32_t* maxScoreCounts = getScores();
+    bool* remainingIsPossibleSolution = getRemainingIsPossibleSolution();
+    bool bestIsPossibleSolution = false;
+    uint32_t bestScore = 0;
+    uint32_t bestGuessIndex = 0;
+
+    for (int i = 0; i < allCodewordsCount; i++) {
+      uint32_t score = maxScoreCounts[i];
+      if (score > bestScore || (!bestIsPossibleSolution && remainingIsPossibleSolution[i] && score == bestScore)) {
+        uint32_t codeword = codewordGetter(i);
+        if (find(usedCodewords.cbegin(), usedCodewords.cend(), codeword) != usedCodewords.end()) {
+          continue;  // Ignore codewords we've already used
+        }
+        bestScore = score;
+        bestGuessIndex = i;
+        bestIsPossibleSolution = remainingIsPossibleSolution[i];
+      }
+    }
+    return {bestGuessIndex, bestScore, bestIsPossibleSolution};
+  }
 
   std::string getGPUName() override;
 };

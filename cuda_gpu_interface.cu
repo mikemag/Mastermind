@@ -6,8 +6,8 @@
 #include <cuda_runtime.h>
 
 #include <algorithm>
+#include <cub/cub.cuh>
 #include <cuda/std/cstdint>
-#include <iostream>
 #include <string>
 
 #include "codeword.hpp"
@@ -60,21 +60,21 @@ __device__ uint scoreCodewords(const uint32_t secret, const uint4 secretColors, 
   return b * pinCount - ((b - 1) * b) / 2 + allHits;
 }
 
-// The common portion of the kernels which scores all possible solutions against a given guess and computes subset
-// sizes.
-typedef uint32_t ScoreCounter;
+// The common portion of the kernels which scores all possible solutions against a given secret and computes subset
+// sizes, i.e., for each score the number of codewords with that score.
+typedef uint32_t SubsetSize;
 
 template <uint32_t pinCount, Algo algo>
-__device__ void computeSubsetSizes(ScoreCounter *__restrict__ scoreCounts, const uint32_t secret,
+__device__ void computeSubsetSizes(SubsetSize *__restrict__ subsetSizes, const uint32_t secret,
                                    const uint4 secretColors, const uint32_t possibleSolutionsCount,
                                    const uint32_t *__restrict__ possibleSolutions,
                                    const uint4 *__restrict__ possibleSolutionsColors) {
   for (uint32_t i = 0; i < possibleSolutionsCount; i++) {
     uint score = scoreCodewords<pinCount>(secret, secretColors, possibleSolutions[i], possibleSolutionsColors[i]);
     if (algo == Algo::MostParts) {
-      scoreCounts[score] = 1;
+      subsetSizes[score] = 1;
     } else {
-      scoreCounts[score]++;
+      subsetSizes[score]++;
     }
   }
 }
@@ -87,78 +87,142 @@ __device__ void computeSubsetSizes(ScoreCounter *__restrict__ scoreCounts, const
 //
 // The possible solutions set changes each time, both content and length, but reuses the same buffers.
 //
-// Output is two arrays with elements for each of the all codewords set: one with the score, and one bool
-// for whether the codeword is a possible solution.
+// All codeword pairs are scored and subset sizes computed, then each codeword is scored for the algorithm we're
+// running. Finally, each block computes the best scored codeword in the group, and we look for fully discriminating
+// codewords.
 //
-// Finally, there's shared block memory for each thread with enough room for all the intermediate subset sizes.
+// Output is an array of IndexAndScores for the best selections from each block, and a single fully discriminating
+// guess.
+//
+// Finally, there's shared block memory for each thread with enough room for all the intermediate subset sizes,
+// reduction space, etc.
 
-extern __shared__ ScoreCounter tgScoreCounts[];
+struct IndexAndScoreReducer {
+  __device__ __forceinline__ GPUInterface::IndexAndScore operator()(const GPUInterface::IndexAndScore &a,
+                                                                    const GPUInterface::IndexAndScore &b) const {
+    // Always take the best score. If it's a tie, take the one that could be a solution. If that's a tie, take lexically
+    // first.
+    if (b.score > a.score) return b;
+    if (b.score < a.score) return a;
+    if (b.isPossibleSolution ^ a.isPossibleSolution) return b.isPossibleSolution ? b : a;
+    return (b.index < a.index) ? b : a;
+  }
+};
 
 template <uint32_t pinCount, Algo algo, int totalScores>
-__global__ void subsettingAlgosKernel(const uint32_t *__restrict__ allCodewords,
+__global__ void subsettingAlgosKernel(const uint32_t allCodewordsCount, const uint32_t *__restrict__ allCodewords,
                                       const uint4 *__restrict__ allCodewordsColors, uint32_t possibleSolutionsCount,
                                       const uint32_t *__restrict__ possibleSolutions,
-                                      const uint4 *__restrict__ possibleSolutionsColors, uint32_t *__restrict__ scores,
-                                      bool *__restrict__ remainingIsPossibleSolution,
-                                      uint32_t *__restrict__ fullyDiscriminatingCodewords) {
-  uint tidGrid = blockDim.x * blockIdx.x + threadIdx.x;
-  ScoreCounter *scoreCounts = &tgScoreCounts[threadIdx.x * totalScores];
-  for (int i = 0; i < totalScores; i++) scoreCounts[i] = 0;
+                                      const uint4 *__restrict__ possibleSolutionsColors, uint32_t usedCodewordsCount,
+                                      const uint32_t *__restrict__ usedCodewords, uint32_t *__restrict__ fdGuess,
+                                      GPUInterface::IndexAndScore *__restrict__ perBlockSolutions) {
+  using BlockReduce = cub::BlockReduce<GPUInterface::IndexAndScore, 128>;  // TODO: block size
 
-  computeSubsetSizes<pinCount, algo>(scoreCounts, allCodewords[tidGrid], allCodewordsColors[tidGrid],
+  union SharedMemLayout {
+    SubsetSize scoreCounts;
+    BlockReduce::TempStorage reduce;
+    GPUInterface::IndexAndScore aggregate;
+  };
+
+  extern __shared__ __align__(alignof(SharedMemLayout)) char sharedMem[];
+
+  uint tidGrid = blockDim.x * blockIdx.x + threadIdx.x;
+  auto subsetSizes = &(reinterpret_cast<SubsetSize *>(sharedMem))[threadIdx.x * totalScores];
+  for (int i = 0; i < totalScores; i++) subsetSizes[i] = 0;
+
+  computeSubsetSizes<pinCount, algo>(subsetSizes, allCodewords[tidGrid], allCodewordsColors[tidGrid],
                                      possibleSolutionsCount, possibleSolutions, possibleSolutionsColors);
 
-  remainingIsPossibleSolution[tidGrid] = scoreCounts[totalScores - 1] > 0;
+  bool isPossibleSolution = subsetSizes[totalScores - 1] > 0;
 
   uint32_t largestSubsetSize = 0;
   uint32_t totalUsedSubsets = 0;
   float entropySum = 0.0;
   float expectedSize = 0.0;
   for (int i = 0; i < totalScores; i++) {
-    if (scoreCounts[i] > 0) {
+    if (subsetSizes[i] > 0) {
       totalUsedSubsets++;
       switch (algo) {
         case Knuth:
-          largestSubsetSize = max(largestSubsetSize, scoreCounts[i]);
+          largestSubsetSize = max(largestSubsetSize, subsetSizes[i]);
           break;
         case MostParts:
           // Already done
           break;
         case ExpectedSize:
-          expectedSize += ((float)scoreCounts[i] * (float)scoreCounts[i]) / possibleSolutionsCount;
+          expectedSize += ((float)subsetSizes[i] * (float)subsetSizes[i]) / possibleSolutionsCount;
           break;
         case Entropy:
-          float pi = (float)scoreCounts[i] / possibleSolutionsCount;
+          float pi = (float)subsetSizes[i] / possibleSolutionsCount;
           entropySum -= pi * log(pi);
           break;
       }
     }
   }
+  uint32_t score;
   switch (algo) {
     case Knuth:
-      scores[tidGrid] = possibleSolutionsCount - largestSubsetSize;
+      score = possibleSolutionsCount - largestSubsetSize;
       break;
     case MostParts:
-      scores[tidGrid] = totalUsedSubsets;
+      score = totalUsedSubsets;
       break;
     case ExpectedSize:
-      scores[tidGrid] = (uint32_t)round(expectedSize * 1'000'000.0) * -1;  // 9 digits of precision
+      score = (uint32_t)round(expectedSize * 1'000'000.0) * -1;  // 9 digits of precision
       break;
     case Entropy:
-      scores[tidGrid] = round(entropySum * 1'000'000'000.0);  // 9 digits of precision
+      score = round(entropySum * 1'000'000'000.0);  // 9 digits of precision
       break;
   }
 
+  // A score of 0 will prevent used or invalid codewords from being chosen.
+  if (tidGrid >= allCodewordsCount) score = 0;
+  for (int i = 0; i < usedCodewordsCount; i++) {
+    if (allCodewords[tidGrid] == usedCodewords[i]) score = 0;
+  }
+
+  // Reduce to find the best solution we have in this block. This keeps the codeword index, score, and possible solution
+  // indicator together.
+  __syncthreads();
+  auto &temp_storage = reinterpret_cast<BlockReduce::TempStorage &>(sharedMem);
+  GPUInterface::IndexAndScore ias{tidGrid, score, isPossibleSolution};
+  GPUInterface::IndexAndScore bestSolution = BlockReduce(temp_storage).Reduce(ias, IndexAndScoreReducer());
+
+  if (threadIdx.x == 0) {
+    perBlockSolutions[blockIdx.x] = bestSolution;
+  }
+
   // If we find some guesses which are fully discriminating, we want to pick the first one lexically to play. tidGrid is
-  // the same as the ordinal for each member of allCodewords, so we can simply take the min tidGrid. We'll have every
-  // member of each warp that finds such a solution vote on the minimum, and have the first of them write the
-  // result. I could do a further reduction to a value per block, or a final single value, but for now I'll just
-  // let the CPU take the first non-zero result and run with it.
-  if (totalUsedSubsets == possibleSolutionsCount) {
-    uint d = __reduce_min_sync(__activemask(), tidGrid);
-    if (tidGrid == d) {
-      fullyDiscriminatingCodewords[tidGrid / 32] = d;
+  // the same as the ordinal for each member of allCodewords, so we can simply take the min tidGrid.
+  if (possibleSolutionsCount <= totalScores) {
+    if (totalUsedSubsets == possibleSolutionsCount) {
+      atomicMin(fdGuess, tidGrid);
     }
+  }
+}
+
+// @TODO: try cub::DeviceReduce::Reduce instead.
+template <uint32_t blockSize>
+__global__ void reduceMaxScore(GPUInterface::IndexAndScore *__restrict__ perBlockSolutions,
+                               const uint32_t solutionsCount) {
+  uint32_t idx = threadIdx.x;
+  IndexAndScoreReducer reduce;
+  GPUInterface::IndexAndScore bestScore{0, 0, false};
+  for (uint32_t i = idx; i < solutionsCount; i += blockDim.x) {
+    bestScore = reduce(bestScore, perBlockSolutions[i]);
+  }
+
+  __shared__ GPUInterface::IndexAndScore r[blockSize];
+  r[idx] = bestScore;
+  __syncthreads();
+
+  for (uint32_t size = blockDim.x / 2; size > 0; size /= 2) {
+    if (idx < size) r[idx] = reduce(r[idx], r[idx + size]);
+    __syncthreads();
+  }
+
+  if (idx == 0) {
+    perBlockSolutions[0] = r[0];
   }
 }
 
@@ -170,7 +234,10 @@ CUDAGPUInterface<p, c, a, l>::CUDAGPUInterface() {
   threadsPerBlock = std::min(128lu, totalCodewords);
   numBlocks = (totalCodewords + threadsPerBlock - 1) / threadsPerBlock;  // nb: round up!
   uint32_t roundedTotalCodewords = numBlocks * threadsPerBlock;
-  sharedMemSize = sizeof(ScoreCounter) * totalScores * threadsPerBlock;
+
+  auto block_reduce_temp_bytes = sizeof(typename cub::BlockReduce<int, 128>::TempStorage);
+  sharedMemSize = std::max(1 * sizeof(IndexAndScore), block_reduce_temp_bytes);
+  sharedMemSize = std::max(sharedMemSize, sizeof(SubsetSize) * totalScores * threadsPerBlock);
 
   auto mallocManaged = [](auto devPtr, auto size) {
     cudaError_t err = cudaMallocManaged(devPtr, size);
@@ -184,11 +251,9 @@ CUDAGPUInterface<p, c, a, l>::CUDAGPUInterface() {
   mallocManaged((void **)&dAllCodewordsColors, sizeof(*dAllCodewordsColors) * roundedTotalCodewords);
   mallocManaged((void **)&dPossibleSolutions, sizeof(*dPossibleSolutions) * roundedTotalCodewords);
   mallocManaged((void **)&dPossibleSolutionsColors, sizeof(*dPossibleSolutionsColors) * roundedTotalCodewords);
-  mallocManaged((void **)&dScores, sizeof(*dScores) * roundedTotalCodewords);
-  mallocManaged((void **)&dRemainingIsPossibleSolution, sizeof(*dRemainingIsPossibleSolution) * roundedTotalCodewords);
-
-  fdCount = (roundedTotalCodewords / 32) + 1;
-  mallocManaged((void **)&dFullyDiscriminatingCodewords, sizeof(*dFullyDiscriminatingCodewords) * fdCount);
+  mallocManaged((void **)&dUsedCodewords, sizeof(*dUsedCodewords) * 100);
+  mallocManaged((void **)&dFdGuess, sizeof(*dFdGuess) * 1);
+  mallocManaged((void **)&dPerBlockSolutions, sizeof(*dPerBlockSolutions) * numBlocks);
 }
 
 template <uint8_t p, uint8_t c, Algo a, bool l>
@@ -205,9 +270,9 @@ CUDAGPUInterface<p, c, a, l>::~CUDAGPUInterface() {
   freeManaged(dAllCodewordsColors);
   freeManaged(dPossibleSolutions);
   freeManaged(dPossibleSolutionsColors);
-  freeManaged(dScores);
-  freeManaged(dRemainingIsPossibleSolution);
-  freeManaged(dFullyDiscriminatingCodewords);
+  freeManaged(dUsedCodewords);
+  freeManaged(dFdGuess);
+  freeManaged(dPerBlockSolutions);
 }
 
 template <uint8_t p, uint8_t c, Algo a, bool l>
@@ -238,6 +303,7 @@ template <uint8_t p, uint8_t c, Algo a, bool l>
 uint32_t *CUDAGPUInterface<p, c, a, l>::getPossibleSolutionsBuffer() {
   return dPossibleSolutions;
 }
+
 template <uint8_t p, uint8_t c, Algo a, bool l>
 unsigned __int128 *CUDAGPUInterface<p, c, a, l>::getPossibleSolutionsColorsBuffer() {
   return dPossibleSolutionsColors;
@@ -249,21 +315,34 @@ void CUDAGPUInterface<p, c, a, l>::setPossibleSolutionsCount(uint32_t count) {
 }
 
 template <uint8_t p, uint8_t c, Algo a, bool l>
-void CUDAGPUInterface<p, c, a, l>::sendComputeCommand() {
-  cudaError_t err = cudaSuccess;
-  err = cudaMemset(dFullyDiscriminatingCodewords, 0, sizeof(*dFullyDiscriminatingCodewords) * fdCount);
-  if (err != cudaSuccess) {
-    fprintf(stderr, "Failed to clear FDC buffer (error code %s)!\n", cudaGetErrorString(err));
-    exit(EXIT_FAILURE);
-  }
+uint32_t *CUDAGPUInterface<p, c, a, l>::getUsedCodewordsBuffer() {
+  return dUsedCodewords;
+}
 
+template <uint8_t p, uint8_t c, Algo a, bool l>
+void CUDAGPUInterface<p, c, a, l>::setUsedCodewordsCount(uint32_t count) {
+  usedCodewordsCount = count;
+}
+
+template <uint8_t p, uint8_t c, Algo a, bool l>
+void CUDAGPUInterface<p, c, a, l>::sendComputeCommand() {
+  *dFdGuess = Codeword<p, c>::totalCodewords;
+
+  cudaError_t err = cudaSuccess;
   subsettingAlgosKernel<p, a, totalScores><<<numBlocks, threadsPerBlock, sharedMemSize>>>(
-      dAllCodewords, reinterpret_cast<const uint4 *>(dAllCodewordsColors), possibleSolutionsCount, dPossibleSolutions,
-      reinterpret_cast<uint4 *>(dPossibleSolutionsColors), dScores, dRemainingIsPossibleSolution,
-      dFullyDiscriminatingCodewords);
+      Codeword<p, c>::totalCodewords, dAllCodewords, reinterpret_cast<const uint4 *>(dAllCodewordsColors),
+      possibleSolutionsCount, dPossibleSolutions, reinterpret_cast<uint4 *>(dPossibleSolutionsColors),
+      usedCodewordsCount, dUsedCodewords, dFdGuess, dPerBlockSolutions);
   err = cudaGetLastError();
   if (err != cudaSuccess) {
     fprintf(stderr, "Failed to launch subsettingAlgosKernel kernel (error code %s)!\n", cudaGetErrorString(err));
+    exit(EXIT_FAILURE);
+  }
+
+  reduceMaxScore<128><<<1, threadsPerBlock>>>(dPerBlockSolutions, numBlocks);
+  err = cudaGetLastError();
+  if (err != cudaSuccess) {
+    fprintf(stderr, "Failed to launch reduceMaxScore kernel (error code %s)!\n", cudaGetErrorString(err));
     exit(EXIT_FAILURE);
   }
 
@@ -276,18 +355,30 @@ void CUDAGPUInterface<p, c, a, l>::sendComputeCommand() {
 
 template <uint8_t p, uint8_t c, Algo a, bool l>
 uint32_t *CUDAGPUInterface<p, c, a, l>::getScores() {
-  return dScores;
+  return nullptr;
 }
 
 template <uint8_t p, uint8_t c, Algo a, bool l>
 bool *CUDAGPUInterface<p, c, a, l>::getRemainingIsPossibleSolution() {
-  return dRemainingIsPossibleSolution;
+  return nullptr;
 }
 
 template <uint8_t p, uint8_t c, Algo a, bool l>
 uint32_t *CUDAGPUInterface<p, c, a, l>::getFullyDiscriminatingCodewords(uint32_t &count) {
-  count = fdCount;
-  return dFullyDiscriminatingCodewords;
+  count = 0;
+  return nullptr;
+}
+
+template <uint8_t p, uint8_t c, Algo a, bool l>
+uint32_t CUDAGPUInterface<p, c, a, l>::getFDGuess() {
+  return *dFdGuess;
+}
+
+template <uint8_t p, uint8_t c, Algo a, bool l>
+GPUInterface::IndexAndScore CUDAGPUInterface<p, c, a, l>::getBestGuess(uint32_t allCodewordsCounts,
+                                                                       std::vector<uint32_t> &usedCodewords,
+                                                                       uint32_t (*codewordGetter)(uint32_t)) {
+  return dPerBlockSolutions[0];
 }
 
 template <uint8_t p, uint8_t c, Algo a, bool l>
@@ -489,5 +580,9 @@ void CUDAGPUInterface<p, c, a, l>::dumpDeviceInfo() {
   INST_CL(14, l)  \
   INST_CL(15, l)
 
-INST_L(true)
-INST_L(false)
+// INST_L(true)
+// INST_L(false)
+
+INST_PCL(4, 6, true)
+INST_PCL(4, 6, false)
+INST_PCL(8, 5, false)

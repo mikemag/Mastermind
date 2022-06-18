@@ -119,8 +119,8 @@ void Strategy<p, c, log>::removeImpossibleSolutions(Score r) {
 //
 // That's a big difference. This skips a great deal of work in the inner loop for CPU scoring, where it is almost free
 // to compute. In the GPU version (not shown), it also skips some work in the inner loop of consuming GPU results, and
-// is very cheap to add to the overall GPU time. She shortcut applied in the outter loop saves both CPU and GPU schemes
-// quite a lot of work as well with a reasonable ration of wasted work to work saved.
+// is very cheap to add to the overall GPU time. The shortcut applied in the outer loop saves both CPU and GPU schemes
+// quite a lot of work as well with a reasonable ratio of wasted work to work saved.
 //
 // All-in-all, this is a very nice shortcut for all of these algorithms.
 

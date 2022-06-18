@@ -28,12 +28,18 @@ class CUDAGPUInterface : public GPUInterface {
   unsigned __int128* getPossibleSolutionsColorsBuffer() override;
   void setPossibleSolutionsCount(uint32_t count) override;
 
+  uint32_t* getUsedCodewordsBuffer() override;
+  void setUsedCodewordsCount(uint32_t count) override;
+
   void sendComputeCommand() override;
 
   uint32_t* getScores() override;
   bool* getRemainingIsPossibleSolution() override;
 
   uint32_t* getFullyDiscriminatingCodewords(uint32_t& count) override;
+  uint32_t getFDGuess() override;
+  IndexAndScore getBestGuess(uint32_t allCodewordsCount, std::vector<uint32_t>& usedCodewords,
+                             uint32_t (*codewordGetter)(uint32_t)) override;
 
   std::string getGPUName() override;
 
@@ -48,11 +54,12 @@ class CUDAGPUInterface : public GPUInterface {
   uint32_t* dPossibleSolutions;
   unsigned __int128* dPossibleSolutionsColors;
   uint32_t possibleSolutionsCount;
-  uint32_t* dScores;
-  bool* dRemainingIsPossibleSolution;
 
-  uint32_t fdCount;
-  uint32_t* dFullyDiscriminatingCodewords;
+  uint32_t* dUsedCodewords;
+  uint32_t usedCodewordsCount;
+
+  uint32_t* dFdGuess;
+  IndexAndScore* dPerBlockSolutions;
 
   uint32_t threadsPerBlock;
   uint32_t numBlocks;

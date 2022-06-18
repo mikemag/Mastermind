@@ -104,53 +104,47 @@ Codeword<p, c> StrategySubsettingGPU<p, c, log, Derived>::selectNextGuess() {
   }
   gpuRootData->gpuInterface->setPossibleSolutionsCount((uint32_t)this->possibleSolutions.size());
 
+  uint32_t *uw = gpuRootData->gpuInterface->getUsedCodewordsBuffer();
+  if (uw) {
+    for (int i = 0; i < this->usedCodewords.size(); i++) {
+      uw[i] = this->usedCodewords[i];
+    }
+    gpuRootData->gpuInterface->setUsedCodewordsCount((uint32_t)this->usedCodewords.size());
+  }
+
   gpuRootData->gpuInterface->sendComputeCommand();
   gpuRootData->kernelsExecuted++;
   this->rootData->scoreCounterGPU += Codeword<p, c>::getAllCodewords().size() * this->possibleSolutions.size();
 
-  uint32_t *maxScoreCounts = gpuRootData->gpuInterface->getScores();
-  bool *remainingIsPossibleSolution = gpuRootData->gpuInterface->getRemainingIsPossibleSolution();
-
-  if (Strategy<p, c, log>::enableSmallPSShortcutGPU) {
+  if (Strategy<p, c, log>::enableSmallPSShortcutGPU &&
+      this->possibleSolutions.size() <= Strategy<p, c, log>::totalScores) {
     // Shortcut small sets with fully discriminating codewords. Certain versions of the GPU kernels look for these and
     // pass them back in a list of useful codewords per SIMD group. Running through the list in-order and taking the
     // first one gives the first lexically ordered option.
-    uint32_t discriminatingCount = 0;
-    uint32_t *smallOptsOut = gpuRootData->gpuInterface->getFullyDiscriminatingCodewords(discriminatingCount);
-    for (int i = 0; i < discriminatingCount; i++) {
-      if (smallOptsOut[i] > 0) {
-        Codeword<p, c> g = Codeword<p, c>::getAllCodewords()[smallOptsOut[i]];
-        if (log) {
-          cout << "Selecting fully discriminating guess from GPU: " << g
-               << ", subsets: " << this->possibleSolutions.size()
-               << ", isPossibleSolution: " << remainingIsPossibleSolution[smallOptsOut[i]]
-               << ", small opts index: " << i << endl;
-        }
-        return g;
+    uint32_t fd = gpuRootData->gpuInterface->getFDGuess();
+    if (fd < Codeword<p, c>::totalCodewords) {
+      Codeword<p, c> g = Codeword<p, c>::getAllCodewords()[fd];
+      if (log) {
+        cout << "Selecting fully discriminating guess from GPU: " << g << ", subsets: "
+             << this->possibleSolutions.size()
+             //             << ", isPossibleSolution: " << remainingIsPossibleSolution[fd]
+             << ", small opts index: " << fd << endl;
       }
+      return g;
     }
   }
 
-  Codeword<p, c> bestGuess;
-  size_t bestScore = 0;
-  bool bestIsPossibleSolution = false;
+  // TODO: this is a massive hack to keep the Metal version working for now. I pushed the CPU-side work down into its
+  // impl of getBestGuess and it's messy.
+  auto codewordGetter = [](uint32_t index) -> uint32_t {
+    return Codeword<p, c>::getAllCodewords()[index].packedCodeword();
+  };
 
-  for (int i = 0; i < Codeword<p, c>::getAllCodewords().size(); i++) {
-    size_t score = maxScoreCounts[i];
-    if (score > bestScore || (!bestIsPossibleSolution && remainingIsPossibleSolution[i] && score == bestScore)) {
-      auto &codeword = Codeword<p, c>::getAllCodewords()[i];
-      if (find(this->usedCodewords.cbegin(), this->usedCodewords.cend(), codeword.packedCodeword()) !=
-          this->usedCodewords.end()) {
-        continue;  // Ignore codewords we've already used
-      }
-      bestScore = score;
-      bestGuess = codeword;
-      bestIsPossibleSolution = remainingIsPossibleSolution[i];
-    }
-  }
-
+  GPUInterface::IndexAndScore bestGPUGuess = gpuRootData->gpuInterface->getBestGuess(
+      Codeword<p, c>::getAllCodewords().size(), this->usedCodewords, codewordGetter);
+  Codeword<p, c> bestGuess = Codeword<p, c>::getAllCodewords()[bestGPUGuess.index];
   if (log) {
-    cout << "Selecting best guess: " << bestGuess << "\tscore: " << bestScore << " (GPU)" << endl;
+    cout << "Selecting best guess: " << bestGuess << "\tscore: " << bestGPUGuess.score << " (GPU)" << endl;
   }
 
   return bestGuess;
