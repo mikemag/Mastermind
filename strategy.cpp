@@ -51,14 +51,15 @@ uint32_t Strategy<p, c, log>::findSecret(Codeword<p, c> secret, int depth) {
 
   // Figure out what our next guess should be
   Codeword<p, c> nextGuess;
+  auto &allCodewords = Codeword<p, c>::getAllCodewords();
   if (possibleSolutions.size() == 1) {
-    nextGuess = possibleSolutions.front();
+    nextGuess = allCodewords[possibleSolutions.front()];
     possibleSolutions.clear();
     if (log) {
       cout << "Only remaining solution must be correct: " << nextGuess << endl;
     }
   } else if (enableTwoPSShortcut && possibleSolutions.size() == 2) {
-    nextGuess = possibleSolutions.front();
+    nextGuess = allCodewords[possibleSolutions.front()];
     possibleSolutions.erase(begin(possibleSolutions));
     if (log) {
       cout << "Only two solutions remain, selecting the first one blindly: " << nextGuess << endl;
@@ -87,9 +88,10 @@ void Strategy<p, c, log>::removeImpossibleSolutions(Score r) {
   if (log) {
     cout << "Removing inconsistent possibilities... ";
   }
+  auto &allCodewords = Codeword<p, c>::getAllCodewords();
   rootData->scoreCounterCPU += possibleSolutions.size();
   possibleSolutions.erase(remove_if(possibleSolutions.begin(), possibleSolutions.end(),
-                                    [&](Codeword<p, c> codeword) { return codeword.score(guess) != r; }),
+                                    [&](uint32_t i) { return allCodewords[i].score(guess) != r; }),
                           possibleSolutions.end());
   if (log) {
     cout << possibleSolutions.size() << " remain." << endl;
@@ -127,10 +129,11 @@ void Strategy<p, c, log>::removeImpossibleSolutions(Score r) {
 template <uint8_t p, uint8_t c, bool log>
 Codeword<p, c> Strategy<p, c, log>::shortcutSmallSets() {
   int subsetSizes[maxScoreSlots];
-  for (const auto &psa : possibleSolutions) {
+  auto &allCodewords = Codeword<p, c>::getAllCodewords();
+  for (const auto &psia : possibleSolutions) {
     fill(begin(subsetSizes), end(subsetSizes), 0);
-    for (const auto &psb : possibleSolutions) {
-      Score r = psa.score(psb);
+    for (const auto &psib : possibleSolutions) {
+      Score r = allCodewords[psia].score(allCodewords[psib]);
       subsetSizes[r.result] = 1;
     }
     rootData->smallPSHighScores += possibleSolutions.size();
@@ -143,10 +146,10 @@ Codeword<p, c> Strategy<p, c, log>::shortcutSmallSets() {
     }
     if (totalSubsets == possibleSolutions.size()) {
       if (log) {
-        cout << "Selecting fully discriminating guess from PS: " << psa << ", subsets: " << totalSubsets << endl;
+        cout << "Selecting fully discriminating guess from PS: " << allCodewords[psia] << ", subsets: " << totalSubsets << endl;
       }
       ++rootData->smallPSHighShortcuts;
-      return psa;
+      return allCodewords[psia];
     }
   }
 

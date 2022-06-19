@@ -29,7 +29,7 @@ struct StrategyRootData;
 template <uint8_t p, uint8_t c, bool l>
 class Strategy {
  public:
-  explicit Strategy(Codeword<p, c> guess) : savedPossibleSolutions(Codeword<p, c>::getAllCodewords()) {
+  explicit Strategy(Codeword<p, c> guess) : savedPossibleSolutions(Codeword<p, c>::getAllCodewordIndexes()) {
     this->guess = guess;
     rootData = make_shared<StrategyRootData>();
   }
@@ -56,11 +56,11 @@ class Strategy {
   // These extra members are to allow us to build the strategy lazily, as we play games using any algorithm. nb: these
   // are copies.
   Codeword<p, c> guess;
-  std::vector<Codeword<p, c>> possibleSolutions;
+  std::vector<uint32_t> possibleSolutions;
 
   shared_ptr<StrategyRootData> rootData = nullptr;
 
-  Strategy(Strategy<p, c, l> &parent, Codeword<p, c> nextGuess, std::vector<Codeword<p, c>> &nextPossibleSolutions)
+  Strategy(Strategy<p, c, l> &parent, Codeword<p, c> nextGuess, std::vector<uint32_t> &nextPossibleSolutions)
       : savedPossibleSolutions(std::move(nextPossibleSolutions)), guess(nextGuess), rootData(parent.rootData) {}
 
   void removeImpossibleSolutions(Score r);
@@ -78,7 +78,7 @@ class Strategy {
  private:
   // The strategy is made up of the next guess to play, and a map of where to go based on the result of that play.
   std::unordered_map<Score, std::shared_ptr<Strategy<p, c, l>>> nextMoves;
-  const std::vector<Codeword<p, c>> savedPossibleSolutions;
+  const std::vector<uint32_t> savedPossibleSolutions;
 
   Codeword<p, c> shortcutSmallSets();
 

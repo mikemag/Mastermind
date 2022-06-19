@@ -28,13 +28,13 @@ using namespace std;
 
 // Config for a single game
 static constexpr bool playSingleGame = true;
-static constexpr Algo singleGameAlgo = Algo::Knuth;
+static constexpr Algo singleGameAlgo = Algo::MostParts;
 static constexpr GPUMode singleGameGPUMode = Both;
 static constexpr uint8_t singleGamePinCount = 8;    // 1-8, 4 is classic
 static constexpr uint8_t singleGameColorCount = 5;  // 1-15, 6 is classic
 
 static constexpr bool playMultipleGames = false;     // Play a set of games defined below.
-static constexpr bool runTests = true;               // Run unit tests and play Knuth's game
+static constexpr bool runTests = false;               // Run unit tests and play Knuth's game
 static constexpr bool findBestFirstGuesses = false;  // Initial guess exploration
 static constexpr bool writeStratFiles = false;
 
@@ -69,7 +69,7 @@ void runUnitTests() {
 
 void runKnuthTest() {
   printf("\nRun the example from Knuth's paper to compare with his results.\n");
-  StrategyKnuth<4, 6, true> s(Codeword<4, 6>(0x1122));
+  StrategyKnuth<4, 6, true> s(Codeword<4, 6>(0x1122), singleGameGPUMode);
   s.findSecret(Codeword<4, 6>(0x3632));
   printf("\n");
 }
@@ -381,3 +381,25 @@ int main(int argc, const char* argv[]) {
 
   return 0;
 }
+
+//Run the example from Knuth's paper to compare with his results.
+//Starting search for secret 3632, initial guess is 1122 with 1,296 possibilities.
+//
+//Tried guess 1122 against secret 3632 => 10
+//Removing inconsistent possibilities... 256 remain.
+//Selecting best guess: 1344	score: 212
+//
+//Tried guess 1344 against secret 3632 => 01
+//Removing inconsistent possibilities... 44 remain.
+//Selecting best guess: 3526	score: 37
+//
+//Tried guess 3526 against secret 3632 => 12
+//Removing inconsistent possibilities... 7 remain.
+//Selecting fully discriminating guess: 1462, subsets: 7
+//
+//Tried guess 1462 against secret 3632 => 11
+//Removing inconsistent possibilities... 1 remain.
+//Only remaining solution must be correct: 3632
+//
+//Tried guess 3632 against secret 3632 => 40
+//Solution found after 5 moves.

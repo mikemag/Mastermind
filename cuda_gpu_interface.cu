@@ -62,15 +62,17 @@ __device__ uint scoreCodewords(const uint32_t secret, const uint4 secretColors, 
 
 // The common portion of the kernels which scores all possible solutions against a given secret and computes subset
 // sizes, i.e., for each score the number of codewords with that score.
-typedef uint32_t SubsetSize;
+typedef uint8_t SubsetSize;
 
 template <uint32_t pinCount, Algo algo>
 __device__ void computeSubsetSizes(SubsetSize *__restrict__ subsetSizes, const uint32_t secret,
                                    const uint4 secretColors, const uint32_t possibleSolutionsCount,
-                                   const uint32_t *__restrict__ possibleSolutions,
-                                   const uint4 *__restrict__ possibleSolutionsColors) {
+                                   const uint32_t *__restrict__ allCodewords,
+                                   const uint4 *__restrict__ allCodewordsColors,
+                                   const uint32_t *__restrict__ possibleSolutions) {
   for (uint32_t i = 0; i < possibleSolutionsCount; i++) {
-    uint score = scoreCodewords<pinCount>(secret, secretColors, possibleSolutions[i], possibleSolutionsColors[i]);
+    uint score = scoreCodewords<pinCount>(secret, secretColors, allCodewords[possibleSolutions[i]],
+                                          allCodewordsColors[possibleSolutions[i]]);
     if (algo == Algo::MostParts) {
       subsetSizes[score] = 1;
     } else {
@@ -112,8 +114,7 @@ struct IndexAndScoreReducer {
 template <uint32_t pinCount, Algo algo, int totalScores>
 __global__ void subsettingAlgosKernel(const uint32_t allCodewordsCount, const uint32_t *__restrict__ allCodewords,
                                       const uint4 *__restrict__ allCodewordsColors, uint32_t possibleSolutionsCount,
-                                      const uint32_t *__restrict__ possibleSolutions,
-                                      const uint4 *__restrict__ possibleSolutionsColors, uint32_t usedCodewordsCount,
+                                      const uint32_t *__restrict__ possibleSolutions, uint32_t usedCodewordsCount,
                                       const uint32_t *__restrict__ usedCodewords, uint32_t *__restrict__ fdGuess,
                                       GPUInterface::IndexAndScore *__restrict__ perBlockSolutions) {
   using BlockReduce = cub::BlockReduce<GPUInterface::IndexAndScore, 128>;  // TODO: block size
@@ -131,7 +132,7 @@ __global__ void subsettingAlgosKernel(const uint32_t allCodewordsCount, const ui
   for (int i = 0; i < totalScores; i++) subsetSizes[i] = 0;
 
   computeSubsetSizes<pinCount, algo>(subsetSizes, allCodewords[tidGrid], allCodewordsColors[tidGrid],
-                                     possibleSolutionsCount, possibleSolutions, possibleSolutionsColors);
+                                     possibleSolutionsCount, allCodewords, allCodewordsColors, possibleSolutions);
 
   bool isPossibleSolution = subsetSizes[totalScores - 1] > 0;
 
@@ -250,9 +251,10 @@ CUDAGPUInterface<p, c, a, l>::CUDAGPUInterface() {
   mallocManaged((void **)&dAllCodewords, sizeof(*dAllCodewords) * roundedTotalCodewords);
   mallocManaged((void **)&dAllCodewordsColors, sizeof(*dAllCodewordsColors) * roundedTotalCodewords);
   cudaMalloc((void **)&dPossibleSolutions, sizeof(*dPossibleSolutions) * roundedTotalCodewords);
-  cudaMalloc((void **)&dPossibleSolutionsColors, sizeof(*dPossibleSolutionsColors) * roundedTotalCodewords);
-  dPossibleSolutionsHost = (uint32_t*)malloc(sizeof(*dPossibleSolutionsHost) * roundedTotalCodewords);
-  dPossibleSolutionsColorsHost = (unsigned __int128*)malloc(sizeof(*dPossibleSolutionsColorsHost) * roundedTotalCodewords);
+  //  cudaMalloc((void **)&dPossibleSolutionsColors, sizeof(*dPossibleSolutionsColors) * roundedTotalCodewords);
+  dPossibleSolutionsHost = (uint32_t *)malloc(sizeof(*dPossibleSolutionsHost) * roundedTotalCodewords);
+  //  dPossibleSolutionsColorsHost =
+  //      (unsigned __int128 *)malloc(sizeof(*dPossibleSolutionsColorsHost) * roundedTotalCodewords);
   mallocManaged((void **)&dUsedCodewords, sizeof(*dUsedCodewords) * 100);
   mallocManaged((void **)&dFdGuess, sizeof(*dFdGuess) * 1);
   mallocManaged((void **)&dPerBlockSolutions, sizeof(*dPerBlockSolutions) * numBlocks);
@@ -274,9 +276,9 @@ CUDAGPUInterface<p, c, a, l>::~CUDAGPUInterface() {
   freeManaged(dAllCodewords);
   freeManaged(dAllCodewordsColors);
   cudaFree(dPossibleSolutions);
-  cudaFree(dPossibleSolutionsColors);
+  //  cudaFree(dPossibleSolutionsColors);
   free(dPossibleSolutionsHost);
-  free(dPossibleSolutionsColorsHost);
+  //  free(dPossibleSolutionsColorsHost);
   freeManaged(dUsedCodewords);
   freeManaged(dFdGuess);
   freeManaged(dPerBlockSolutions);
@@ -337,13 +339,14 @@ void CUDAGPUInterface<p, c, a, l>::sendComputeCommand() {
 
   cudaError_t err = cudaSuccess;
 
-  cudaMemcpyAsync(dPossibleSolutions, dPossibleSolutionsHost, sizeof(*dPossibleSolutions) * possibleSolutionsCount, cudaMemcpyHostToDevice);
-  cudaMemcpyAsync(dPossibleSolutionsColors, dPossibleSolutionsColorsHost, sizeof(*dPossibleSolutionsColors) * possibleSolutionsCount, cudaMemcpyHostToDevice);
+  cudaMemcpyAsync(dPossibleSolutions, dPossibleSolutionsHost, sizeof(*dPossibleSolutions) * possibleSolutionsCount,
+                  cudaMemcpyHostToDevice);
+  //  cudaMemcpyAsync(dPossibleSolutionsColors, dPossibleSolutionsColorsHost,
+  //                  sizeof(*dPossibleSolutionsColors) * possibleSolutionsCount, cudaMemcpyHostToDevice);
 
   subsettingAlgosKernel<p, a, totalScores><<<numBlocks, threadsPerBlock, sharedMemSize>>>(
       Codeword<p, c>::totalCodewords, dAllCodewords, reinterpret_cast<const uint4 *>(dAllCodewordsColors),
-      possibleSolutionsCount, dPossibleSolutions, reinterpret_cast<uint4 *>(dPossibleSolutionsColors),
-      usedCodewordsCount, dUsedCodewords, dFdGuess, dPerBlockSolutions);
+      possibleSolutionsCount, dPossibleSolutions, usedCodewordsCount, dUsedCodewords, dFdGuess, dPerBlockSolutions);
   err = cudaGetLastError();
   if (err != cudaSuccess) {
     fprintf(stderr, "Failed to launch subsettingAlgosKernel kernel (error code %s)!\n", cudaGetErrorString(err));
@@ -598,4 +601,5 @@ void CUDAGPUInterface<p, c, a, l>::dumpDeviceInfo() {
 
 INST_PCL(4, 6, true)
 INST_PCL(4, 6, false)
+INST_PCL(7, 7, false)
 INST_PCL(8, 5, false)

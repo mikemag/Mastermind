@@ -17,13 +17,14 @@ Codeword<p, c> StrategySubsetting<p, c, log>::selectNextGuess() {
   usedCodewords.emplace_back(this->guess.packedCodeword());
 
   Codeword<p, c> bestGuess;
+  auto &allCodewords = Codeword<p, c>::getAllCodewords();
   size_t bestScore = 0;
   bool bestIsPossibleSolution = false;
   int allCount = 0;  // For metrics only
   for (const auto &g : Codeword<p, c>::getAllCodewords()) {
     bool isPossibleSolution = false;
-    for (const auto &ps : this->possibleSolutions) {
-      Score r = g.score(ps);
+    for (const auto &psi : this->possibleSolutions) {
+      Score r = g.score(allCodewords[psi]);
       subsetSizes[r.result]++;
       if (r == Codeword<p, c>::winningScore) {
         isPossibleSolution = true;  // Remember if this guess is in the set of possible solutions
@@ -96,11 +97,13 @@ Codeword<p, c> StrategySubsettingGPU<p, c, log, Derived>::selectNextGuess() {
   // Pull out the codewords and colors into individual arrays
   // TODO: if this were separated into these two arrays throughout the Strategy then we could use a target-optimized
   //  memcpy to blit them into the buffers, which would be much faster.
+  auto &allCodewords = Codeword<p, c>::getAllCodewords();
   uint32_t *psw = gpuRootData->gpuInterface->getPossibleSolutionsBuffer();
   unsigned __int128 *psc = gpuRootData->gpuInterface->getPossibleSolutionsColorsBuffer();
   for (int i = 0; i < this->possibleSolutions.size(); i++) {
-    psw[i] = this->possibleSolutions[i].packedCodeword();
-    psc[i] = this->possibleSolutions[i].packedColors8();
+//    psw[i] = allCodewords[this->possibleSolutions[i]].packedCodeword();
+    psw[i] = this->possibleSolutions[i];
+//    psc[i] = allCodewords[this->possibleSolutions[i]].packedColors8();
   }
   gpuRootData->gpuInterface->setPossibleSolutionsCount((uint32_t)this->possibleSolutions.size());
 

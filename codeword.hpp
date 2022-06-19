@@ -37,6 +37,7 @@ class Codeword {
   Score score(const Codeword &guess) const;
 
   static std::vector<Codeword> &getAllCodewords();
+  static std::vector<uint32_t> &getAllCodewordIndexes();
 
   std::ostream &dump(std::ostream &stream) const;
 
@@ -47,6 +48,7 @@ class Codeword {
 
   // All codewords for the given pin and color counts.
   static inline std::vector<Codeword> allCodewords;
+  static inline std::vector<uint32_t> allCodewordIndexes;
 
   Score scoreSimpleLoops(const Codeword &guess) const;
   Score scoreCountingScalar(const Codeword &guess) const;

@@ -30,7 +30,7 @@ class StrategyFirstOne : public Strategy<p, c, l> {
   explicit StrategyFirstOne(Codeword<p, c> initialGuess) : Strategy<p, c, l>{initialGuess} {}
 
   StrategyFirstOne(Strategy<p, c, l> &parent, Codeword<p, c> nextGuess,
-                   std::vector<Codeword<p, c>> &nextPossibleSolutions)
+                   std::vector<uint32_t> &nextPossibleSolutions)
       : Strategy<p, c, l>(parent, nextGuess, nextPossibleSolutions) {}
 
   std::string getName() const override { return "First One"; }
@@ -51,7 +51,7 @@ class StrategyRandom : public Strategy<p, c, l> {
   explicit StrategyRandom(Codeword<p, c> initialGuess) : Strategy<p, c, l>{initialGuess} {}
 
   StrategyRandom(Strategy<p, c, l> &parent, Codeword<p, c> nextGuess,
-                 std::vector<Codeword<p, c>> &nextPossibleSolutions)
+                 std::vector<uint32_t> &nextPossibleSolutions)
       : Strategy<p, c, l>(parent, nextGuess, nextPossibleSolutions) {}
 
   std::string getName() const override { return "Random"; }

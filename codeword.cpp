@@ -182,6 +182,19 @@ vector<Codeword<pinCount, colorCount>> &Codeword<pinCount, colorCount>::getAllCo
   return allCodewords;
 }
 
+// Make a list of indexes for all codewords, which is just 0, 1, 2, ..., colorCount ^ pinCount - 1.
+template <uint8_t pinCount, uint8_t colorCount>
+vector<uint32_t> &Codeword<pinCount, colorCount>::getAllCodewordIndexes() {
+  if (allCodewordIndexes.empty()) {
+    allCodewordIndexes.reserve(totalCodewords);
+
+    for (uint i = 0; i < totalCodewords; i++) {
+      allCodewordIndexes.emplace_back(i);
+    }
+  }
+  return allCodewordIndexes;
+}
+
 template <uint8_t pinCount, uint8_t c>
 std::ostream &Codeword<pinCount, c>::dump(std::ostream &stream) const {
   std::ios state(nullptr);

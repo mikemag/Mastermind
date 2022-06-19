@@ -12,7 +12,8 @@ using namespace std;
 
 template <uint8_t p, uint8_t c, bool log>
 Codeword<p, c> StrategyFirstOne<p, c, log>::selectNextGuess() {
-  Codeword<p, c> nextGuess = this->possibleSolutions.front();
+  auto &allCodewords = Codeword<p, c>::getAllCodewords();
+  Codeword<p, c> nextGuess = allCodewords[this->possibleSolutions.front()];
   this->possibleSolutions.erase(this->possibleSolutions.begin());
   if (log) {
     cout << "Selecting the first possibility blindly: " << nextGuess << endl;
@@ -36,8 +37,10 @@ static std::mt19937 randGenerator(randDevice());
 template <uint8_t p, uint8_t c, bool log>
 Codeword<p, c> StrategyRandom<p, c, log>::selectNextGuess() {
   std::uniform_int_distribution<> distrib(0, (int)this->possibleSolutions.size() - 1);
-  Codeword<p, c> nextGuess = this->possibleSolutions[distrib(randGenerator)];
-  this->possibleSolutions.erase(remove(this->possibleSolutions.begin(), this->possibleSolutions.end(), nextGuess),
+  auto &allCodewords = Codeword<p, c>::getAllCodewords();
+  uint32_t nextGuessIndex = this->possibleSolutions[distrib(randGenerator)];
+  Codeword<p, c> nextGuess = allCodewords[nextGuessIndex];
+  this->possibleSolutions.erase(remove(this->possibleSolutions.begin(), this->possibleSolutions.end(), nextGuessIndex),
                                 this->possibleSolutions.end());
   if (log) {
     cout << "Selecting a random possibility: " << nextGuess << endl;
