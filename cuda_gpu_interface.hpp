@@ -64,6 +64,7 @@ class CUDAGPUInterface : public GPUInterface {
   uint32_t threadsPerBlock;
   uint32_t numBlocks;
   size_t sharedMemSize = 0;
+  uint32_t roundedTotalCodewords;
 
   string deviceName;
 };

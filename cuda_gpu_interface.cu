@@ -233,7 +233,7 @@ CUDAGPUInterface<p, c, a, l>::CUDAGPUInterface() {
   const uint64_t totalCodewords = Codeword<p, c>::totalCodewords;
   threadsPerBlock = std::min(128lu, totalCodewords);
   numBlocks = (totalCodewords + threadsPerBlock - 1) / threadsPerBlock;  // nb: round up!
-  uint32_t roundedTotalCodewords = numBlocks * threadsPerBlock;
+  roundedTotalCodewords = numBlocks * threadsPerBlock;
 
   auto block_reduce_temp_bytes = sizeof(typename cub::BlockReduce<int, 128>::TempStorage);
   sharedMemSize = std::max(1 * sizeof(IndexAndScore), block_reduce_temp_bytes);
@@ -254,6 +254,9 @@ CUDAGPUInterface<p, c, a, l>::CUDAGPUInterface() {
   mallocManaged((void **)&dUsedCodewords, sizeof(*dUsedCodewords) * 100);
   mallocManaged((void **)&dFdGuess, sizeof(*dFdGuess) * 1);
   mallocManaged((void **)&dPerBlockSolutions, sizeof(*dPerBlockSolutions) * numBlocks);
+
+  // This is a huge win. The buffer is small, and it gets put into constant memory. 20s -> 8s on MostParts_8p5c.
+  cudaMemAdvise(dUsedCodewords, sizeof(*dUsedCodewords) * 100, cudaMemAdviseSetReadMostly, 0);
 }
 
 template <uint8_t p, uint8_t c, Algo a, bool l>
@@ -522,6 +525,8 @@ void CUDAGPUInterface<p, c, a, l>::dumpDeviceInfo() {
 #endif
     printf("  Device supports Unified Addressing (UVA):      %s\n", deviceProp.unifiedAddressing ? "Yes" : "No");
     printf("  Device supports Managed Memory:                %s\n", deviceProp.managedMemory ? "Yes" : "No");
+    printf("  Device supports Direct Mgd Access From Host:   %s\n",
+           deviceProp.directManagedMemAccessFromHost ? "Yes" : "No");
     printf("  Device supports Compute Preemption:            %s\n",
            deviceProp.computePreemptionSupported ? "Yes" : "No");
     printf("  Supports Cooperative Kernel Launch:            %s\n", deviceProp.cooperativeLaunch ? "Yes" : "No");
