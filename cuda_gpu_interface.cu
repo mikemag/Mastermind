@@ -249,8 +249,10 @@ CUDAGPUInterface<p, c, a, l>::CUDAGPUInterface() {
 
   mallocManaged((void **)&dAllCodewords, sizeof(*dAllCodewords) * roundedTotalCodewords);
   mallocManaged((void **)&dAllCodewordsColors, sizeof(*dAllCodewordsColors) * roundedTotalCodewords);
-  mallocManaged((void **)&dPossibleSolutions, sizeof(*dPossibleSolutions) * roundedTotalCodewords);
-  mallocManaged((void **)&dPossibleSolutionsColors, sizeof(*dPossibleSolutionsColors) * roundedTotalCodewords);
+  cudaMalloc((void **)&dPossibleSolutions, sizeof(*dPossibleSolutions) * roundedTotalCodewords);
+  cudaMalloc((void **)&dPossibleSolutionsColors, sizeof(*dPossibleSolutionsColors) * roundedTotalCodewords);
+  dPossibleSolutionsHost = (uint32_t*)malloc(sizeof(*dPossibleSolutionsHost) * roundedTotalCodewords);
+  dPossibleSolutionsColorsHost = (unsigned __int128*)malloc(sizeof(*dPossibleSolutionsColorsHost) * roundedTotalCodewords);
   mallocManaged((void **)&dUsedCodewords, sizeof(*dUsedCodewords) * 100);
   mallocManaged((void **)&dFdGuess, sizeof(*dFdGuess) * 1);
   mallocManaged((void **)&dPerBlockSolutions, sizeof(*dPerBlockSolutions) * numBlocks);
@@ -271,8 +273,10 @@ CUDAGPUInterface<p, c, a, l>::~CUDAGPUInterface() {
 
   freeManaged(dAllCodewords);
   freeManaged(dAllCodewordsColors);
-  freeManaged(dPossibleSolutions);
-  freeManaged(dPossibleSolutionsColors);
+  cudaFree(dPossibleSolutions);
+  cudaFree(dPossibleSolutionsColors);
+  free(dPossibleSolutionsHost);
+  free(dPossibleSolutionsColorsHost);
   freeManaged(dUsedCodewords);
   freeManaged(dFdGuess);
   freeManaged(dPerBlockSolutions);
@@ -304,12 +308,12 @@ void CUDAGPUInterface<p, c, a, l>::syncAllCodewords(uint32_t count) {
 
 template <uint8_t p, uint8_t c, Algo a, bool l>
 uint32_t *CUDAGPUInterface<p, c, a, l>::getPossibleSolutionsBuffer() {
-  return dPossibleSolutions;
+  return dPossibleSolutionsHost;
 }
 
 template <uint8_t p, uint8_t c, Algo a, bool l>
 unsigned __int128 *CUDAGPUInterface<p, c, a, l>::getPossibleSolutionsColorsBuffer() {
-  return dPossibleSolutionsColors;
+  return dPossibleSolutionsColorsHost;
 }
 
 template <uint8_t p, uint8_t c, Algo a, bool l>
@@ -332,6 +336,10 @@ void CUDAGPUInterface<p, c, a, l>::sendComputeCommand() {
   *dFdGuess = Codeword<p, c>::totalCodewords;
 
   cudaError_t err = cudaSuccess;
+
+  cudaMemcpyAsync(dPossibleSolutions, dPossibleSolutionsHost, sizeof(*dPossibleSolutions) * possibleSolutionsCount, cudaMemcpyHostToDevice);
+  cudaMemcpyAsync(dPossibleSolutionsColors, dPossibleSolutionsColorsHost, sizeof(*dPossibleSolutionsColors) * possibleSolutionsCount, cudaMemcpyHostToDevice);
+
   subsettingAlgosKernel<p, a, totalScores><<<numBlocks, threadsPerBlock, sharedMemSize>>>(
       Codeword<p, c>::totalCodewords, dAllCodewords, reinterpret_cast<const uint4 *>(dAllCodewordsColors),
       possibleSolutionsCount, dPossibleSolutions, reinterpret_cast<uint4 *>(dPossibleSolutionsColors),

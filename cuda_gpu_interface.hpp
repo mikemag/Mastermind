@@ -54,6 +54,8 @@ class CUDAGPUInterface : public GPUInterface {
   uint32_t* dPossibleSolutions;
   unsigned __int128* dPossibleSolutionsColors;
   uint32_t possibleSolutionsCount;
+  uint32_t* dPossibleSolutionsHost;
+  unsigned __int128* dPossibleSolutionsColorsHost;
 
   uint32_t* dUsedCodewords;
   uint32_t usedCodewordsCount;
