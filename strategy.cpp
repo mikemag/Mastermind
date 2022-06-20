@@ -91,6 +91,12 @@ void Strategy<p, c, log>::removeImpossibleSolutions(Score r) {
   possibleSolutions.erase(remove_if(possibleSolutions.begin(), possibleSolutions.end(),
                                     [&](Codeword<p, c> codeword) { return codeword.score(guess) != r; }),
                           possibleSolutions.end());
+
+  // This will result in an extra allocation and copy, but it is worth it to keep memory use in check. It actually makes
+  // many larger games faster, and is required to be able to play things like 8p7c without running out of memory on a
+  // 16GB system.
+  possibleSolutions.shrink_to_fit();
+
   if (log) {
     cout << possibleSolutions.size() << " remain." << endl;
   }
