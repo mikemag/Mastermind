@@ -41,11 +41,12 @@
 // There's a decent summary of Knuth's overall algorithm on Wikipedia, too:
 // https://en.wikipedia.org/wiki/Mastermind_(board_game)
 
-template <uint8_t p, uint8_t c, bool l>
+template <uint8_t p, uint8_t c, bool l, class Derived>
 class StrategySubsetting : public Strategy<p, c, l> {
  public:
   explicit StrategySubsetting(Codeword<p, c> initialGuess) : Strategy<p, c, l>{initialGuess} {
-    for (auto &s : subsetSizes) {
+    ssHolder = make_unique<SubsetSizesHolder>();
+    for (auto &s : ssHolder->subsetSizes) {
       s = 0;
     }
   }
@@ -66,7 +67,11 @@ class StrategySubsetting : public Strategy<p, c, l> {
 
   // Storage for the subset counts, kept static and reused for an easy way to have them zero'd for each use. Also flat
   // and sparse, but that's okay, it's faster to use it in the inner loop than using a 2D array.
-  static inline int subsetSizes[Strategy<p, c, l>::maxScoreSlots];
+  class SubsetSizesHolder {
+   public:
+    static inline typename Derived::SubsetSize subsetSizes[Strategy<p, c, l>::maxScoreSlots];
+  };
+  unique_ptr<SubsetSizesHolder> ssHolder;
 
  private:
   int computeTotalSubsets();
@@ -109,17 +114,17 @@ struct StrategySubsettingGPURootData {
 };
 
 template <uint8_t pinCount, uint8_t c, bool l, class Derived>
-class StrategySubsettingGPU : public StrategySubsetting<pinCount, c, l> {
+class StrategySubsettingGPU : public StrategySubsetting<pinCount, c, l, Derived> {
  public:
   StrategySubsettingGPU(Codeword<pinCount, c> initialGuess, GPUMode mode)
-      : StrategySubsetting<pinCount, c, l>{initialGuess}, mode(mode) {
+      : StrategySubsetting<pinCount, c, l, Derived>{initialGuess}, mode(mode) {
     gpuRootData = make_shared<StrategySubsettingGPURootData>();
   }
 
   StrategySubsettingGPU(StrategySubsettingGPU<pinCount, c, l, Derived> &parent, Codeword<pinCount, c> nextGuess,
                         std::vector<Codeword<pinCount, c>> &nextPossibleSolutions,
                         std::vector<uint32_t> &nextUsedCodewords)
-      : StrategySubsetting<pinCount, c, l>(parent, nextGuess, nextPossibleSolutions, nextUsedCodewords) {
+      : StrategySubsetting<pinCount, c, l, Derived>(parent, nextGuess, nextPossibleSolutions, nextUsedCodewords) {
     gpuRootData = parent.gpuRootData;
   }
 
@@ -147,8 +152,8 @@ class StrategySubsettingGPU : public StrategySubsetting<pinCount, c, l> {
 #elif __NVCC__
       gpuRootData->gpuInterface = new CUDAGPUInterface<pinCount, c, a, l>();
 #else
-//            gpuRootData->gpuInterface = new NoGPUInterface();
-      gpuRootData->gpuInterface = new CUDAGPUInterface<pinCount, c, a, l>();
+      //            gpuRootData->gpuInterface = new NoGPUInterface();
+      gpuRootData->gpuInterface = new CUDAGPUInterface<pinCount, c, a, typename Derived::SubsetSize, l>();
 #endif
 
       if (gpuRootData->gpuInterface->gpuAvailable()) {
@@ -199,6 +204,8 @@ class StrategyKnuth : public StrategySubsettingGPU<p, c, l, StrategyKnuth<p, c, 
   std::string getName() const override { return "Knuth"; }
 
   size_t computeSubsetScore() override;
+
+  typedef uint32_t SubsetSize;
 };
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -232,6 +239,8 @@ class StrategyMostParts : public StrategySubsettingGPU<p, c, l, StrategyMostPart
   std::string getName() const override { return "Most Parts"; }
 
   size_t computeSubsetScore() override;
+
+  typedef uint8_t SubsetSize;
 };
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -274,6 +283,8 @@ class StrategyExpectedSize : public StrategySubsettingGPU<p, c, l, StrategyExpec
   std::string getName() const override { return "Expected Size"; }
 
   size_t computeSubsetScore() override;
+
+  typedef uint32_t SubsetSize;
 };
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -310,6 +321,8 @@ class StrategyEntropy : public StrategySubsettingGPU<p, c, l, StrategyEntropy<p,
   std::string getName() const override { return "Entropy"; }
 
   size_t computeSubsetScore() override;
+
+  typedef uint32_t SubsetSize;
 };
 
 #include "subsetting_strategies.cpp"

@@ -62,9 +62,7 @@ __device__ uint scoreCodewords(const uint32_t secret, const uint4 secretColors, 
 
 // The common portion of the kernels which scores all possible solutions against a given secret and computes subset
 // sizes, i.e., for each score the number of codewords with that score.
-typedef uint32_t SubsetSize;
-
-template <uint32_t pinCount, Algo algo>
+template <uint32_t pinCount, Algo algo, typename SubsetSize>
 __device__ void computeSubsetSizes(SubsetSize *__restrict__ subsetSizes, const uint32_t secret,
                                    const uint4 secretColors, const uint32_t possibleSolutionsCount,
                                    const uint32_t *__restrict__ possibleSolutions,
@@ -109,7 +107,7 @@ struct IndexAndScoreReducer {
   }
 };
 
-template <uint32_t pinCount, Algo algo, int totalScores>
+template <uint32_t pinCount, Algo algo, typename SubsetSize, int totalScores>
 __global__ void subsettingAlgosKernel(const uint32_t allCodewordsCount, const uint32_t *__restrict__ allCodewords,
                                       const uint4 *__restrict__ allCodewordsColors, uint32_t possibleSolutionsCount,
                                       const uint32_t *__restrict__ possibleSolutions,
@@ -168,7 +166,11 @@ __global__ void subsettingAlgosKernel(const uint32_t allCodewordsCount, const ui
       score = totalUsedSubsets;
       break;
     case ExpectedSize:
+#pragma nv_diagnostic push
+#pragma nv_diag_suppress 68
+      // This is a bit broken, and needs to be to match the semantics in the paper.
       score = (uint32_t)round(expectedSize * 1'000'000.0) * -1;  // 9 digits of precision
+#pragma nv_diagnostic pop
       break;
     case Entropy:
       score = round(entropySum * 1'000'000'000.0);  // 9 digits of precision
@@ -226,8 +228,8 @@ __global__ void reduceMaxScore(GPUInterface::IndexAndScore *__restrict__ perBloc
   }
 }
 
-template <uint8_t p, uint8_t c, Algo a, bool l>
-CUDAGPUInterface<p, c, a, l>::CUDAGPUInterface() {
+template <uint8_t p, uint8_t c, Algo a, typename SubsetSize, bool l>
+CUDAGPUInterface<p, c, a, SubsetSize, l>::CUDAGPUInterface() {
   dumpDeviceInfo();
 
   const uint64_t totalCodewords = Codeword<p, c>::totalCodewords;
@@ -251,8 +253,9 @@ CUDAGPUInterface<p, c, a, l>::CUDAGPUInterface() {
   mallocManaged((void **)&dAllCodewordsColors, sizeof(*dAllCodewordsColors) * roundedTotalCodewords);
   cudaMalloc((void **)&dPossibleSolutions, sizeof(*dPossibleSolutions) * roundedTotalCodewords);
   cudaMalloc((void **)&dPossibleSolutionsColors, sizeof(*dPossibleSolutionsColors) * roundedTotalCodewords);
-  dPossibleSolutionsHost = (uint32_t*)malloc(sizeof(*dPossibleSolutionsHost) * roundedTotalCodewords);
-  dPossibleSolutionsColorsHost = (unsigned __int128*)malloc(sizeof(*dPossibleSolutionsColorsHost) * roundedTotalCodewords);
+  dPossibleSolutionsHost = (uint32_t *)malloc(sizeof(*dPossibleSolutionsHost) * roundedTotalCodewords);
+  dPossibleSolutionsColorsHost =
+      (unsigned __int128 *)malloc(sizeof(*dPossibleSolutionsColorsHost) * roundedTotalCodewords);
   mallocManaged((void **)&dUsedCodewords, sizeof(*dUsedCodewords) * 100);
   mallocManaged((void **)&dFdGuess, sizeof(*dFdGuess) * 1);
   mallocManaged((void **)&dPerBlockSolutions, sizeof(*dPerBlockSolutions) * numBlocks);
@@ -261,86 +264,18 @@ CUDAGPUInterface<p, c, a, l>::CUDAGPUInterface() {
   cudaMemAdvise(dUsedCodewords, sizeof(*dUsedCodewords) * 100, cudaMemAdviseSetReadMostly, 0);
 }
 
-template <uint8_t p, uint8_t c, Algo a, bool l>
-CUDAGPUInterface<p, c, a, l>::~CUDAGPUInterface() {
-  auto freeManaged = [](auto devPtr) {
-    cudaError_t err = cudaFree(devPtr);
-    if (err != cudaSuccess) {
-      fprintf(stderr, "Failed to free managed memory (error code %s)!\n", cudaGetErrorString(err));
-      exit(EXIT_FAILURE);
-    }
-  };
-
-  freeManaged(dAllCodewords);
-  freeManaged(dAllCodewordsColors);
-  cudaFree(dPossibleSolutions);
-  cudaFree(dPossibleSolutionsColors);
-  free(dPossibleSolutionsHost);
-  free(dPossibleSolutionsColorsHost);
-  freeManaged(dUsedCodewords);
-  freeManaged(dFdGuess);
-  freeManaged(dPerBlockSolutions);
-}
-
-template <uint8_t p, uint8_t c, Algo a, bool l>
-bool CUDAGPUInterface<p, c, a, l>::gpuAvailable() const {
-  return true;
-}
-
-template <uint8_t p, uint8_t c, Algo a, bool l>
-uint32_t *CUDAGPUInterface<p, c, a, l>::getAllCodewordsBuffer() {
-  return dAllCodewords;
-}
-template <uint8_t p, uint8_t c, Algo a, bool l>
-unsigned __int128 *CUDAGPUInterface<p, c, a, l>::getAllCodewordsColorsBuffer() {
-  return dAllCodewordsColors;
-}
-
-template <uint8_t p, uint8_t c, Algo a, bool l>
-void CUDAGPUInterface<p, c, a, l>::setAllCodewordsCount(uint32_t count) {
-  // TODO: this is redundant for this impl, and likely for the Metal impl too. Need to fix this up.
-}
-
-template <uint8_t p, uint8_t c, Algo a, bool l>
-void CUDAGPUInterface<p, c, a, l>::syncAllCodewords(uint32_t count) {
-  // TODO: let it page fault for now, come back and add movement hints if necessary.
-}
-
-template <uint8_t p, uint8_t c, Algo a, bool l>
-uint32_t *CUDAGPUInterface<p, c, a, l>::getPossibleSolutionsBuffer() {
-  return dPossibleSolutionsHost;
-}
-
-template <uint8_t p, uint8_t c, Algo a, bool l>
-unsigned __int128 *CUDAGPUInterface<p, c, a, l>::getPossibleSolutionsColorsBuffer() {
-  return dPossibleSolutionsColorsHost;
-}
-
-template <uint8_t p, uint8_t c, Algo a, bool l>
-void CUDAGPUInterface<p, c, a, l>::setPossibleSolutionsCount(uint32_t count) {
-  possibleSolutionsCount = count;
-}
-
-template <uint8_t p, uint8_t c, Algo a, bool l>
-uint32_t *CUDAGPUInterface<p, c, a, l>::getUsedCodewordsBuffer() {
-  return dUsedCodewords;
-}
-
-template <uint8_t p, uint8_t c, Algo a, bool l>
-void CUDAGPUInterface<p, c, a, l>::setUsedCodewordsCount(uint32_t count) {
-  usedCodewordsCount = count;
-}
-
-template <uint8_t p, uint8_t c, Algo a, bool l>
-void CUDAGPUInterface<p, c, a, l>::sendComputeCommand() {
+template <uint8_t p, uint8_t c, Algo a, typename SubsetSize, bool l>
+void CUDAGPUInterface<p, c, a, SubsetSize, l>::sendComputeCommand() {
   *dFdGuess = Codeword<p, c>::totalCodewords;
 
   cudaError_t err = cudaSuccess;
 
-  cudaMemcpyAsync(dPossibleSolutions, dPossibleSolutionsHost, sizeof(*dPossibleSolutions) * possibleSolutionsCount, cudaMemcpyHostToDevice);
-  cudaMemcpyAsync(dPossibleSolutionsColors, dPossibleSolutionsColorsHost, sizeof(*dPossibleSolutionsColors) * possibleSolutionsCount, cudaMemcpyHostToDevice);
+  cudaMemcpyAsync(dPossibleSolutions, dPossibleSolutionsHost, sizeof(*dPossibleSolutions) * possibleSolutionsCount,
+                  cudaMemcpyHostToDevice);
+  cudaMemcpyAsync(dPossibleSolutionsColors, dPossibleSolutionsColorsHost,
+                  sizeof(*dPossibleSolutionsColors) * possibleSolutionsCount, cudaMemcpyHostToDevice);
 
-  subsettingAlgosKernel<p, a, totalScores><<<numBlocks, threadsPerBlock, sharedMemSize>>>(
+  subsettingAlgosKernel<p, a, SubsetSize, totalScores><<<numBlocks, threadsPerBlock, sharedMemSize>>>(
       Codeword<p, c>::totalCodewords, dAllCodewords, reinterpret_cast<const uint4 *>(dAllCodewordsColors),
       possibleSolutionsCount, dPossibleSolutions, reinterpret_cast<uint4 *>(dPossibleSolutionsColors),
       usedCodewordsCount, dUsedCodewords, dFdGuess, dPerBlockSolutions);
@@ -364,37 +299,25 @@ void CUDAGPUInterface<p, c, a, l>::sendComputeCommand() {
   }
 }
 
-template <uint8_t p, uint8_t c, Algo a, bool l>
-uint32_t *CUDAGPUInterface<p, c, a, l>::getScores() {
-  return nullptr;
-}
+template <uint8_t p, uint8_t c, Algo a, typename SubsetSize, bool l>
+CUDAGPUInterface<p, c, a, SubsetSize, l>::~CUDAGPUInterface() {
+  auto freeManaged = [](auto devPtr) {
+    cudaError_t err = cudaFree(devPtr);
+    if (err != cudaSuccess) {
+      fprintf(stderr, "Failed to free managed memory (error code %s)!\n", cudaGetErrorString(err));
+      exit(EXIT_FAILURE);
+    }
+  };
 
-template <uint8_t p, uint8_t c, Algo a, bool l>
-bool *CUDAGPUInterface<p, c, a, l>::getRemainingIsPossibleSolution() {
-  return nullptr;
-}
-
-template <uint8_t p, uint8_t c, Algo a, bool l>
-uint32_t *CUDAGPUInterface<p, c, a, l>::getFullyDiscriminatingCodewords(uint32_t &count) {
-  count = 0;
-  return nullptr;
-}
-
-template <uint8_t p, uint8_t c, Algo a, bool l>
-uint32_t CUDAGPUInterface<p, c, a, l>::getFDGuess() {
-  return *dFdGuess;
-}
-
-template <uint8_t p, uint8_t c, Algo a, bool l>
-GPUInterface::IndexAndScore CUDAGPUInterface<p, c, a, l>::getBestGuess(uint32_t allCodewordsCounts,
-                                                                       std::vector<uint32_t> &usedCodewords,
-                                                                       uint32_t (*codewordGetter)(uint32_t)) {
-  return dPerBlockSolutions[0];
-}
-
-template <uint8_t p, uint8_t c, Algo a, bool l>
-std::string CUDAGPUInterface<p, c, a, l>::getGPUName() {
-  return deviceName;
+  freeManaged(dAllCodewords);
+  freeManaged(dAllCodewordsColors);
+  cudaFree(dPossibleSolutions);
+  cudaFree(dPossibleSolutionsColors);
+  free(dPossibleSolutionsHost);
+  free(dPossibleSolutionsColorsHost);
+  freeManaged(dUsedCodewords);
+  freeManaged(dFdGuess);
+  freeManaged(dPerBlockSolutions);
 }
 
 // ------------------------------------------------------------------------------------------------------------
@@ -428,8 +351,8 @@ inline int _ConvertSMVer2Cores(int major, int minor) {
   return nGpuArchCoresPerSM[index - 1].Cores;
 }
 
-template <uint8_t p, uint8_t c, Algo a, bool l>
-void CUDAGPUInterface<p, c, a, l>::dumpDeviceInfo() {
+template <uint8_t p, uint8_t c, Algo a, typename SubsetSize, bool l>
+void CUDAGPUInterface<p, c, a, SubsetSize, l>::dumpDeviceInfo() {
   int nDevices;
 
   cudaGetDeviceCount(&nDevices);
@@ -562,11 +485,11 @@ void CUDAGPUInterface<p, c, a, l>::dumpDeviceInfo() {
 //   conditional build stuff and compiler used for each file all the way up to main to allow
 //   the templates to be included everywhere.
 
-#define INST_PCL(p, c, l)                                       \
-  template class CUDAGPUInterface<p, c, Algo::Knuth, l>;        \
-  template class CUDAGPUInterface<p, c, Algo::MostParts, l>;    \
-  template class CUDAGPUInterface<p, c, Algo::ExpectedSize, l>; \
-  template class CUDAGPUInterface<p, c, Algo::Entropy, l>;
+#define INST_PCL(p, c, l)                                                 \
+  template class CUDAGPUInterface<p, c, Algo::Knuth, uint32_t, l>;        \
+  template class CUDAGPUInterface<p, c, Algo::MostParts, uint8_t, l>;     \
+  template class CUDAGPUInterface<p, c, Algo::ExpectedSize, uint32_t, l>; \
+  template class CUDAGPUInterface<p, c, Algo::Entropy, uint32_t, l>;
 
 #define INST_CL(c, l) \
   INST_PCL(2, c, l)   \
@@ -596,6 +519,15 @@ void CUDAGPUInterface<p, c, a, l>::dumpDeviceInfo() {
 // INST_L(true)
 // INST_L(false)
 
-INST_PCL(4, 6, true)
-INST_PCL(4, 6, false)
-INST_PCL(8, 5, false)
+// INST_PCL(4, 6, true)
+// INST_PCL(4, 6, false)
+// INST_PCL(8, 5, false)
+
+// The unit test needs this one all the time
+template class CUDAGPUInterface<4, 6, Algo::Knuth, uint32_t, true>;
+
+// Specializations for whatever experiments you want to run. Keep this list fairly small to keep compilation speeds
+// reasonable. Use the macros above to enable lots of things at once, but with long comp times.
+template class CUDAGPUInterface<4, 6, Algo::Knuth, uint32_t, false>;
+template class CUDAGPUInterface<8, 5, Algo::Knuth, uint32_t, false>;
+template class CUDAGPUInterface<8, 5, Algo::MostParts, uint8_t, false>;
