@@ -5,6 +5,7 @@
 
 #include "utils.hpp"
 
+#include <algorithm>
 #include <fstream>
 #include <set>
 

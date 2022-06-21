@@ -149,11 +149,10 @@ class StrategySubsettingGPU : public StrategySubsetting<pinCount, c, l, Derived>
 #ifdef __MM_GPU_METAL__
       gpuRootData->gpuInterface =
           new MetalGPUInterfaceWrapper(pinCount, (uint)Codeword<pinCount, c>::totalCodewords, kernelName);
-#elif __NVCC__
-      gpuRootData->gpuInterface = new CUDAGPUInterface<pinCount, c, a, l>();
-#else
-      //            gpuRootData->gpuInterface = new NoGPUInterface();
+#elif MASTERMIND_CUDA
       gpuRootData->gpuInterface = new CUDAGPUInterface<pinCount, c, a, typename Derived::SubsetSize, l>();
+#else
+      gpuRootData->gpuInterface = new NoGPUInterface();
 #endif
 
       if (gpuRootData->gpuInterface->gpuAvailable()) {

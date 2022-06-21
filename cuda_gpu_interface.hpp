@@ -80,5 +80,3 @@ class CUDAGPUInterface : public GPUInterface {
 
   string deviceName;
 };
-
-//#include "cuda_gpu_interface.cu"

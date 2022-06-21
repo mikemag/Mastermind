@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -38,7 +39,7 @@ class MetalGPUInterfaceWrapper : public GPUInterface {
   void setPossibleSolutionsCount(uint32_t count) override;
 
   uint32_t* getUsedCodewordsBuffer() override { return nullptr; }
-  void setUsedCodewordsCount(uint32_t count) {}
+  void setUsedCodewordsCount(uint32_t count) override {}
 
   void sendComputeCommand() override;
 
