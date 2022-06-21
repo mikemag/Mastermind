@@ -31,7 +31,8 @@ even for larger games. In fact, the CPU implementations here do precisely this, 
 against the cost of anything more complex.
 
 However, certain kinds of GPU memory are quite limited, and parallelizing interesting gameplay algorithms on the GPU
-requires careful use of shared "threadgroup" memory. Wasting half of it or more is unacceptable.
+requires careful use of shared memory. Wasting half of it or more is unacceptable since it's on the order of 48-100KiB
+and ever thread in a block needs a portion.
 
 Some implementations may choose to use a sparse lookup table to translate scores to a dense range, and others employ
 (possibly large) switch statements. Neither of these are particularly good on the GPU either.
@@ -39,7 +40,7 @@ Some implementations may choose to use a sparse lookup table to translate scores
 ## Dense Packing
 
 To form a dense index for Mastermind scores, note first that all valid scores sum to the number of pins $p$, i.e.,
-$b + w = p$. Grouping scores by $b$, the number of scores with $b = 0$ is $p + 1$, with $b = 1$ is $p$, and with 
+$b + w = p$. Grouping scores by $b$, the number of scores with $b = 0$ is $p + 1$, with $b = 1$ is $p$, and with
 $b = 2$ is $p - 1$, and so on until $b = p$ with just a single score.
 
 At this point you may note that the score $b = p - 1$, $w = 1$, is not possible. That would say that all colors in the
@@ -74,10 +75,10 @@ $$O_{b,w} = bp + b - \frac{(b - 1)b}{2} + a - b$$
 
 $$O_{b,w} = bp - \frac{(b - 1)b}{2} + a$$
 
-It turns out that [isn't too bad to compute at all](https://godbolt.org/z/ab5vTn), and it saves significant thread group
-memory on the GPU, enabling better occupancy and thus throughput.
+It turns out that [isn't too bad to compute at all](https://godbolt.org/z/ab5vTn), and it saves significant shared
+memory on the GPU, enabling much, much better occupancy and thus throughput.
 
-Note, however, that the packing is not perfect. The equations above leave room for the impossible score 
+Note, however, that the packing is not perfect. The equations above leave room for the impossible score
 $b = p - 1$, $w = 1$. This can be adjusted for programmatically, by subtracting $1$ if $b = p$, but it's not worth it in
 this case. The extra word of memory is expendable vs. having the GPU execute an `if` statement.
 

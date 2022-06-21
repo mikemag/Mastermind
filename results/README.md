@@ -2,6 +2,8 @@
 
 Various results are summarized here. Raw data is in the .csv files in subdirectories here.
 
+All results are from my MacBook Pro (16-inch, 2019) running macOS Catalina 10.15.7 and the AMD Radeon Pro 5500M.
+
 ## Average turns over all games
 
 ### Knuth
@@ -258,7 +260,7 @@ GPU is already pulling ahead on some algorithms. Because of this I really haven'
 
 #### 4p6c
 
-|Strategy|Initial Guess|Max Turns|GPU Mode|Average Turns|Time (s)|CPU Scores|GPU Scores|GPU Kernels
+|Strategy|Initial Guess|Max Turns|GPU Mode|Average Turns|Time (s)|CPU Scores|GPU Scores|GPU Kernels|
 |:---:|:---:|:---:|:---:|:---:|---:|---:|---:|:---:|
 |First One|3456|7|CPU|4.6211|0.0008| 55,417 | | |
 |Knuth|1122|5|CPU|4.4761|0.0085| 3,237,885 | | |   
@@ -272,7 +274,7 @@ GPU is already pulling ahead on some algorithms. Because of this I really haven'
 
 #### 4p7c
 
-|Strategy|Initial Guess|Max Turns|GPU Mode|Average Turns|Time (s)|CPU Scores|GPU Scores|GPU Kernels
+|Strategy|Initial Guess|Max Turns|GPU Mode|Average Turns|Time (s)|CPU Scores|GPU Scores|GPU Kernels|
 |:---:|:---:|:---:|:---:|:---:|---:|---:|---:|:---:|
 |First One|4567|8|CPU|5.0675|0.0017| 114,469 | | |
 |Knuth|1234|6|CPU|4.8367|0.0345| 13,577,917 | | |   

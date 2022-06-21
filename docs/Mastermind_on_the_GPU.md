@@ -1,5 +1,7 @@
 # Mastermind on the GPU
 
+@TODO: update w/ notes from the CUDA impl. See [cuda_gpu_interface.cpp](../cuda_gpu_interface.cu) for now.
+
 The core of most interesting Mastermind algorithms involves scoring all possible codewords, call the this All Set $AS$,
 against a diminishing set of possible solutions which we'll call the Possible Set $PS$.
 This is $\mathcal{O}(n^2)$ in the total number of codewords, which is $n = c^p$. This has to be done once
