@@ -45,6 +45,14 @@
 
       if ((_mDevice == nil) || (!device.isLowPower && [device supportsFamily:MTLGPUFamilyMac2])) {
         _mDevice = device;
+
+        _gpuInfo = @{
+          @"GPU Name" : device.name,
+          @"GPU Shared Memory per block" :
+              [NSString stringWithFormat:@"%lu", (unsigned long)device.maxThreadgroupMemoryLength],
+          @"GPU Threads per Block" :
+              [NSString stringWithFormat:@"%lu", (unsigned long)device.maxThreadsPerThreadgroup.width]
+        };
       }
     }
 
@@ -242,8 +250,8 @@
   }
 }
 
-- (NSString *)getGPUName {
-  return _mDevice.name;
+- (NSDictionary *)getGPUInfo {
+  return _gpuInfo;
 }
 
 @end

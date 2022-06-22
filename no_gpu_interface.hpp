@@ -11,6 +11,8 @@
 #include "gpu_interface.hpp"
 
 class NoGPUInterface : public GPUInterface {
+  unordered_map<string, string> gpuInfo;
+
  public:
   NoGPUInterface() = default;
 
@@ -40,5 +42,5 @@ class NoGPUInterface : public GPUInterface {
     return {UINT32_MAX, 0, false};
   }
 
-  std::string getGPUName() override { return "None"; }
+  std::unordered_map<std::string, std::string> &getGPUInfo() override { return gpuInfo; }
 };

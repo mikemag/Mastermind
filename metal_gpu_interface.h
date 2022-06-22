@@ -27,7 +27,10 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (uint32_t *)getFullyDiscriminatingCodewords:(uint32_t *)count;
 
-- (NSString *)getGPUName;
+- (NSDictionary *)getGPUInfo;
+
+@property (nonatomic, strong) NSDictionary *gpuInfo;
+
 @end
 
 NS_ASSUME_NONNULL_END

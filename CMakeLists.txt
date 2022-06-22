@@ -34,9 +34,29 @@ add_executable(mastermind-cpu
         utils.cpp
         )
 target_include_directories(mastermind-cpu PUBLIC .)
-set_target_properties(mastermind-cpu PROPERTIES CXX_STANDARD 20)
+set_target_properties(mastermind-cpu PROPERTIES
+        CXX_STANDARD 20
+        CXX_STANDARD_REQUIRED ON
+        )
 target_compile_options(mastermind-cpu PRIVATE -march=native)
 
+# https://github.com/anrieff/libcpuid to get CPU info like number of processors, L1 cache size, etc.
+# On Ubuntu: sudo apt install cpuidtool libcpuid15 libcpuid-dev
+find_library(LIBCPUID_LIBRARY NAMES libcpuid.so)
+find_path(LIBCPUID_INCLUDE_DIR NAMES libcpuid)
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(LIBCPUID
+        FOUND_VAR LIBCPUID_FOUND
+        REQUIRED_VARS LIBCPUID_LIBRARY LIBCPUID_INCLUDE_DIR
+        )
+if (LIBCPUID_FOUND AND NOT TARGET LIBCPUID)
+    add_library(LIBCPUID UNKNOWN IMPORTED)
+    set_target_properties(LIBCPUID PROPERTIES
+            IMPORTED_LOCATION "${LIBCPUID_LIBRARY}"
+            INTERFACE_INCLUDE_DIRECTORIES "${LIBCPUID_INCLUDE_DIR}/libcpuid"
+            )
+    target_link_libraries(mastermind-cpu PUBLIC LIBCPUID)
+endif ()
 
 include(CheckLanguage)
 check_language(CUDA)
@@ -53,8 +73,8 @@ if (CMAKE_CUDA_COMPILER)
     target_include_directories(mastermind-cuda PUBLIC .)
     set_target_properties(mastermind-cuda PROPERTIES
             CXX_STANDARD 20
-            CMAKE_CUDA_STANDARD 17
-            CMAKE_CUDA_STANDARD_REQUIRED ON
+            CUDA_STANDARD 17
+            CUDA_STANDARD_REQUIRED ON
             CUDA_SEPARABLE_COMPILATION ON
             CUDA_ARCHITECTURES "86")
     target_compile_options(mastermind-cuda PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-march=native>)
@@ -65,6 +85,9 @@ if (CMAKE_CUDA_COMPILER)
             --std=c++17
             --forward-unknown-to-host-compiler -march=native
             >)
+    if (LIBCPUID_FOUND)
+        target_link_libraries(mastermind-cuda PUBLIC LIBCPUID)
+    endif ()
 
     # https://developer.nvidia.com/blog/building-cuda-4applications-cmake/
 endif ()

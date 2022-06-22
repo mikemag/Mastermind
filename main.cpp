@@ -99,7 +99,7 @@ void playAllGamesForStrategy(shared_ptr<Strategy<pinCount, colorCount, log>> str
   statsRecorder.add("Total Codewords", allCodewords.size());
 
   Codeword<pinCount, colorCount> initialGuess = strategy->currentGuess();
-  cout << "Initial guess: " << strategy->currentGuess() << endl;
+  cout << "Initial guess: " << initialGuess << endl;
   statsRecorder.add("Initial Guess", initialGuess);
 
   int maxTurns = 0;
@@ -107,7 +107,7 @@ void playAllGamesForStrategy(shared_ptr<Strategy<pinCount, colorCount, log>> str
   fill(begin(histogram), end(histogram), 0);
   Codeword<pinCount, colorCount> maxSecret;
   bool showProgress = true;
-  int progressFactor = 1000;
+  chrono::duration<float> printDelay(5);
   int gameCount = 0;
   auto startTime = chrono::high_resolution_clock::now();
   auto lastTime = startTime;
@@ -122,17 +122,16 @@ void playAllGamesForStrategy(shared_ptr<Strategy<pinCount, colorCount, log>> str
     }
     if (showProgress) {
       gameCount++;
-      if (gameCount > 0 && gameCount % progressFactor == 0) {
+      if (gameCount % 100 == 0) { // 100 just to cut the per-loop overhead of this
         auto currentTime = chrono::high_resolution_clock::now();
         chrono::duration<float> elapsedS = currentTime - lastTime;
-        if (gameCount == progressFactor && elapsedS.count() < 0.5f) {
-          showProgress = false;
+        if (elapsedS < printDelay) {
           continue;
         }
-        float eta = (allCodewords.size() - gameCount) / 1000.0 * elapsedS.count();
-        cout << "Completed " << secret;
-        printf(", %.04fs per %d, %.02f%%, ETA %.02fs\n", elapsedS.count(), progressFactor,
-               ((float)gameCount / allCodewords.size()) * 100.0f, eta);
+        chrono::duration<float> totalS = currentTime - startTime;
+        float eta = (totalS.count() / ((float)gameCount / allCodewords.size())) - totalS.count();
+        cout << "Completed " << secret << ", " << commaString(gameCount);
+        printf(" games (%.02f%%), elapsed %0.2fs, ETA %.02fs\n", ((float)gameCount / allCodewords.size()) * 100.0f, totalS.count(), eta);
         lastTime = currentTime;
       }
     }
@@ -148,7 +147,7 @@ void playAllGamesForStrategy(shared_ptr<Strategy<pinCount, colorCount, log>> str
   chrono::duration<float, milli> elapsedMS = endTime - startTime;
   auto elapsedS = elapsedMS.count() / 1000;
   auto avgGameTimeMS = elapsedMS.count() / allCodewords.size();
-  cout << "Elapsed time " << commaString(elapsedS) << "s, average search " << commaString(avgGameTimeMS) << "ms"
+  cout << "Elapsed time " << commaString(elapsedS) << "s, average game time " << commaString(avgGameTimeMS) << "ms"
        << endl;
   statsRecorder.add("Elapsed (s)", elapsedS);
   statsRecorder.add("Average Game Time (ms)", avgGameTimeMS);

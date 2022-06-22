@@ -7,6 +7,7 @@
 
 #include <cstdint>
 #include <string>
+#include <unordered_map>
 
 class GPUInterface {
  public:
@@ -42,5 +43,5 @@ class GPUInterface {
   virtual IndexAndScore getBestGuess(uint32_t allCodewordsCount, std::vector<uint32_t>& usedCodewords,
                                      uint32_t (*codewordGetter)(uint32_t)) = 0;
 
-  virtual std::string getGPUName() = 0;
+  virtual std::unordered_map<std::string, std::string> &getGPUInfo() = 0;
 };

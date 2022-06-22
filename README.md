@@ -92,6 +92,8 @@ The program will tell you about the GPUs on your system and which one it selecte
 
 @TODO: need to add in the CUDA results, notes on Ubuntu OS & build, etc.
 
+@TODO: build req on Ubuntu, `sudo apt install cpuidtool libcpuid15 libcpuid-dev`
+
 ## License
 
 Code is licensed under the MIT license except as otherwise noted.

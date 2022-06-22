@@ -22,6 +22,7 @@ OBJC_CLASS(MetalGPUInterface);
 
 class MetalGPUInterfaceWrapper : public GPUInterface {
   MetalGPUInterface* wrapped;
+  std::unordered_map<std::string, std::string> gpuInfo;
 
  public:
   MetalGPUInterfaceWrapper(unsigned int pinCount, unsigned int totalCodewords, const char* kernelName);
@@ -84,5 +85,5 @@ class MetalGPUInterfaceWrapper : public GPUInterface {
     return {bestGuessIndex, bestScore, bestIsPossibleSolution};
   }
 
-  std::string getGPUName() override;
+  std::unordered_map<std::string, std::string> &getGPUInfo() override;
 };

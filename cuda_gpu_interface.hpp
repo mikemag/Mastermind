@@ -51,7 +51,7 @@ class CUDAGPUInterface : public GPUInterface {
     return dPerBlockSolutions[0];
   }
 
-  std::string getGPUName() override { return deviceName; }
+  std::unordered_map<std::string, std::string> &getGPUInfo() override { return gpuInfo; }
 
  private:
   void dumpDeviceInfo();
@@ -78,5 +78,5 @@ class CUDAGPUInterface : public GPUInterface {
   size_t sharedMemSize = 0;
   uint32_t roundedTotalCodewords;
 
-  string deviceName;
+  unordered_map<string, string> gpuInfo;
 };

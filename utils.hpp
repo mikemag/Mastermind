@@ -8,6 +8,7 @@
 #include <iomanip>
 #include <iostream>
 #include <locale>
+#include <map>
 #include <sstream>
 #include <unordered_map>
 #include <vector>
@@ -36,12 +37,42 @@ constexpr T constPow(T num, T pow) {
   return pow == 0 ? 1 : num * constPow(num, pow - 1);
 }
 
+// Get basic info about the OS, hardware, machine, etc.
+class OSInfo {
+ public:
+  std::map<std::string, std::string> info;
+
+  OSInfo();
+
+  std::ostream &dump(std::ostream &stream) const {
+    for (const auto &a : info) {
+      stream << a.first << ": " << a.second << std::endl;
+    }
+    return stream;
+  }
+
+  template <typename T>
+  std::string macOSSysctlByName(const std::string &name);
+};
+
+template <bool enabled>
+std::ostream &operator<<(std::ostream &stream, const OSInfo &r) {
+  return r.dump(stream);
+}
+
 // A way to record various stats about a game so we can write a nice csv of results.
 class StatsRecorder {
  public:
   std::vector<std::unordered_map<std::string, std::string>> runs;
   size_t currentRun = 0;
-  std::unordered_map<std::string, std::string> all;
+  std::map<std::string, std::string> all;
+  OSInfo osInfo;
+
+  StatsRecorder() {
+    for (const auto &a : osInfo.info) {
+      all[a.first] = a.second;
+    }
+  }
 
   void newRun() {
     runs.emplace_back();

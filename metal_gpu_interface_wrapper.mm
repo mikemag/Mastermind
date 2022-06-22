@@ -63,6 +63,9 @@ uint32_t *MetalGPUInterfaceWrapper::getFullyDiscriminatingCodewords(uint32_t &co
   return [wrapped getFullyDiscriminatingCodewords:&count];
 }
 
-std::string MetalGPUInterfaceWrapper::getGPUName() {
-  return [wrapped getGPUName].UTF8String;
+std::unordered_map<std::string, std::string> &MetalGPUInterfaceWrapper::getGPUInfo() {
+  [[wrapped getGPUInfo] enumerateKeysAndObjectsUsingBlock:^(NSString* key, NSString* value, BOOL* stop) {
+    gpuInfo[key.UTF8String] = value.UTF8String;
+  }];
+  return gpuInfo;
 }

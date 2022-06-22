@@ -142,7 +142,7 @@ Codeword<p, c> StrategySubsettingGPU<p, c, log, Derived>::selectNextGuess() {
   };
 
   GPUInterface::IndexAndScore bestGPUGuess = gpuRootData->gpuInterface->getBestGuess(
-      Codeword<p, c>::getAllCodewords().size(), this->usedCodewords, codewordGetter);
+      (uint32_t)Codeword<p, c>::getAllCodewords().size(), this->usedCodewords, codewordGetter);
   Codeword<p, c> bestGuess = Codeword<p, c>::getAllCodewords()[bestGPUGuess.index];
   if (log) {
     cout << "Selecting best guess: " << bestGuess << "\tscore: " << bestGPUGuess.score << " (GPU)" << endl;
@@ -190,7 +190,9 @@ void StrategySubsettingGPU<p, c, l, Derived>::recordStats(StatsRecorder &sr,
   sr.add("GPU Kernels", gpuRootData->kernelsExecuted);
   sr.add("GPU FPS", (float)gpuRootData->kernelsExecuted / (elapsedMS.count() / 1000.0));
   if (gpuRootData->gpuInterface && gpuRootData->gpuInterface->gpuAvailable()) {
-    sr.add("GPU Name", gpuRootData->gpuInterface->getGPUName());
+    for (const auto &a : gpuRootData->gpuInterface->getGPUInfo()) {
+      sr.addAll(a.first, a.second);
+    }
   }
 }
 
