@@ -24,19 +24,20 @@
 //
 // These results match those presented in [2], Tables 3, 4, & 5.
 
-template <uint8_t p, uint8_t c, bool l>
-class StrategyFirstOne : public Strategy<p, c, l> {
+template <typename StrategyConfig>
+class StrategyFirstOne : public Strategy<StrategyConfig> {
  public:
-  explicit StrategyFirstOne(Codeword<p, c> initialGuess) : Strategy<p, c, l>{initialGuess} {}
+  using CodewordT = typename Strategy<StrategyConfig>::CodewordT;
 
-  StrategyFirstOne(Strategy<p, c, l> &parent, Codeword<p, c> nextGuess,
-                   std::vector<Codeword<p, c>> &nextPossibleSolutions)
-      : Strategy<p, c, l>(parent, nextGuess, nextPossibleSolutions) {}
+  explicit StrategyFirstOne(CodewordT initialGuess) : Strategy<StrategyConfig>{initialGuess} {}
+
+  StrategyFirstOne(Strategy<StrategyConfig> &parent, CodewordT nextGuess, std::vector<CodewordT> &nextPossibleSolutions)
+      : Strategy<StrategyConfig>(parent, nextGuess, nextPossibleSolutions) {}
 
   std::string getName() const override { return "First One"; }
 
-  Codeword<p, c> selectNextGuess() override;
-  std::shared_ptr<Strategy<p, c, l>> createNewMove(Score r, Codeword<p, c> nextGuess) override;
+  CodewordT selectNextGuess() override;
+  std::shared_ptr<Strategy<StrategyConfig>> createNewMove(Score r, CodewordT nextGuess) override;
 };
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -45,19 +46,20 @@ class StrategyFirstOne : public Strategy<p, c, l> {
 // Much like First One, but this picks a random guess from the list. This is surprisingly effective in producing
 // quick wins, with very little effort.
 
-template <uint8_t p, uint8_t c, bool l>
-class StrategyRandom : public Strategy<p, c, l> {
+template <typename StrategyConfig>
+class StrategyRandom : public Strategy<StrategyConfig> {
  public:
-  explicit StrategyRandom(Codeword<p, c> initialGuess) : Strategy<p, c, l>{initialGuess} {}
+  using CodewordT = typename Strategy<StrategyConfig>::CodewordT;
 
-  StrategyRandom(Strategy<p, c, l> &parent, Codeword<p, c> nextGuess,
-                 std::vector<Codeword<p, c>> &nextPossibleSolutions)
-      : Strategy<p, c, l>(parent, nextGuess, nextPossibleSolutions) {}
+  explicit StrategyRandom(CodewordT initialGuess) : Strategy<StrategyConfig>{initialGuess} {}
+
+  StrategyRandom(Strategy<StrategyConfig> &parent, CodewordT nextGuess, std::vector<CodewordT> &nextPossibleSolutions)
+      : Strategy<StrategyConfig>(parent, nextGuess, nextPossibleSolutions) {}
 
   std::string getName() const override { return "Random"; }
 
-  Codeword<p, c> selectNextGuess() override;
-  std::shared_ptr<Strategy<p, c, l>> createNewMove(Score r, Codeword<p, c> nextGuess) override;
+  CodewordT selectNextGuess() override;
+  std::shared_ptr<Strategy<StrategyConfig>> createNewMove(Score r, CodewordT nextGuess) override;
 };
 
 #include "simple_strategies.cpp"

@@ -10,41 +10,41 @@ using namespace std;
 // --------------------------------------------------------------------------------------------------------------------
 // Base for all subsetting strategies
 
-template <uint8_t p, uint8_t c, bool log, class Derived>
-Codeword<p, c> StrategySubsetting<p, c, log, Derived>::selectNextGuess() {
+template <typename StrategyConfig, class Derived>
+typename Strategy<StrategyConfig>::CodewordT StrategySubsetting<StrategyConfig, Derived>::selectNextGuess() {
   // Add the last guess from the list of used codewords.
   usedCodewords = savedUsedCodewords;
   usedCodewords.emplace_back(this->guess.packedCodeword());
 
-  Codeword<p, c> bestGuess;
+  CodewordT bestGuess;
   size_t bestScore = 0;
   bool bestIsPossibleSolution = false;
   int allCount = 0;  // For metrics only
-  for (const auto &g : Codeword<p, c>::getAllCodewords()) {
+  for (const auto &g : CodewordT::getAllCodewords()) {
     bool isPossibleSolution = false;
     for (const auto &ps : this->possibleSolutions) {
       Score r = g.score(ps);
       ssHolder->subsetSizes[r.result]++;
-      if (r == Codeword<p, c>::winningScore) {
+      if (r == CodewordT::WINNING_SCORE) {
         isPossibleSolution = true;  // Remember if this guess is in the set of possible solutions
       }
     }
     this->rootData->scoreCounterCPU += this->possibleSolutions.size();
-    if (this->rootData->enableSmallPSMetrics) allCount++;
+    if (this->rootData->ENABLE_SMALL_PS_METRICS) allCount++;
 
     // Shortcut small sets. Note, we've already done this check for possible solutions.
-    if (Strategy<p, c, log>::enableSmallPSShortcut && !isPossibleSolution &&
-        this->possibleSolutions.size() <= Strategy<p, c, log>::totalScores) {
+    if (Strategy<StrategyConfig>::ENABLE_SMALL_PS_SHORTCUT && !isPossibleSolution &&
+        this->possibleSolutions.size() <= StrategyConfig::TOTAL_SCORES) {
       int subsetsCount = computeTotalSubsets();
       if (subsetsCount == this->possibleSolutions.size()) {
-        if (log) {
+        if (StrategyConfig::LOG) {
           cout << "Selecting fully discriminating guess: " << g << ", subsets: " << subsetsCount << endl;
         }
         // Done implicitly in computeSubsetScore, which we're skipping
         fill(begin(ssHolder->subsetSizes), end(ssHolder->subsetSizes), 0);
         ++this->rootData->smallPSInnerShortcuts;
         this->rootData->smallPSInnerScoresSkipped +=
-            (Codeword<p, c>::getAllCodewords().size() - allCount) * this->possibleSolutions.size();
+            (CodewordT::getAllCodewords().size() - allCount) * this->possibleSolutions.size();
         return g;
       }
       ++this->rootData->smallPSInnerWasted;
@@ -62,14 +62,14 @@ Codeword<p, c> StrategySubsetting<p, c, log, Derived>::selectNextGuess() {
     }
   }
 
-  if (log) {
+  if (StrategyConfig::LOG) {
     cout << "Selecting best guess: " << bestGuess << "\tscore: " << bestScore << endl;
   }
   return bestGuess;
 }
 
-template <uint8_t p, uint8_t c, bool log, class Derived>
-int StrategySubsetting<p, c, log, Derived>::computeTotalSubsets() {
+template <typename StrategyConfig, class Derived>
+int StrategySubsetting<StrategyConfig, Derived>::computeTotalSubsets() {
   int totalSubsets = 0;
   for (auto s : ssHolder->subsetSizes) {
     if (s > 0) {
@@ -82,12 +82,12 @@ int StrategySubsetting<p, c, log, Derived>::computeTotalSubsets() {
 // --------------------------------------------------------------------------------------------------------------------
 // Base for all subsetting GPU strategies
 
-template <uint8_t p, uint8_t c, bool log, class Derived>
-Codeword<p, c> StrategySubsettingGPU<p, c, log, Derived>::selectNextGuess() {
+template <typename StrategyConfig, class Derived>
+typename Strategy<StrategyConfig>::CodewordT StrategySubsettingGPU<StrategyConfig, Derived>::selectNextGuess() {
   // Cut off "small" work and just do it on the CPU.
   if (mode == CPU ||
-      (mode == Both && Codeword<p, c>::getAllCodewords().size() * this->possibleSolutions.size() < 4 * 1024)) {
-    return StrategySubsetting<p, c, log, Derived>::selectNextGuess();
+      (mode == Both && CodewordT::getAllCodewords().size() * this->possibleSolutions.size() < 4 * 1024)) {
+    return StrategySubsetting<StrategyConfig, Derived>::selectNextGuess();
   }
 
   // Add the last guess from the list of used codewords.
@@ -115,17 +115,17 @@ Codeword<p, c> StrategySubsettingGPU<p, c, log, Derived>::selectNextGuess() {
 
   gpuRootData->gpuInterface->sendComputeCommand();
   gpuRootData->kernelsExecuted++;
-  this->rootData->scoreCounterGPU += Codeword<p, c>::getAllCodewords().size() * this->possibleSolutions.size();
+  this->rootData->scoreCounterGPU += CodewordT::getAllCodewords().size() * this->possibleSolutions.size();
 
-  if (Strategy<p, c, log>::enableSmallPSShortcutGPU &&
-      this->possibleSolutions.size() <= Strategy<p, c, log>::totalScores) {
+  if (Strategy<StrategyConfig>::ENABLE_SMALL_PS_SHORTCUT_GPU &&
+      this->possibleSolutions.size() <= StrategyConfig::TOTAL_SCORES) {
     // Shortcut small sets with fully discriminating codewords. Certain versions of the GPU kernels look for these and
     // pass them back in a list of useful codewords per SIMD group. Running through the list in-order and taking the
     // first one gives the first lexically ordered option.
     uint32_t fd = gpuRootData->gpuInterface->getFDGuess();
-    if (fd < Codeword<p, c>::totalCodewords) {
-      Codeword<p, c> g = Codeword<p, c>::getAllCodewords()[fd];
-      if (log) {
+    if (fd < CodewordT::TOTAL_CODEWORDS) {
+      CodewordT g = CodewordT::getAllCodewords()[fd];
+      if (StrategyConfig::LOG) {
         cout << "Selecting fully discriminating guess from GPU: " << g << ", subsets: "
              << this->possibleSolutions.size()
              //             << ", isPossibleSolution: " << remainingIsPossibleSolution[fd]
@@ -137,14 +137,12 @@ Codeword<p, c> StrategySubsettingGPU<p, c, log, Derived>::selectNextGuess() {
 
   // TODO: this is a massive hack to keep the Metal version working for now. I pushed the CPU-side work down into its
   // impl of getBestGuess and it's messy.
-  auto codewordGetter = [](uint32_t index) -> uint32_t {
-    return Codeword<p, c>::getAllCodewords()[index].packedCodeword();
-  };
+  auto codewordGetter = [](uint32_t index) -> uint32_t { return CodewordT::getAllCodewords()[index].packedCodeword(); };
 
   GPUInterface::IndexAndScore bestGPUGuess = gpuRootData->gpuInterface->getBestGuess(
-      (uint32_t)Codeword<p, c>::getAllCodewords().size(), this->usedCodewords, codewordGetter);
-  Codeword<p, c> bestGuess = Codeword<p, c>::getAllCodewords()[bestGPUGuess.index];
-  if (log) {
+      (uint32_t)CodewordT::getAllCodewords().size(), this->usedCodewords, codewordGetter);
+  CodewordT bestGuess = CodewordT::getAllCodewords()[bestGPUGuess.index];
+  if (StrategyConfig::LOG) {
     cout << "Selecting best guess: " << bestGuess << "\tscore: " << bestGPUGuess.score << " (GPU)" << endl;
   }
 
@@ -153,8 +151,8 @@ Codeword<p, c> StrategySubsettingGPU<p, c, log, Derived>::selectNextGuess() {
 
 // This moves all the codewords into the correct device-private buffers just once, since it's a) read only and b)
 // quite large.
-template <uint8_t p, uint8_t c, bool l, class Derived>
-void StrategySubsettingGPU<p, c, l, Derived>::copyAllCodewordsToGPU() {
+template <typename StrategyConfig, class Derived>
+void StrategySubsettingGPU<StrategyConfig, Derived>::copyAllCodewordsToGPU() {
   if (!gpuRootData->gpuInterface->gpuAvailable()) {
     return;
   }
@@ -162,30 +160,30 @@ void StrategySubsettingGPU<p, c, l, Derived>::copyAllCodewordsToGPU() {
   // Pull out the codewords and colors into individual arrays
   uint32_t *acw = gpuRootData->gpuInterface->getAllCodewordsBuffer();
   unsigned __int128 *acc = gpuRootData->gpuInterface->getAllCodewordsColorsBuffer();
-  for (int i = 0; i < Codeword<p, c>::getAllCodewords().size(); i++) {
-    acw[i] = Codeword<p, c>::getAllCodewords()[i].packedCodeword();
-    acc[i] = Codeword<p, c>::getAllCodewords()[i].packedColors8();
+  for (int i = 0; i < CodewordT::getAllCodewords().size(); i++) {
+    acw[i] = CodewordT::getAllCodewords()[i].packedCodeword();
+    acc[i] = CodewordT::getAllCodewords()[i].packedColors8();
   }
-  gpuRootData->gpuInterface->setAllCodewordsCount((uint32_t)Codeword<p, c>::getAllCodewords().size());
+  gpuRootData->gpuInterface->setAllCodewordsCount((uint32_t)CodewordT::getAllCodewords().size());
 
   // This shoves both buffers over into GPU memory just once, where they remain constant after that. No need to touch
   // them again.
-  gpuRootData->gpuInterface->syncAllCodewords((uint32_t)Codeword<p, c>::getAllCodewords().size());
+  gpuRootData->gpuInterface->syncAllCodewords((uint32_t)CodewordT::getAllCodewords().size());
 }
 
-template <uint8_t p, uint8_t c, bool l, class Derived>
-void StrategySubsettingGPU<p, c, l, Derived>::printStats(chrono::duration<float, milli> elapsedMS) {
-  StrategySubsetting<p, c, l, Derived>::printStats(elapsedMS);
+template <typename StrategyConfig, class Derived>
+void StrategySubsettingGPU<StrategyConfig, Derived>::printStats(chrono::duration<float, milli> elapsedMS) {
+  StrategySubsetting<StrategyConfig, Derived>::printStats(elapsedMS);
   if (mode != CPU && gpuRootData->gpuInterface->gpuAvailable()) {
     cout << "GPU kernels executed: " << commaString(gpuRootData->kernelsExecuted)
          << "  FPS: " << commaString((float)gpuRootData->kernelsExecuted / (elapsedMS.count() / 1000.0)) << endl;
   }
 }
 
-template <uint8_t p, uint8_t c, bool l, class Derived>
-void StrategySubsettingGPU<p, c, l, Derived>::recordStats(StatsRecorder &sr,
-                                                          std::chrono::duration<float, std::milli> elapsedMS) {
-  StrategySubsetting<p, c, l, Derived>::recordStats(sr, elapsedMS);
+template <typename StrategyConfig, class Derived>
+void StrategySubsettingGPU<StrategyConfig, Derived>::recordStats(StatsRecorder &sr,
+                                                                  std::chrono::duration<float, std::milli> elapsedMS) {
+  StrategySubsetting<StrategyConfig, Derived>::recordStats(sr, elapsedMS);
   sr.add("GPU Mode", GPUModeNames[mode]);
   sr.add("GPU Kernels", gpuRootData->kernelsExecuted);
   sr.add("GPU FPS", (float)gpuRootData->kernelsExecuted / (elapsedMS.count() / 1000.0));
@@ -204,8 +202,8 @@ StrategySubsettingGPURootData::~StrategySubsettingGPURootData() {
 // --------------------------------------------------------------------------------------------------------------------
 // Knuth
 
-template <uint8_t p, uint8_t c, bool l>
-size_t StrategyKnuth<p, c, l>::computeSubsetScore() {
+template <typename StrategyConfig>
+size_t StrategyKnuth<StrategyConfig>::computeSubsetScore() {
   int largestSubsetSize = 0;  // Maximum number of codewords that could be retained by using this guess
   for (auto &s : this->ssHolder->subsetSizes) {
     if (s > largestSubsetSize) {
@@ -220,8 +218,8 @@ size_t StrategyKnuth<p, c, l>::computeSubsetScore() {
 // --------------------------------------------------------------------------------------------------------------------
 // Most Parts
 
-template <uint8_t p, uint8_t c, bool l>
-size_t StrategyMostParts<p, c, l>::computeSubsetScore() {
+template <typename StrategyConfig>
+size_t StrategyMostParts<StrategyConfig>::computeSubsetScore() {
   int totalUsedSubsets = 0;
   for (auto &s : this->ssHolder->subsetSizes) {
     if (s > 0) {
@@ -235,8 +233,8 @@ size_t StrategyMostParts<p, c, l>::computeSubsetScore() {
 // --------------------------------------------------------------------------------------------------------------------
 // Expected Size
 
-template <uint8_t p, uint8_t c, bool l>
-size_t StrategyExpectedSize<p, c, l>::computeSubsetScore() {
+template <typename StrategyConfig>
+size_t StrategyExpectedSize<StrategyConfig>::computeSubsetScore() {
   double expectedSize = 0;
   for (auto &s : this->ssHolder->subsetSizes) {
     if (s > 0) {
@@ -250,8 +248,8 @@ size_t StrategyExpectedSize<p, c, l>::computeSubsetScore() {
 // --------------------------------------------------------------------------------------------------------------------
 // Entropy
 
-template <uint8_t p, uint8_t c, bool l>
-size_t StrategyEntropy<p, c, l>::computeSubsetScore() {
+template <typename StrategyConfig>
+size_t StrategyEntropy<StrategyConfig>::computeSubsetScore() {
   double entropySum = 0.0;
   for (auto &s : this->ssHolder->subsetSizes) {
     if (s > 0) {

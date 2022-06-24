@@ -10,8 +10,9 @@
 
 #include "compute_kernel_constants.h"
 #include "gpu_interface.hpp"
+#include "strategy_config.hpp"
 
-template <uint8_t p, uint8_t c, Algo a, typename SubsetSize, bool l>
+template <typename SubsettingStrategyConfig>
 class CUDAGPUInterface : public GPUInterface {
  public:
   CUDAGPUInterface();
@@ -51,13 +52,10 @@ class CUDAGPUInterface : public GPUInterface {
     return dPerBlockSolutions[0];
   }
 
-  std::unordered_map<std::string, std::string> &getGPUInfo() override { return gpuInfo; }
+  std::unordered_map<std::string, std::string>& getGPUInfo() override { return gpuInfo; }
 
  private:
   void dumpDeviceInfo();
-
-  // Total scores = (p * (p + 3)) / 2, but +1 for imperfect packing.
-  static constexpr int totalScores = ((p * (p + 3)) / 2) + 1;
 
   uint32_t* dAllCodewords;
   unsigned __int128* dAllCodewordsColors;
@@ -72,11 +70,6 @@ class CUDAGPUInterface : public GPUInterface {
 
   uint32_t* dFdGuess;
   IndexAndScore* dPerBlockSolutions;
-
-  uint32_t threadsPerBlock;
-  uint32_t numBlocks;
-  size_t sharedMemSize = 0;
-  uint32_t roundedTotalCodewords;
 
   unordered_map<string, string> gpuInfo;
 };

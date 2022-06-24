@@ -12,6 +12,7 @@
 
 #include "codeword.hpp"
 #include "score.hpp"
+#include "strategy_config.hpp"
 #include "utils.hpp"
 
 // Gameplay Strategy
@@ -26,18 +27,20 @@
 // next play, then add it to the tree. As games are played, the tree gets filled in and playtime decreases.
 struct StrategyRootData;
 
-template <uint8_t p, uint8_t c, bool l>
+template <typename StrategyConfig>
 class Strategy {
  public:
-  explicit Strategy(Codeword<p, c> guess) : savedPossibleSolutions(Codeword<p, c>::getAllCodewords()) {
+  using CodewordT = Codeword<StrategyConfig::PIN_COUNT, StrategyConfig::COLOR_COUNT>;
+
+  explicit Strategy(CodewordT guess) : savedPossibleSolutions(CodewordT::getAllCodewords()) {
     this->guess = guess;
     rootData = make_shared<StrategyRootData>();
   }
 
   virtual std::string getName() const = 0;
-  Codeword<p, c> currentGuess() const { return guess; }
+  CodewordT currentGuess() const { return guess; }
 
-  uint32_t findSecret(Codeword<p, c> secret, int depth = 0);
+  uint32_t findSecret(CodewordT secret, int depth = 0);
 
   virtual void printStats(std::chrono::duration<float, std::milli> elapsedMS);
   virtual void recordStats(StatsRecorder &sr, std::chrono::duration<float, std::milli> elapsedMS);
@@ -55,32 +58,31 @@ class Strategy {
  protected:
   // These extra members are to allow us to build the strategy lazily, as we play games using any algorithm. nb: these
   // are copies.
-  Codeword<p, c> guess;
-  std::vector<Codeword<p, c>> possibleSolutions;
+  CodewordT guess;
+  std::vector<CodewordT> possibleSolutions;
 
   shared_ptr<StrategyRootData> rootData = nullptr;
 
-  Strategy(Strategy<p, c, l> &parent, Codeword<p, c> nextGuess, std::vector<Codeword<p, c>> &nextPossibleSolutions)
+  Strategy(Strategy<StrategyConfig> &parent, CodewordT nextGuess, std::vector<CodewordT> &nextPossibleSolutions)
       : savedPossibleSolutions(std::move(nextPossibleSolutions)), guess(nextGuess), rootData(parent.rootData) {}
 
   void removeImpossibleSolutions(Score r);
-  virtual Codeword<p, c> selectNextGuess() = 0;
-  virtual std::shared_ptr<Strategy<p, c, l>> createNewMove(Score r, Codeword<p, c> nextGuess) = 0;
+  virtual CodewordT selectNextGuess() = 0;
+  virtual std::shared_ptr<Strategy<StrategyConfig>> createNewMove(Score r, CodewordT nextGuess) = 0;
 
-  constexpr static uint32_t maxScoreSlots = (p << 4u) + 1;
-  constexpr static int totalScores = (p * (p + 3)) / 2;
+  constexpr static uint32_t MAX_SCORE_SLOTS = (StrategyConfig::PIN_COUNT << 4u) + 1;
 
   // Optimization control -- for experimentation
-  constexpr static bool enableTwoPSShortcut = true;
-  constexpr static bool enableSmallPSShortcut = true;
-  constexpr static bool enableSmallPSShortcutGPU = true;
+  constexpr static bool ENABLE_TWO_PS_SHORTCUT = true;
+  constexpr static bool ENABLE_SMALL_PS_SHORTCUT = true;
+  constexpr static bool ENABLE_SMALL_PS_SHORTCUT_GPU = true;
 
  private:
   // The strategy is made up of the next guess to play, and a map of where to go based on the result of that play.
-  std::unordered_map<Score, std::shared_ptr<Strategy<p, c, l>>> nextMoves;
-  const std::vector<Codeword<p, c>> savedPossibleSolutions;
+  std::unordered_map<Score, std::shared_ptr<Strategy<StrategyConfig>>> nextMoves;
+  const std::vector<CodewordT> savedPossibleSolutions;
 
-  Codeword<p, c> shortcutSmallSets();
+  CodewordT shortcutSmallSets();
 
   void dumpRoot(std::ofstream &graphStream);
   void dump(std::ofstream &graphStream);
@@ -93,23 +95,23 @@ struct StrategyRootData {
   uint64_t scoreCounterGPU = 0;
 
   // Optimization metrics -- measuring experimentation
-  constexpr static bool enableTwoPSMetrics = false;
-  ExperimentCounter<enableTwoPSMetrics> twoPSShortcuts =
-      ExperimentCounter<enableTwoPSMetrics>("Exp: Size 2 PS Shortcuts");
+  constexpr static bool ENABLE_TWO_PS_METRICS = false;
+  ExperimentCounter<ENABLE_TWO_PS_METRICS> twoPSShortcuts =
+      ExperimentCounter<ENABLE_TWO_PS_METRICS>("Exp: Size 2 PS Shortcuts");
 
-  constexpr static bool enableSmallPSMetrics = false;
-  ExperimentCounter<enableSmallPSMetrics> smallPSHighShortcuts =
-      ExperimentCounter<enableSmallPSMetrics>("Exp: Small PS High Shortcuts");
-  ExperimentCounter<enableSmallPSMetrics> smallPSHighWasted =
-      ExperimentCounter<enableSmallPSMetrics>("Exp: Small PS High Wasted");
-  ExperimentCounter<enableSmallPSMetrics> smallPSHighScores =
-      ExperimentCounter<enableSmallPSMetrics>("Exp: Small PS High Scores");
-  ExperimentCounter<enableSmallPSMetrics> smallPSInnerShortcuts =
-      ExperimentCounter<enableSmallPSMetrics>("Exp: Small PS Inner Shortcuts");
-  ExperimentCounter<enableSmallPSMetrics> smallPSInnerWasted =
-      ExperimentCounter<enableSmallPSMetrics>("Exp: Small PS Inner Wasted");
-  ExperimentCounter<enableSmallPSMetrics> smallPSInnerScoresSkipped =
-      ExperimentCounter<enableSmallPSMetrics>("Exp: Small PS Inner Scores Skipped");
+  constexpr static bool ENABLE_SMALL_PS_METRICS = false;
+  ExperimentCounter<ENABLE_SMALL_PS_METRICS> smallPSHighShortcuts =
+      ExperimentCounter<ENABLE_SMALL_PS_METRICS>("Exp: Small PS High Shortcuts");
+  ExperimentCounter<ENABLE_SMALL_PS_METRICS> smallPSHighWasted =
+      ExperimentCounter<ENABLE_SMALL_PS_METRICS>("Exp: Small PS High Wasted");
+  ExperimentCounter<ENABLE_SMALL_PS_METRICS> smallPSHighScores =
+      ExperimentCounter<ENABLE_SMALL_PS_METRICS>("Exp: Small PS High Scores");
+  ExperimentCounter<ENABLE_SMALL_PS_METRICS> smallPSInnerShortcuts =
+      ExperimentCounter<ENABLE_SMALL_PS_METRICS>("Exp: Small PS Inner Shortcuts");
+  ExperimentCounter<ENABLE_SMALL_PS_METRICS> smallPSInnerWasted =
+      ExperimentCounter<ENABLE_SMALL_PS_METRICS>("Exp: Small PS Inner Wasted");
+  ExperimentCounter<ENABLE_SMALL_PS_METRICS> smallPSInnerScoresSkipped =
+      ExperimentCounter<ENABLE_SMALL_PS_METRICS>("Exp: Small PS Inner Scores Skipped");
 };
 
 #include "strategy.cpp"

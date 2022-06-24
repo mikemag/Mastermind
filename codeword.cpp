@@ -13,26 +13,26 @@
 
 using namespace std;
 
-template <uint8_t p, uint8_t c>
-std::ostream &operator<<(std::ostream &stream, const Codeword<p, c> &codeword) {
+template <uint8_t PIN_COUNT, uint8_t COLOR_COUNT>
+std::ostream &operator<<(std::ostream &stream, const Codeword<PIN_COUNT, COLOR_COUNT> &codeword) {
   return codeword.dump(stream);
 }
 
-// This is a relatively simple O(2p) scoring method. First we count black hits and unused colors in O(pinCount) time,
-// then we consume colors in O(pinCount) time and count white hits. This is quite efficient for a rather simple scoring
+// This is a relatively simple O(2p) scoring method. First we count black hits and unused colors in O(p) time,
+// then we consume colors in O(p) time and count white hits. This is quite efficient for a rather simple scoring
 // method, with the only real complexity being the packing of pins and colors to reduce space used.
 // https://godbolt.org/z/sEEjcY
 //
 // Elapsed time 4.4948s, average search 3.4682ms
-template <uint8_t pinCount, uint8_t c>
-Score Codeword<pinCount, c>::scoreSimpleLoops(const Codeword &guess) const {
+template <uint8_t PIN_COUNT, uint8_t COLOR_COUNT>
+Score Codeword<PIN_COUNT, COLOR_COUNT>::scoreSimpleLoops(const Codeword &guess) const {
   uint8_t b = 0;
   uint8_t w = 0;
   uint64_t unusedColorCounts = 0;  // Room for 16 4-bit counters
 
   uint32_t s = this->codeword;
   uint32_t g = guess.codeword;
-  for (int i = 0; i < pinCount; i++) {
+  for (int i = 0; i < PIN_COUNT; i++) {
     if ((g & 0xFu) == (s & 0xFu)) {
       b++;
     } else {
@@ -44,7 +44,7 @@ Score Codeword<pinCount, c>::scoreSimpleLoops(const Codeword &guess) const {
 
   s = this->codeword;
   g = guess.codeword;
-  for (int i = 0; i < pinCount; i++) {
+  for (int i = 0; i < PIN_COUNT; i++) {
     if ((g & 0xFu) != (s & 0xFu) && (unusedColorCounts & (0xFlu << ((g & 0xFu) * 4))) > 0) {
       w++;
       unusedColorCounts -= 1lu << ((g & 0xFu) * 4);
@@ -71,9 +71,9 @@ Score Codeword<pinCount, c>::scoreSimpleLoops(const Codeword &guess) const {
 // big improvement for larger games and surprisingly efficient overall.
 //
 // Elapsed time 3.1218s, average search 2.4088ms
-template <uint8_t pinCount, uint8_t c>
-Score Codeword<pinCount, c>::scoreCountingScalar(const Codeword &guess) const {
-  constexpr static uint32_t unusedPinsMask = (uint32_t)(0xFFFFFFFFlu << (pinCount * 4u));
+template <uint8_t PIN_COUNT, uint8_t COLOR_COUNT>
+Score Codeword<PIN_COUNT, COLOR_COUNT>::scoreCountingScalar(const Codeword &guess) const {
+  constexpr static uint32_t unusedPinsMask = (uint32_t)(0xFFFFFFFFlu << (PIN_COUNT * 4u));
   uint32_t v = this->codeword ^ guess.codeword;  // Matched pins are now 0.
   v |= unusedPinsMask;                           // Ensure that any unused pin positions are non-zero.
   uint32_t r = ~((((v & 0x77777777u) + 0x77777777u) | v) | 0x77777777u);  // Yields 1 bit per matched pin
@@ -103,9 +103,9 @@ Score Codeword<pinCount, c>::scoreCountingScalar(const Codeword &guess) const {
 // pretty large and sub-optimal. https://godbolt.org/z/arcE5e
 //
 // Elapsed time 2.2948s, average search 1.7707ms
-template <uint8_t pinCount, uint8_t c>
-Score Codeword<pinCount, c>::scoreCountingAutoVec(const Codeword &guess) const {
-  constexpr static uint32_t unusedPinsMask = (uint32_t)(0xFFFFFFFFlu << (pinCount * 4u));
+template <uint8_t PIN_COUNT, uint8_t COLOR_COUNT>
+Score Codeword<PIN_COUNT, COLOR_COUNT>::scoreCountingAutoVec(const Codeword &guess) const {
+  constexpr static uint32_t unusedPinsMask = (uint32_t)(0xFFFFFFFFlu << (PIN_COUNT * 4u));
   uint32_t v = this->codeword ^ guess.codeword;  // Matched pins are now 0.
   v |= unusedPinsMask;                           // Ensure that any unused pin positions are non-zero.
   uint32_t r = ~((((v & 0x77777777u) + 0x77777777u) | v) | 0x77777777u);  // Yields 1 bit per matched pin
@@ -127,9 +127,9 @@ Score Codeword<pinCount, c>::scoreCountingAutoVec(const Codeword &guess) const {
 // See scoreCountingScalar() for an explanation of how hits are computed.
 //
 // Elapsed time 0.9237s, average search 0.7127ms
-template <uint8_t pinCount, uint8_t c>
-Score Codeword<pinCount, c>::scoreCountingHandVec(const Codeword &guess) const {
-  constexpr static uint32_t unusedPinsMask = (uint32_t)(0xFFFFFFFFlu << (pinCount * 4u));
+template <uint8_t PIN_COUNT, uint8_t COLOR_COUNT>
+Score Codeword<PIN_COUNT, COLOR_COUNT>::scoreCountingHandVec(const Codeword &guess) const {
+  constexpr static uint32_t unusedPinsMask = (uint32_t)(0xFFFFFFFFlu << (PIN_COUNT * 4u));
   uint32_t v = this->codeword ^ guess.codeword;  // Matched pins are now 0.
   v |= unusedPinsMask;                           // Ensure that any unused pin positions are non-zero.
   uint32_t r = ~((((v & 0x77777777u) + 0x77777777u) | v) | 0x77777777u);  // Yields 1 bit per matched pin
@@ -153,40 +153,40 @@ Score Codeword<pinCount, c>::scoreCountingHandVec(const Codeword &guess) const {
 
 // Wrapper for the real scoring function to allow for easy experimentation.
 // Note: I used to employ a score cache here, see docs/Score_Cache.md for details.
-template <uint8_t p, uint8_t c>
-Score Codeword<p, c>::score(const Codeword &guess) const {
+template <uint8_t PIN_COUNT, uint8_t COLOR_COUNT>
+Score Codeword<PIN_COUNT, COLOR_COUNT>::score(const Codeword &guess) const {
   return scoreCountingHandVec(guess);
 }
 
 // Make a list of all codewords for a given number of "colors". Colors are represented by the digits 1 thru n. This
-// figures out how many codewords there are, which is colorCount ^ pinCount, then converts the base-10 number of each
-// codeword to it's base-colorCount representation.
-template <uint8_t pinCount, uint8_t colorCount>
-vector<Codeword<pinCount, colorCount>> &Codeword<pinCount, colorCount>::getAllCodewords() {
+// figures out how many codewords there are, which is COLOR_COUNT ^ PIN_COUNT, then converts the base-10 number of each
+// codeword to it's base-COLOR_COUNT representation.
+template <uint8_t PIN_COUNT, uint8_t COLOR_COUNT>
+vector<Codeword<PIN_COUNT, COLOR_COUNT>> &Codeword<PIN_COUNT, COLOR_COUNT>::getAllCodewords() {
   if (allCodewords.empty()) {
-    allCodewords.reserve(totalCodewords);
+    allCodewords.reserve(TOTAL_CODEWORDS);
 
-    for (uint i = 0; i < totalCodewords; i++) {
+    for (uint i = 0; i < TOTAL_CODEWORDS; i++) {
       uint w = i;
       uint32_t cw = 0;
       int di = 0;
       do {
-        cw |= (w % colorCount) << (4u * di++);
-        w /= colorCount;
+        cw |= (w % COLOR_COUNT) << (4u * di++);
+        w /= COLOR_COUNT;
       } while (w > 0);
 
-      cw += onePins;  // Colors start at 1, not 0.
+      cw += ONE_PINS;  // Colors start at 1, not 0.
       allCodewords.emplace_back(cw);
     }
   }
   return allCodewords;
 }
 
-template <uint8_t pinCount, uint8_t c>
-std::ostream &Codeword<pinCount, c>::dump(std::ostream &stream) const {
+template <uint8_t PIN_COUNT, uint8_t COLOR_COUNT>
+std::ostream &Codeword<PIN_COUNT, COLOR_COUNT>::dump(std::ostream &stream) const {
   std::ios state(nullptr);
   state.copyfmt(stream);
-  stream << std::hex << std::setw(pinCount) << std::setfill('0') << codeword;
+  stream << std::hex << std::setw(PIN_COUNT) << std::setfill('0') << codeword;
   // stream << " o:" << ordinal << " cc4:" << std::setw(16) << colorCounts4 << " cc8:" << std::setw(32) << (unsigned
   // long long)colorCounts8;
   stream.copyfmt(state);

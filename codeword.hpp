@@ -15,7 +15,7 @@
 //
 // This is represented as a packed group of 4-bit digits, up to 8 digits. Colors are pre-computed and packed into 64 or
 // 128 bits for different versions of the scoring functions.
-template <uint8_t p, uint8_t c>
+template <uint8_t PIN_COUNT, uint8_t COLOR_COUNT>
 class Codeword {
  public:
   constexpr Codeword() noexcept : codeword(0xFFFFFFFF), colorCounts4(0), colorCounts8(0) {}
@@ -30,9 +30,9 @@ class Codeword {
   uint32_t packedCodeword() const { return codeword; }
   unsigned __int128 packedColors8() const { return colorCounts8; }
 
-  constexpr static uint64_t totalCodewords = constPow<uint64_t>(c, p);
-  constexpr static Score winningScore = Score(p, 0);  // "0x40" for a 4-pin game.
-  constexpr static uint32_t onePins = 0x11111111u & ((1lu << p * 4u) - 1);
+  constexpr static uint64_t TOTAL_CODEWORDS = constPow<uint64_t>(COLOR_COUNT, PIN_COUNT);
+  constexpr static Score WINNING_SCORE = Score(PIN_COUNT, 0);  // "0x40" for a 4-pin game.
+  constexpr static uint32_t ONE_PINS = 0x11111111u & ((1lu << PIN_COUNT * 4u) - 1);
 
   Score score(const Codeword &guess) const;
 
@@ -58,7 +58,7 @@ class Codeword {
   // vectorization, both auto and by-hand. https://godbolt.org/z/bfM86K
   constexpr static unsigned __int128 computeColorCounts8(uint32_t word) {
     unsigned __int128 cc8 = 0;
-    for (int i = 0; i < p; i++) {
+    for (int i = 0; i < PIN_COUNT; i++) {
       cc8 += ((unsigned __int128)1) << ((word & 0xFu) * 8);
       word >>= 4u;
     }
@@ -67,7 +67,7 @@ class Codeword {
 
   constexpr static uint64_t computeColorCounts4(uint32_t word) {
     uint64_t cc4 = 0;
-    for (int i = 0; i < p; i++) {
+    for (int i = 0; i < PIN_COUNT; i++) {
       cc4 += 1lu << ((word & 0xFu) * 4);
       word >>= 4u;
     }
@@ -78,16 +78,16 @@ class Codeword {
   constexpr static uint32_t computeOrdinal(uint32_t word) {
     uint32_t o = 0;
     uint32_t mult = 1;
-    for (int i = 0; i < p; i++) {
+    for (int i = 0; i < PIN_COUNT; i++) {
       o += ((word & 0xFu) - 1) * mult;
       word >>= 4u;
-      mult *= c;
+      mult *= COLOR_COUNT;
     }
     return o;
   }
 };
 
-template <uint8_t p, uint8_t c>
-std::ostream &operator<<(std::ostream &stream, const Codeword<p, c> &codeword);
+template <uint8_t PIN_COUNT, uint8_t COLOR_COUNT>
+std::ostream &operator<<(std::ostream &stream, const Codeword<PIN_COUNT, COLOR_COUNT> &codeword);
 
 #include "codeword.cpp"

@@ -69,7 +69,7 @@ void runUnitTests() {
 
 void runKnuthTest() {
   printf("\nRun the example from Knuth's paper to compare with his results.\n");
-  StrategyKnuth<4, 6, true> s(Codeword<4, 6>(0x1122));
+  StrategyKnuth<StrategyConfig<4, 6, true>> s(Codeword<4, 6>(0x1122));
   s.findSecret(Codeword<4, 6>(0x3632));
   printf("\n");
 }
@@ -86,26 +86,26 @@ static void setupHistogramHeaders() {
   }
 }
 
-template <uint8_t pinCount, uint8_t colorCount, bool log>
-void playAllGamesForStrategy(shared_ptr<Strategy<pinCount, colorCount, log>> strategy, StatsRecorder& statsRecorder) {
-  auto& allCodewords = Codeword<pinCount, colorCount>::getAllCodewords();
-  printf("Playing all %d pin %d color games using algorithm '%s' for every possible secret...\n", pinCount, colorCount,
-         strategy->getName().c_str());
-  statsRecorder.add("Pin Count", (int)pinCount);
-  statsRecorder.add("Color Count", (int)colorCount);
+template <typename StrategyConfig>
+void playAllGamesForStrategy(shared_ptr<Strategy<StrategyConfig>> strategy, StatsRecorder& statsRecorder) {
+  auto& allCodewords = Codeword<StrategyConfig::PIN_COUNT, StrategyConfig::COLOR_COUNT>::getAllCodewords();
+  printf("Playing all %d pin %d color games using algorithm '%s' for every possible secret...\n",
+         StrategyConfig::PIN_COUNT, StrategyConfig::COLOR_COUNT, strategy->getName().c_str());
+  statsRecorder.add("Pin Count", (int)StrategyConfig::PIN_COUNT);
+  statsRecorder.add("Color Count", (int)StrategyConfig::COLOR_COUNT);
   statsRecorder.add("Strategy", strategy->getName());
 
   cout << "Total codewords: " << commaString(allCodewords.size()) << endl;
   statsRecorder.add("Total Codewords", allCodewords.size());
 
-  Codeword<pinCount, colorCount> initialGuess = strategy->currentGuess();
+  Codeword<StrategyConfig::PIN_COUNT, StrategyConfig::COLOR_COUNT> initialGuess = strategy->currentGuess();
   cout << "Initial guess: " << initialGuess << endl;
   statsRecorder.add("Initial Guess", initialGuess);
 
   int maxTurns = 0;
   int totalTurns = 0;
   fill(begin(histogram), end(histogram), 0);
-  Codeword<pinCount, colorCount> maxSecret;
+  Codeword<StrategyConfig::PIN_COUNT, StrategyConfig::COLOR_COUNT> maxSecret;
   bool showProgress = true;
   chrono::duration<float> printDelay(5);
   int gameCount = 0;
@@ -122,7 +122,7 @@ void playAllGamesForStrategy(shared_ptr<Strategy<pinCount, colorCount, log>> str
     }
     if (showProgress) {
       gameCount++;
-      if (gameCount % 100 == 0) { // 100 just to cut the per-loop overhead of this
+      if (gameCount % 100 == 0) {  // 100 just to cut the per-loop overhead of this
         auto currentTime = chrono::high_resolution_clock::now();
         chrono::duration<float> elapsedS = currentTime - lastTime;
         if (elapsedS < printDelay) {
@@ -131,7 +131,8 @@ void playAllGamesForStrategy(shared_ptr<Strategy<pinCount, colorCount, log>> str
         chrono::duration<float> totalS = currentTime - startTime;
         float eta = (totalS.count() / ((float)gameCount / allCodewords.size())) - totalS.count();
         cout << "Completed " << secret << ", " << commaString(gameCount);
-        printf(" games (%.02f%%), elapsed %0.2fs, ETA %.02fs\n", ((float)gameCount / allCodewords.size()) * 100.0f, totalS.count(), eta);
+        printf(" games (%.02f%%), elapsed %0.2fs, ETA %.02fs\n", ((float)gameCount / allCodewords.size()) * 100.0f,
+               totalS.count(), eta);
         lastTime = currentTime;
       }
     }
@@ -170,48 +171,48 @@ void playAllGamesForStrategy(shared_ptr<Strategy<pinCount, colorCount, log>> str
   cout << "Done" << endl;
 }
 
-template <uint8_t pinCount, uint8_t colorCount, bool log>
-shared_ptr<Strategy<pinCount, colorCount, log>> makeStrategy(Algo algorithm, GPUMode mode) {
+template <typename StrategyConfig>
+shared_ptr<Strategy<StrategyConfig>> makeStrategy(Algo algorithm, GPUMode mode) {
   switch (algorithm) {
     case FirstOne:
-      return make_shared<StrategyFirstOne<pinCount, colorCount, log>>(
-          presetInitialGuessFirstOne<pinCount, colorCount>());
+      return make_shared<StrategyFirstOne<StrategyConfig>>(
+          presetInitialGuessFirstOne<StrategyConfig::PIN_COUNT, StrategyConfig::COLOR_COUNT>());
     case Random:
-      return make_shared<StrategyRandom<pinCount, colorCount, log>>(Codeword<pinCount, colorCount>::onePins);
+      return make_shared<StrategyRandom<StrategyConfig>>(
+          Codeword<StrategyConfig::PIN_COUNT, StrategyConfig::COLOR_COUNT>::ONE_PINS);
     case Knuth:
-      return make_shared<StrategyKnuth<pinCount, colorCount, log>>(presetInitialGuessKnuth<pinCount, colorCount>(),
-                                                                   mode);
+      return make_shared<StrategyKnuth<StrategyConfig>>(
+          presetInitialGuessKnuth<StrategyConfig::PIN_COUNT, StrategyConfig::COLOR_COUNT>(), mode);
     case MostParts:
-      return make_shared<StrategyMostParts<pinCount, colorCount, log>>(
-          presetInitialGuessMostParts<pinCount, colorCount>(), mode);
+      return make_shared<StrategyMostParts<StrategyConfig>>(
+          presetInitialGuessMostParts<StrategyConfig::PIN_COUNT, StrategyConfig::COLOR_COUNT>(), mode);
     case ExpectedSize:
-      return make_shared<StrategyExpectedSize<pinCount, colorCount, log>>(
-          presetInitialGuessExpectedSize<pinCount, colorCount>(), mode);
+      return make_shared<StrategyExpectedSize<StrategyConfig>>(
+          presetInitialGuessExpectedSize<StrategyConfig::PIN_COUNT, StrategyConfig::COLOR_COUNT>(), mode);
     case Entropy:
-      return make_shared<StrategyEntropy<pinCount, colorCount, log>>(presetInitialGuessEntropy<pinCount, colorCount>(),
-                                                                     mode);
+      return make_shared<StrategyEntropy<StrategyConfig>>(
+          presetInitialGuessEntropy<StrategyConfig::PIN_COUNT, StrategyConfig::COLOR_COUNT>(), mode);
     default:
       return nullptr;
   }
 };
 
-template <uint8_t pinCount, uint8_t colorCount, bool log>
-shared_ptr<Strategy<pinCount, colorCount, log>> makeStrategy(Algo algorithm, uint32_t initialGuessPacked,
-                                                             GPUMode mode) {
-  Codeword<pinCount, colorCount> initialGuess(initialGuessPacked);
+template <typename StrategyConfig>
+shared_ptr<Strategy<StrategyConfig>> makeStrategy(Algo algorithm, uint32_t initialGuessPacked, GPUMode mode) {
+  Codeword<StrategyConfig::PIN_COUNT, StrategyConfig::COLOR_COUNT> initialGuess(initialGuessPacked);
   switch (algorithm) {
     case FirstOne:
-      return make_shared<StrategyFirstOne<pinCount, colorCount, log>>(initialGuess);
+      return make_shared<StrategyFirstOne<StrategyConfig>>(initialGuess);
     case Random:
-      return make_shared<StrategyRandom<pinCount, colorCount, log>>(initialGuess);
+      return make_shared<StrategyRandom<StrategyConfig>>(initialGuess);
     case Knuth:
-      return make_shared<StrategyKnuth<pinCount, colorCount, log>>(initialGuess, mode);
+      return make_shared<StrategyKnuth<StrategyConfig>>(initialGuess, mode);
     case MostParts:
-      return make_shared<StrategyMostParts<pinCount, colorCount, log>>(initialGuess, mode);
+      return make_shared<StrategyMostParts<StrategyConfig>>(initialGuess, mode);
     case ExpectedSize:
-      return make_shared<StrategyExpectedSize<pinCount, colorCount, log>>(initialGuess, mode);
+      return make_shared<StrategyExpectedSize<StrategyConfig>>(initialGuess, mode);
     case Entropy:
-      return make_shared<StrategyEntropy<pinCount, colorCount, log>>(initialGuess, mode);
+      return make_shared<StrategyEntropy<StrategyConfig>>(initialGuess, mode);
     default:
       return nullptr;
   }
@@ -285,7 +286,7 @@ void runWithAllInitialGuesses(Algo a, StatsRecorder& s) {
   set<uint32_t> igs = buildInitialGuessSet<p, c>(a);
   for (auto ig : igs) {
     s.newRun();
-    playAllGamesForStrategy(makeStrategy<p, c, false>(a, ig, Both), s);
+    playAllGamesForStrategy(makeStrategy<StrategyConfig<p, c, false>>(a, ig, Both), s);
   }
 }
 
@@ -305,7 +306,7 @@ int main(int argc, const char* argv[]) {
 
   if (playSingleGame) {
     statsRecorder.newRun();
-    auto strategy = makeStrategy<singleGamePinCount, singleGameColorCount, false>(singleGameAlgo, singleGameGPUMode);
+    auto strategy = makeStrategy<StrategyConfig<singleGamePinCount, singleGameColorCount, false>>(singleGameAlgo, singleGameGPUMode);
     playAllGamesForStrategy(strategy, statsRecorder);
   }
 
@@ -315,13 +316,13 @@ int main(int argc, const char* argv[]) {
     // development.
     csvTag = "6_7_8_med_";
     static vector<void (*)(Algo, GPUMode, StatsRecorder&)> games = {
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<6, 9, false>(a, m), s); },
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<6, 10, false>(a, m), s); },
+        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<StrategyConfig<6, 9, false>>(a, m), s); },
+        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<StrategyConfig<6, 10, false>>(a, m), s); },
 
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<7, 7, false>(a, m), s); },
+        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<StrategyConfig<7, 7, false>>(a, m), s); },
 
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<8, 5, false>(a, m), s); },
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<8, 6, false>(a, m), s); },
+        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<StrategyConfig<8, 5, false>>(a, m), s); },
+        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<StrategyConfig<8, 6, false>>(a, m), s); },
     };
 
     static vector<Algo> interestingAlgos = {Knuth, MostParts, Entropy, ExpectedSize, FirstOne};

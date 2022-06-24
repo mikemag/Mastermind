@@ -10,19 +10,19 @@ using namespace std;
 // --------------------------------------------------------------------------------------------------------------------
 // First One
 
-template <uint8_t p, uint8_t c, bool log>
-Codeword<p, c> StrategyFirstOne<p, c, log>::selectNextGuess() {
-  Codeword<p, c> nextGuess = this->possibleSolutions.front();
+template <typename StrategyConfig>
+typename Strategy<StrategyConfig>::CodewordT StrategyFirstOne<StrategyConfig>::selectNextGuess() {
+  CodewordT nextGuess = this->possibleSolutions.front();
   this->possibleSolutions.erase(this->possibleSolutions.begin());
-  if (log) {
+  if (StrategyConfig::LOG) {
     cout << "Selecting the first possibility blindly: " << nextGuess << endl;
   }
   return nextGuess;
 }
 
-template <uint8_t p, uint8_t c, bool l>
-shared_ptr<Strategy<p, c, l>> StrategyFirstOne<p, c, l>::createNewMove(Score r, Codeword<p, c> nextGuess) {
-  auto next = make_shared<StrategyFirstOne<p, c, l>>(*this, nextGuess, this->possibleSolutions);
+template <typename StrategyConfig>
+shared_ptr<Strategy<StrategyConfig>> StrategyFirstOne<StrategyConfig>::createNewMove(Score r, CodewordT nextGuess) {
+  auto next = make_shared<StrategyFirstOne<StrategyConfig>>(*this, nextGuess, this->possibleSolutions);
   return next;
 }
 
@@ -33,20 +33,20 @@ shared_ptr<Strategy<p, c, l>> StrategyFirstOne<p, c, l>::createNewMove(Score r, 
 static std::random_device randDevice;
 static std::mt19937 randGenerator(randDevice());
 
-template <uint8_t p, uint8_t c, bool log>
-Codeword<p, c> StrategyRandom<p, c, log>::selectNextGuess() {
+template <typename StrategyConfig>
+typename Strategy<StrategyConfig>::CodewordT StrategyRandom<StrategyConfig>::selectNextGuess() {
   std::uniform_int_distribution<> distrib(0, (int)this->possibleSolutions.size() - 1);
-  Codeword<p, c> nextGuess = this->possibleSolutions[distrib(randGenerator)];
+  CodewordT nextGuess = this->possibleSolutions[distrib(randGenerator)];
   this->possibleSolutions.erase(remove(this->possibleSolutions.begin(), this->possibleSolutions.end(), nextGuess),
                                 this->possibleSolutions.end());
-  if (log) {
+  if (StrategyConfig::LOG) {
     cout << "Selecting a random possibility: " << nextGuess << endl;
   }
   return nextGuess;
 }
 
-template <uint8_t p, uint8_t c, bool l>
-shared_ptr<Strategy<p, c, l>> StrategyRandom<p, c, l>::createNewMove(Score r, Codeword<p, c> nextGuess) {
-  auto next = make_shared<StrategyRandom<p, c, l>>(*this, nextGuess, this->possibleSolutions);
+template <typename StrategyConfig>
+shared_ptr<Strategy<StrategyConfig>> StrategyRandom<StrategyConfig>::createNewMove(Score r, CodewordT nextGuess) {
+  auto next = make_shared<StrategyRandom<StrategyConfig>>(*this, nextGuess, this->possibleSolutions);
   return next;
 }

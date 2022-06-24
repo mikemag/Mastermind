@@ -172,7 +172,7 @@ constexpr uint32_t presetInitialGuessFirstOne() {
     case 0x6c:
       return 0xcba987;
     default:
-      return (Codeword<p, c>::onePins >> p / 2 * 4) + Codeword<p, c>::onePins;
+      return (Codeword<p, c>::ONE_PINS >> p / 2 * 4) + Codeword<p, c>::ONE_PINS;
   }
 }
 template <uint8_t p, uint8_t c>
@@ -271,7 +271,7 @@ constexpr uint32_t presetInitialGuessKnuth() {
     case 0x3f:
       return 0x123;
     default:
-      return (Codeword<p, c>::onePins >> p / 2 * 4) + Codeword<p, c>::onePins;
+      return (Codeword<p, c>::ONE_PINS >> p / 2 * 4) + Codeword<p, c>::ONE_PINS;
   }
 }
 template <uint8_t p, uint8_t c>
@@ -367,7 +367,7 @@ constexpr uint32_t presetInitialGuessMostParts() {
     case 0x3f:
       return 0x123;
     default:
-      return (Codeword<p, c>::onePins >> p / 2 * 4) + Codeword<p, c>::onePins;
+      return (Codeword<p, c>::ONE_PINS >> p / 2 * 4) + Codeword<p, c>::ONE_PINS;
   }
 }
 template <uint8_t p, uint8_t c>
@@ -463,7 +463,7 @@ constexpr uint32_t presetInitialGuessEntropy() {
     case 0x3f:
       return 0x123;
     default:
-      return (Codeword<p, c>::onePins >> p / 2 * 4) + Codeword<p, c>::onePins;
+      return (Codeword<p, c>::ONE_PINS >> p / 2 * 4) + Codeword<p, c>::ONE_PINS;
   }
 }
 template <uint8_t p, uint8_t c>
@@ -560,6 +560,6 @@ constexpr uint32_t presetInitialGuessExpectedSize() {
     case 0x3f:
       return 0x123;
     default:
-      return (Codeword<p, c>::onePins >> p / 2 * 4) + Codeword<p, c>::onePins;
+      return (Codeword<p, c>::ONE_PINS >> p / 2 * 4) + Codeword<p, c>::ONE_PINS;
   }
 }

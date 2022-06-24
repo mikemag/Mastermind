@@ -14,6 +14,7 @@ enum Algo {
   Entropy,       // Pick the maximum entropy guess.
 };
 
+// TODO: these are Metal-only, move them
 enum ComputeKernelBufferIndices {
   BufferIndexAllCodewords = 0,
   BufferIndexAllCodewordsColors = 1,

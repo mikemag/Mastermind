@@ -20,10 +20,10 @@
 // [1] D.E. Knuth. The computer as Master Mind. Journal of Recreational Mathematics, 9(1):1–6, 1976.
 // https://www.cs.uni.edu/~wallingf/teaching/cs3530/resources/knuth-mastermind.pdf
 //
-// [2] Geoffroy Ville, An Optimal Mastermind (4,7) Strategy<pinCount,c> and More Results in the Expected Case, March
+// [2] Geoffroy Ville, An Optimal Mastermind (4,7) Strategy and More Results in the Expected Case, March
 // 2013, arXiv:1305.1010 [cs.GT].
 //
-// [3] Barteld Kooi, Yet another mastermind Strategy<pinCount,c>. International Computer Games Association Journal,
+// [3] Barteld Kooi, Yet another mastermind Strategy. International Computer Games Association Journal,
 // 28(1):13–20, 2005. https://www.researchgate.net/publication/30485793_Yet_another_Mastermind_strategy
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -41,21 +41,24 @@
 // There's a decent summary of Knuth's overall algorithm on Wikipedia, too:
 // https://en.wikipedia.org/wiki/Mastermind_(board_game)
 
-template <uint8_t p, uint8_t c, bool l, class Derived>
-class StrategySubsetting : public Strategy<p, c, l> {
+template <typename StrategyConfig, class Derived>
+class StrategySubsetting : public Strategy<StrategyConfig> {
  public:
-  explicit StrategySubsetting(Codeword<p, c> initialGuess) : Strategy<p, c, l>{initialGuess} {
+  using CodewordT = typename Strategy<StrategyConfig>::CodewordT;
+
+  explicit StrategySubsetting(CodewordT initialGuess) : Strategy<StrategyConfig>{initialGuess} {
     ssHolder = make_unique<SubsetSizesHolder>();
     for (auto &s : ssHolder->subsetSizes) {
       s = 0;
     }
   }
 
-  StrategySubsetting(Strategy<p, c, l> &parent, Codeword<p, c> nextGuess,
-                     std::vector<Codeword<p, c>> &nextPossibleSolutions, std::vector<uint32_t> &nextUsedCodewords)
-      : Strategy<p, c, l>(parent, nextGuess, nextPossibleSolutions), savedUsedCodewords(std::move(nextUsedCodewords)) {}
+  StrategySubsetting(Strategy<StrategyConfig> &parent, CodewordT nextGuess,
+                     std::vector<CodewordT> &nextPossibleSolutions, std::vector<uint32_t> &nextUsedCodewords)
+      : Strategy<StrategyConfig>(parent, nextGuess, nextPossibleSolutions),
+        savedUsedCodewords(std::move(nextUsedCodewords)) {}
 
-  Codeword<p, c> selectNextGuess() override;
+  CodewordT selectNextGuess() override;
   virtual size_t computeSubsetScore() = 0;
 
  protected:
@@ -69,7 +72,7 @@ class StrategySubsetting : public Strategy<p, c, l> {
   // and sparse, but that's okay, it's faster to use it in the inner loop than using a 2D array.
   class SubsetSizesHolder {
    public:
-    static inline typename Derived::SubsetSize subsetSizes[Strategy<p, c, l>::maxScoreSlots];
+    static inline typename Derived::SubsetSize subsetSizes[Strategy<StrategyConfig>::MAX_SCORE_SLOTS];
   };
   unique_ptr<SubsetSizesHolder> ssHolder;
 
@@ -84,8 +87,8 @@ class StrategySubsetting : public Strategy<p, c, l> {
 // logic is the same, as is the fallback to CPU-only when necessary. The only real variable here is the compute kernel
 // name.
 //
-// Strategies which derrive from this run the same algorithm as their CPU versions, with all scoring and subset counting
-// dones on a GPU via Apple's Metal API. A single compute kernel is passed buffers with codewords and pre-computed color
+// Strategies which derive from this run the same algorithm as their CPU versions, with all scoring and subset counting
+// done on a GPU via Apple's Metal API. A single compute kernel is passed buffers with codewords and pre-computed color
 // counts: one set for all codewords, and one set for the possible solutions. Each GPU core gets a single entry G from
 // the all codewords set and scores it against all elements of the possible solutions set, forming the subsets. Then,
 // the subset score for G is found and placed in the correct place in a return buffer, along with a bool to tell us if G
@@ -100,7 +103,7 @@ class StrategySubsetting : public Strategy<p, c, l> {
 // 5p8c:   17.4421s    2.0124s
 // 6p6c:   36.2458s    3.3394s
 //
-// See the implementation of this class for more details on how buffers are arranged and transfered to the GPU.
+// See the implementation of this class for more details on how buffers are arranged and transferred to the GPU.
 //
 // See compute_kernels.metal for the implementation on the GPU side.
 enum GPUMode { Both, GPU, CPU };
@@ -113,28 +116,29 @@ struct StrategySubsettingGPURootData {
   ~StrategySubsettingGPURootData();
 };
 
-template <uint8_t pinCount, uint8_t c, bool l, class Derived>
-class StrategySubsettingGPU : public StrategySubsetting<pinCount, c, l, Derived> {
+template <typename StrategyConfig, class Derived>
+class StrategySubsettingGPU : public StrategySubsetting<StrategyConfig, Derived> {
  public:
-  StrategySubsettingGPU(Codeword<pinCount, c> initialGuess, GPUMode mode)
-      : StrategySubsetting<pinCount, c, l, Derived>{initialGuess}, mode(mode) {
+  using CodewordT = typename Strategy<StrategyConfig>::CodewordT;
+
+  StrategySubsettingGPU(CodewordT initialGuess, GPUMode mode)
+      : StrategySubsetting<StrategyConfig, Derived>{initialGuess}, mode(mode) {
     gpuRootData = make_shared<StrategySubsettingGPURootData>();
   }
 
-  StrategySubsettingGPU(StrategySubsettingGPU<pinCount, c, l, Derived> &parent, Codeword<pinCount, c> nextGuess,
-                        std::vector<Codeword<pinCount, c>> &nextPossibleSolutions,
-                        std::vector<uint32_t> &nextUsedCodewords)
-      : StrategySubsetting<pinCount, c, l, Derived>(parent, nextGuess, nextPossibleSolutions, nextUsedCodewords) {
+  StrategySubsettingGPU(StrategySubsettingGPU &parent, CodewordT nextGuess,
+                        std::vector<CodewordT> &nextPossibleSolutions, std::vector<uint32_t> &nextUsedCodewords)
+      : StrategySubsetting<StrategyConfig, Derived>(parent, nextGuess, nextPossibleSolutions, nextUsedCodewords) {
     gpuRootData = parent.gpuRootData;
   }
 
-  std::shared_ptr<Strategy<pinCount, c, l>> createNewMove(Score r, Codeword<pinCount, c> nextGuess) override {
+  std::shared_ptr<Strategy<StrategyConfig>> createNewMove(Score r, CodewordT nextGuess) override {
     auto next = make_shared<Derived>(*this, nextGuess, this->possibleSolutions, this->usedCodewords);
     next->mode = this->mode;
     return next;
   }
 
-  Codeword<pinCount, c> selectNextGuess() override;
+  CodewordT selectNextGuess() override;
 
   void printStats(std::chrono::duration<float, std::milli> elapsedMS) override;
   void recordStats(StatsRecorder &sr, std::chrono::duration<float, std::milli> elapsedMS) override;
@@ -143,14 +147,14 @@ class StrategySubsettingGPU : public StrategySubsetting<pinCount, c, l, Derived>
   GPUMode mode = Both;
   shared_ptr<StrategySubsettingGPURootData> gpuRootData = nullptr;
 
-  template <Algo a>
+  template <typename SubsettingStrategyConfig>
   void setupGPUInterface(const char *kernelName) {
     if (mode != CPU) {
 #ifdef __MM_GPU_METAL__
-      gpuRootData->gpuInterface =
-          new MetalGPUInterfaceWrapper(pinCount, (uint)Codeword<pinCount, c>::totalCodewords, kernelName);
+      gpuRootData->gpuInterface = new MetalGPUInterfaceWrapper(SubsettingStrategyConfig::PIN_COUNT,
+                                                               (uint)CodewordT::TOTAL_CODEWORDS, kernelName);
 #elif MASTERMIND_CUDA
-      gpuRootData->gpuInterface = new CUDAGPUInterface<pinCount, c, a, typename Derived::SubsetSize, l>();
+      gpuRootData->gpuInterface = new CUDAGPUInterface<SubsettingStrategyConfig>();
 #else
       gpuRootData->gpuInterface = new NoGPUInterface();
 #endif
@@ -184,21 +188,25 @@ class StrategySubsettingGPU : public StrategySubsetting<pinCount, c, l, Derived>
 //
 // These results match those presented in [2], Tables 3, 4, & 5.
 
-template <uint8_t p, uint8_t c, bool l>
-class StrategyKnuth : public StrategySubsettingGPU<p, c, l, StrategyKnuth<p, c, l>> {
+template <typename StrategyConfig>
+class StrategyKnuth : public StrategySubsettingGPU<StrategyConfig, StrategyKnuth<StrategyConfig>> {
  private:
-  constexpr static auto kernelName = "findKnuthGuessKernel";
+  constexpr static auto KERNEL_NAME = "findKnuthGuessKernel";
 
  public:
-  explicit StrategyKnuth(Codeword<p, c> initialGuess, GPUMode mode = Both)
-      : StrategySubsettingGPU<p, c, l, StrategyKnuth<p, c, l>>{initialGuess, mode} {
-    this->template setupGPUInterface<Algo::Knuth>(kernelName);
+  using CodewordT = typename Strategy<StrategyConfig>::CodewordT;
+
+  explicit StrategyKnuth(CodewordT initialGuess, GPUMode mode = Both)
+      : StrategySubsettingGPU<StrategyConfig, StrategyKnuth<StrategyConfig>>{initialGuess, mode} {
+    this->template setupGPUInterface<SubsettingStrategyConfig<StrategyConfig::PIN_COUNT, StrategyConfig::COLOR_COUNT,
+                                                              StrategyConfig::LOG, Algo::Knuth, SubsetSize>>(
+        KERNEL_NAME);
   }
 
-  StrategyKnuth(StrategySubsettingGPU<p, c, l, StrategyKnuth<p, c, l>> &parent, Codeword<p, c> nextGuess,
-                std::vector<Codeword<p, c>> &nextPossibleSolutions, std::vector<uint32_t> &nextUsedCodewords)
-      : StrategySubsettingGPU<p, c, l, StrategyKnuth<p, c, l>>(parent, nextGuess, nextPossibleSolutions,
-                                                               nextUsedCodewords) {}
+  StrategyKnuth(StrategySubsettingGPU<StrategyConfig, StrategyKnuth<StrategyConfig>> &parent, CodewordT nextGuess,
+                std::vector<CodewordT> &nextPossibleSolutions, std::vector<uint32_t> &nextUsedCodewords)
+      : StrategySubsettingGPU<StrategyConfig, StrategyKnuth<StrategyConfig>>(parent, nextGuess, nextPossibleSolutions,
+                                                                             nextUsedCodewords) {}
 
   std::string getName() const override { return "Knuth"; }
 
@@ -219,21 +227,26 @@ class StrategyKnuth : public StrategySubsettingGPU<p, c, l, StrategyKnuth<p, c, 
 // These results match those presented in [2], Tables 3, 4, & 5 except for the 5p8c result: I get 8 moves max, he shows
 // 9 in Table 5.
 
-template <uint8_t p, uint8_t c, bool l>
-class StrategyMostParts : public StrategySubsettingGPU<p, c, l, StrategyMostParts<p, c, l>> {
+template <typename StrategyConfig>
+class StrategyMostParts : public StrategySubsettingGPU<StrategyConfig, StrategyMostParts<StrategyConfig>> {
  private:
-  constexpr static auto kernelName = "findMostPartsGuessKernel";
+  constexpr static auto KERNEL_NAME = "findMostPartsGuessKernel";
 
  public:
-  explicit StrategyMostParts(Codeword<p, c> initialGuess, GPUMode mode = Both)
-      : StrategySubsettingGPU<p, c, l, StrategyMostParts<p, c, l>>{initialGuess, mode} {
-    this->template setupGPUInterface<Algo::MostParts>(kernelName);
+  using CodewordT = typename Strategy<StrategyConfig>::CodewordT;
+
+  explicit StrategyMostParts(CodewordT initialGuess, GPUMode mode = Both)
+      : StrategySubsettingGPU<StrategyConfig, StrategyMostParts<StrategyConfig>>{initialGuess, mode} {
+    this->template setupGPUInterface<SubsettingStrategyConfig<StrategyConfig::PIN_COUNT, StrategyConfig::COLOR_COUNT,
+                                                              StrategyConfig::LOG, Algo::MostParts, SubsetSize>>(
+        KERNEL_NAME);
   }
 
-  StrategyMostParts(StrategySubsettingGPU<p, c, l, StrategyMostParts<p, c, l>> &parent, Codeword<p, c> nextGuess,
-                    std::vector<Codeword<p, c>> &nextPossibleSolutions, std::vector<uint32_t> &nextUsedCodewords)
-      : StrategySubsettingGPU<p, c, l, StrategyMostParts<p, c, l>>(parent, nextGuess, nextPossibleSolutions,
-                                                                   nextUsedCodewords) {}
+  StrategyMostParts(StrategySubsettingGPU<StrategyConfig, StrategyMostParts<StrategyConfig>> &parent,
+                    CodewordT nextGuess, std::vector<CodewordT> &nextPossibleSolutions,
+                    std::vector<uint32_t> &nextUsedCodewords)
+      : StrategySubsettingGPU<StrategyConfig, StrategyMostParts<StrategyConfig>>(
+            parent, nextGuess, nextPossibleSolutions, nextUsedCodewords) {}
 
   std::string getName() const override { return "Most Parts"; }
 
@@ -263,21 +276,26 @@ class StrategyMostParts : public StrategySubsettingGPU<p, c, l, StrategyMostPart
 // Note: Metal doesn't support doubles, so there's less precision in the expected size calc and it produces a slightly
 // different result for each run. 4.3951 for 4p6c for instance.
 
-template <uint8_t p, uint8_t c, bool l>
-class StrategyExpectedSize : public StrategySubsettingGPU<p, c, l, StrategyExpectedSize<p, c, l>> {
+template <typename StrategyConfig>
+class StrategyExpectedSize : public StrategySubsettingGPU<StrategyConfig, StrategyExpectedSize<StrategyConfig>> {
  private:
-  constexpr static auto kernelName = "findExpectedSizeGuessKernel";
+  constexpr static auto KERNEL_NAME = "findExpectedSizeGuessKernel";
 
  public:
-  explicit StrategyExpectedSize(Codeword<p, c> initialGuess, GPUMode mode = Both)
-      : StrategySubsettingGPU<p, c, l, StrategyExpectedSize<p, c, l>>{initialGuess, mode} {
-    this->template setupGPUInterface<Algo::ExpectedSize>(kernelName);
+  using CodewordT = typename Strategy<StrategyConfig>::CodewordT;
+
+  explicit StrategyExpectedSize(CodewordT initialGuess, GPUMode mode = Both)
+      : StrategySubsettingGPU<StrategyConfig, StrategyExpectedSize<StrategyConfig>>{initialGuess, mode} {
+    this->template setupGPUInterface<SubsettingStrategyConfig<StrategyConfig::PIN_COUNT, StrategyConfig::COLOR_COUNT,
+                                                              StrategyConfig::LOG, Algo::ExpectedSize, SubsetSize>>(
+        KERNEL_NAME);
   }
 
-  StrategyExpectedSize(StrategySubsettingGPU<p, c, l, StrategyExpectedSize<p, c, l>> &parent, Codeword<p, c> nextGuess,
-                       std::vector<Codeword<p, c>> &nextPossibleSolutions, std::vector<uint32_t> &nextUsedCodewords)
-      : StrategySubsettingGPU<p, c, l, StrategyExpectedSize<p, c, l>>(parent, nextGuess, nextPossibleSolutions,
-                                                                      nextUsedCodewords) {}
+  StrategyExpectedSize(StrategySubsettingGPU<StrategyConfig, StrategyExpectedSize<StrategyConfig>> &parent,
+                       CodewordT nextGuess, std::vector<CodewordT> &nextPossibleSolutions,
+                       std::vector<uint32_t> &nextUsedCodewords)
+      : StrategySubsettingGPU<StrategyConfig, StrategyExpectedSize<StrategyConfig>>(
+            parent, nextGuess, nextPossibleSolutions, nextUsedCodewords) {}
 
   std::string getName() const override { return "Expected Size"; }
 
@@ -301,21 +319,25 @@ class StrategyExpectedSize : public StrategySubsettingGPU<p, c, l, StrategyExpec
 // Note: Metal doesn't support doubles, so there's less precision in the entropy calc and it produces a slightly
 // different result for each run. 4.4151 for 4p6c for instance.
 
-template <uint8_t p, uint8_t c, bool l>
-class StrategyEntropy : public StrategySubsettingGPU<p, c, l, StrategyEntropy<p, c, l>> {
+template <typename StrategyConfig>
+class StrategyEntropy : public StrategySubsettingGPU<StrategyConfig, StrategyEntropy<StrategyConfig>> {
  private:
-  constexpr static auto kernelName = "findEntropyGuessKernel";
+  constexpr static auto KERNEL_NAME = "findEntropyGuessKernel";
 
  public:
-  explicit StrategyEntropy(Codeword<p, c> initialGuess, GPUMode mode = Both)
-      : StrategySubsettingGPU<p, c, l, StrategyEntropy<p, c, l>>{initialGuess, mode} {
-    this->template setupGPUInterface<Algo::Entropy>(kernelName);
+  using CodewordT = typename Strategy<StrategyConfig>::CodewordT;
+
+  explicit StrategyEntropy(CodewordT initialGuess, GPUMode mode = Both)
+      : StrategySubsettingGPU<StrategyConfig, StrategyEntropy<StrategyConfig>>{initialGuess, mode} {
+    this->template setupGPUInterface<SubsettingStrategyConfig<StrategyConfig::PIN_COUNT, StrategyConfig::COLOR_COUNT,
+                                                              StrategyConfig::LOG, Algo::Entropy, SubsetSize>>(
+        KERNEL_NAME);
   }
 
-  StrategyEntropy(StrategySubsettingGPU<p, c, l, StrategyEntropy<p, c, l>> &parent, Codeword<p, c> nextGuess,
-                  std::vector<Codeword<p, c>> &nextPossibleSolutions, std::vector<uint32_t> &nextUsedCodewords)
-      : StrategySubsettingGPU<p, c, l, StrategyEntropy<p, c, l>>(parent, nextGuess, nextPossibleSolutions,
-                                                                 nextUsedCodewords) {}
+  StrategyEntropy(StrategySubsettingGPU<StrategyConfig, StrategyEntropy<StrategyConfig>> &parent, CodewordT nextGuess,
+                  std::vector<CodewordT> &nextPossibleSolutions, std::vector<uint32_t> &nextUsedCodewords)
+      : StrategySubsettingGPU<StrategyConfig, StrategyEntropy<StrategyConfig>>(parent, nextGuess, nextPossibleSolutions,
+                                                                               nextUsedCodewords) {}
 
   std::string getName() const override { return "Entropy"; }
 

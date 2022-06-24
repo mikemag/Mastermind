@@ -92,7 +92,7 @@ def generate_cxx(filename, results):
 
             f.write('    default:\n')
             f.write(
-                '      return (Codeword<p, c>::onePins >> p / 2 * 4) + Codeword<p, c>::onePins;\n'
+                '      return (Codeword<p, c>::ONE_PINS >> p / 2 * 4) + Codeword<p, c>::ONE_PINS;\n'
             )
             f.write('  }\n')
             f.write('}\n')

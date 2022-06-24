@@ -14,10 +14,10 @@ using namespace std;
 
 // The core of the gameplay, this does one level of the search for a secret based on the algorithm implemented in
 // various subclasses. Returns the number of moves needed to find the secret.
-template <uint8_t p, uint8_t c, bool log>
-uint32_t Strategy<p, c, log>::findSecret(Codeword<p, c> secret, int depth) {
+template <typename StrategyConfig>
+uint32_t Strategy<StrategyConfig>::findSecret(CodewordT secret, int depth) {
   if (depth == 0) {
-    if (log) {
+    if (StrategyConfig::LOG) {
       cout << "Starting search for secret " << secret << ", initial guess is " << guess << " with "
            << commaString(savedPossibleSolutions.size()) << " possibilities." << endl;
     }
@@ -27,20 +27,20 @@ uint32_t Strategy<p, c, log>::findSecret(Codeword<p, c> secret, int depth) {
   Score r = secret.score(guess);
   rootData->scoreCounterCPU++;
   depth += 1;
-  if (log) {
+  if (StrategyConfig::LOG) {
     cout << endl << "Tried guess " << guess << " against secret " << secret << " => " << r << endl;
   }
-  if (r == Codeword<p, c>::winningScore) {
-    if (log) {
+  if (r == CodewordT::WINNING_SCORE) {
+    if (StrategyConfig::LOG) {
       cout << "Solution found after " << depth << " moves." << endl;
     }
     return depth;
   }
 
   // Do we already have a move based on the result?
-  shared_ptr<Strategy<p, c, log>> next = nextMoves[r];
+  shared_ptr<Strategy<StrategyConfig>> next = nextMoves[r];
   if (next) {
-    if (log) {
+    if (StrategyConfig::LOG) {
       cout << "Following saved strategy for next move..." << endl;
     }
     return next->findSecret(secret, depth);
@@ -51,21 +51,21 @@ uint32_t Strategy<p, c, log>::findSecret(Codeword<p, c> secret, int depth) {
   removeImpossibleSolutions(r);
 
   // Figure out what our next guess should be
-  Codeword<p, c> nextGuess;
+  CodewordT nextGuess;
   if (possibleSolutions.size() == 1) {
     nextGuess = possibleSolutions.front();
     possibleSolutions.clear();
-    if (log) {
+    if (StrategyConfig::LOG) {
       cout << "Only remaining solution must be correct: " << nextGuess << endl;
     }
-  } else if (enableTwoPSShortcut && possibleSolutions.size() == 2) {
+  } else if (ENABLE_TWO_PS_SHORTCUT && possibleSolutions.size() == 2) {
     nextGuess = possibleSolutions.front();
     possibleSolutions.erase(begin(possibleSolutions));
-    if (log) {
+    if (StrategyConfig::LOG) {
       cout << "Only two solutions remain, selecting the first one blindly: " << nextGuess << endl;
     }
     ++rootData->twoPSShortcuts;
-  } else if (enableSmallPSShortcut && possibleSolutions.size() <= totalScores) {
+  } else if (ENABLE_SMALL_PS_SHORTCUT && possibleSolutions.size() <= StrategyConfig::TOTAL_SCORES) {
     nextGuess = shortcutSmallSets();
   } else {
     nextGuess = selectNextGuess();
@@ -83,14 +83,14 @@ uint32_t Strategy<p, c, log>::findSecret(Codeword<p, c> secret, int depth) {
 // This describes something common to all good solutions: since the scoring function is commutative, and since we know
 // the secret remains in our set of possible solutions, we can quickly eliminate lots and lots of solutions on every
 // iteration.
-template <uint8_t p, uint8_t c, bool log>
-void Strategy<p, c, log>::removeImpossibleSolutions(Score r) {
-  if (log) {
+template <typename StrategyConfig>
+void Strategy<StrategyConfig>::removeImpossibleSolutions(Score r) {
+  if (StrategyConfig::LOG) {
     cout << "Removing inconsistent possibilities... ";
   }
   rootData->scoreCounterCPU += possibleSolutions.size();
   possibleSolutions.erase(remove_if(possibleSolutions.begin(), possibleSolutions.end(),
-                                    [&](Codeword<p, c> codeword) { return codeword.score(guess) != r; }),
+                                    [&](CodewordT CodewordT) { return CodewordT.score(guess) != r; }),
                           possibleSolutions.end());
 
   // This will result in an extra allocation and copy, but it is worth it to keep memory use in check. It actually makes
@@ -98,7 +98,7 @@ void Strategy<p, c, log>::removeImpossibleSolutions(Score r) {
   // 16GB system.
   possibleSolutions.shrink_to_fit();
 
-  if (log) {
+  if (StrategyConfig::LOG) {
     cout << possibleSolutions.size() << " remain." << endl;
   }
   if (possibleSolutions.empty()) {
@@ -131,9 +131,9 @@ void Strategy<p, c, log>::removeImpossibleSolutions(Score r) {
 //
 // All-in-all, this is a very nice shortcut for all of these algorithms.
 
-template <uint8_t p, uint8_t c, bool log>
-Codeword<p, c> Strategy<p, c, log>::shortcutSmallSets() {
-  int subsetSizes[maxScoreSlots];
+template <typename StrategyConfig>
+typename Strategy<StrategyConfig>::CodewordT Strategy<StrategyConfig>::shortcutSmallSets() {
+  int subsetSizes[MAX_SCORE_SLOTS];
   for (const auto &psa : possibleSolutions) {
     fill(begin(subsetSizes), end(subsetSizes), 0);
     for (const auto &psb : possibleSolutions) {
@@ -149,7 +149,7 @@ Codeword<p, c> Strategy<p, c, log>::shortcutSmallSets() {
       }
     }
     if (totalSubsets == possibleSolutions.size()) {
-      if (log) {
+      if (StrategyConfig::LOG) {
         cout << "Selecting fully discriminating guess from PS: " << psa << ", subsets: " << totalSubsets << endl;
       }
       ++rootData->smallPSHighShortcuts;
@@ -162,17 +162,17 @@ Codeword<p, c> Strategy<p, c, log>::shortcutSmallSets() {
   return selectNextGuess();
 }
 
-template <uint8_t p, uint8_t c, bool l>
-void Strategy<p, c, l>::printStats(std::chrono::duration<float, std::milli> elapsedMS) {
+template <typename StrategyConfig>
+void Strategy<StrategyConfig>::printStats(std::chrono::duration<float, std::milli> elapsedMS) {
   cout << "Codeword comparisons: CPU = " << commaString(rootData->scoreCounterCPU)
        << ", GPU = " << commaString(rootData->scoreCounterGPU)
        << ", total = " << commaString(rootData->scoreCounterCPU + rootData->scoreCounterGPU) << endl;
 
-  if (rootData->enableTwoPSMetrics) {
+  if (rootData->ENABLE_TWO_PS_METRICS) {
     cout << rootData->twoPSShortcuts << endl;
   }
 
-  if (rootData->enableSmallPSMetrics) {
+  if (rootData->ENABLE_SMALL_PS_METRICS) {
     cout << rootData->smallPSHighShortcuts << endl;
     cout << rootData->smallPSHighWasted << endl;
     cout << rootData->smallPSHighScores << endl;
@@ -182,16 +182,16 @@ void Strategy<p, c, l>::printStats(std::chrono::duration<float, std::milli> elap
   }
 }
 
-template <uint8_t p, uint8_t c, bool l>
-void Strategy<p, c, l>::recordStats(StatsRecorder &sr, std::chrono::duration<float, std::milli> elapsedMS) {
+template <typename StrategyConfig>
+void Strategy<StrategyConfig>::recordStats(StatsRecorder &sr, std::chrono::duration<float, std::milli> elapsedMS) {
   sr.add("CPU Scores", rootData->scoreCounterCPU);
   sr.add("GPU Scores", rootData->scoreCounterGPU);
 
-  if (rootData->enableTwoPSMetrics) {
+  if (rootData->ENABLE_TWO_PS_METRICS) {
     rootData->twoPSShortcuts.record(sr);
   }
 
-  if (rootData->enableSmallPSMetrics) {
+  if (rootData->ENABLE_SMALL_PS_METRICS) {
     rootData->smallPSHighShortcuts.record(sr);
     rootData->smallPSHighWasted.record(sr);
     rootData->smallPSHighScores.record(sr);
@@ -203,18 +203,20 @@ void Strategy<p, c, l>::recordStats(StatsRecorder &sr, std::chrono::duration<flo
 
 // See header for notes on how to use this output. Parameters for the graph are currently set to convey the point while
 // being reasonably readable in a large JPG.
-template <uint8_t pinCount, uint8_t colorCount, bool l>
-void Strategy<pinCount, colorCount, l>::dump() {
+template <typename StrategyConfig>
+void Strategy<StrategyConfig>::dump() {
   ostringstream fnStream;
   string algName = getName();
   replace(algName.begin(), algName.end(), ' ', '_');
   std::transform(algName.begin(), algName.end(), algName.begin(), ::tolower);
-  fnStream << "mastermind_strategy_" << algName << "_" << (int)pinCount << "p" << (int)colorCount << "c.gv";
+  fnStream << "mastermind_strategy_" << algName << "_" << (int)StrategyConfig::PIN_COUNT << "p"
+           << (int)StrategyConfig::COLOR_COUNT << "c.gv";
   string filename = fnStream.str();
 
   cout << "\nWriting strategy to " << filename << endl;
   ofstream graphStream(filename);
-  graphStream << "digraph Mastermind_Strategy_" << getName() << "_" << (int)pinCount << "p" << (int)colorCount << "c";
+  graphStream << "digraph Mastermind_Strategy_" << getName() << "_" << (int)StrategyConfig::PIN_COUNT << "p"
+              << (int)StrategyConfig::COLOR_COUNT << "c";
   graphStream << " {" << endl;
   graphStream << "size=\"40,40\"" << endl;  // Good size for jpgs
   graphStream << "overlap=true" << endl;    // scale is cool, but the result is unreadable
@@ -226,16 +228,16 @@ void Strategy<pinCount, colorCount, l>::dump() {
   graphStream.close();
 }
 
-template <uint8_t p, uint8_t c, bool l>
-void Strategy<p, c, l>::dumpRoot(ofstream &graphStream) {
+template <typename StrategyConfig>
+void Strategy<StrategyConfig>::dumpRoot(ofstream &graphStream) {
   graphStream << "root=" << (uint64_t)this << endl;
   graphStream << (uint64_t)this << " [label=\"" << guess << " - " << possibleSolutions.size()
               << "\",shape=circle,color=red]" << endl;
   dumpChildren(graphStream);
 }
 
-template <uint8_t p, uint8_t c, bool l>
-void Strategy<p, c, l>::dump(ofstream &graphStream) {
+template <typename StrategyConfig>
+void Strategy<StrategyConfig>::dump(ofstream &graphStream) {
   if (!possibleSolutions.empty()) {
     graphStream << (uint64_t)this << " [label=\"" << guess << " - " << possibleSolutions.size() << "\"]" << endl;
   } else {
@@ -244,8 +246,8 @@ void Strategy<p, c, l>::dump(ofstream &graphStream) {
   dumpChildren(graphStream);
 }
 
-template <uint8_t p, uint8_t c, bool l>
-void Strategy<p, c, l>::dumpChildren(ofstream &graphStream) {
+template <typename StrategyConfig>
+void Strategy<StrategyConfig>::dumpChildren(ofstream &graphStream) {
   for (const auto &m : nextMoves) {
     m.second->dump(graphStream);
     graphStream << (uint64_t)this << " -> " << (uint64_t)(m.second.get()) << " [label=\"" << m.first << "\"]" << endl;
