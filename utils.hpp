@@ -5,11 +5,13 @@
 
 #pragma once
 
+#include <climits>
 #include <iomanip>
 #include <iostream>
 #include <locale>
 #include <map>
 #include <sstream>
+#include <type_traits>
 #include <unordered_map>
 #include <vector>
 
@@ -35,6 +37,13 @@ std::string commaString(float v);
 template <typename T>
 constexpr T constPow(T num, T pow) {
   return pow == 0 ? 1 : num * constPow(num, pow - 1);
+}
+
+// Round up to the next power of two
+template <typename T, typename = typename std::enable_if<std::is_integral<T>::value>::type,
+          typename = typename std::enable_if<std::is_unsigned<T>::value>::type>
+constexpr T nextPowerOfTwo(T value, unsigned maxb = sizeof(T) * CHAR_BIT, unsigned curb = 1) {
+  return maxb <= curb ? value : nextPowerOfTwo(((value - 1) | ((value - 1) >> curb)) + 1, maxb, curb << 1);
 }
 
 // Get basic info about the OS, hardware, machine, etc.

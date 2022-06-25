@@ -8,11 +8,14 @@
 #include <algorithm>
 #include <cub/cub.cuh>
 #include <cuda/std/cstdint>
+#include <limits>
 #include <string>
+#include <type_traits>
 
 #include "codeword.hpp"
 #include "compute_kernel_constants.h"
 #include "cuda_gpu_interface.hpp"
+#include "utils.hpp"
 
 using namespace std;
 
@@ -78,8 +81,9 @@ __device__ void computeSubsetSizes(SubsetSizeT *__restrict__ subsetSizes, const 
 }
 
 // Holds all the constants we need to kick off a CUDA kernel for all the subsetting strategies given a strategy config.
-// Computes how many threads per block, blocks needed, and importantly shared memory size.
-template <typename SubsettingStrategyConfig>
+// Computes how many threads per block, blocks needed, and importantly shared memory size. Can override the subset
+// counter type to be smaller than the one given by the Strategy when we know the max subset size is small enough.
+template <typename SubsettingStrategyConfig, typename SubsetSizeOverrideT = uint32_t>
 struct SubsettingAlgosKernelConfig {
   static constexpr uint8_t PIN_COUNT = SubsettingStrategyConfig::PIN_COUNT;
   static constexpr uint8_t COLOR_COUNT = SubsettingStrategyConfig::COLOR_COUNT;
@@ -90,18 +94,56 @@ struct SubsettingAlgosKernelConfig {
   // Total scores = (PIN_COUNT * (PIN_COUNT + 3)) / 2, but +1 for imperfect packing.
   static constexpr int TOTAL_PACKED_SCORES = ((PIN_COUNT * (PIN_COUNT + 3)) / 2) + 1;
 
-  // TODO: compute max based on shared mem need
-  static constexpr uint32_t MAX_THREADS_PER_BLOCK = 256;
-  static constexpr uint32_t THREADS_PER_BLOCK =
-      std::min(static_cast<uint64_t>(MAX_THREADS_PER_BLOCK), CodewordT::TOTAL_CODEWORDS);
-  static constexpr uint32_t NUM_BLOCKS =
-      (CodewordT::TOTAL_CODEWORDS + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;  // nb: round up!
-  static constexpr uint32_t roundedTotalCodewords = NUM_BLOCKS * THREADS_PER_BLOCK;
+  using SubsetSizeT =
+      typename std::conditional<sizeof(SubsetSizeOverrideT) < sizeof(typename SubsettingStrategyConfig::SubsetSizeT),
+                                SubsetSizeOverrideT, typename SubsettingStrategyConfig::SubsetSizeT>::type;
+
+  // This subset size is good given the PS size, or this is the default type provided by the Strategy.
+  // This is quite coarse: sure, no subset can be larger that PS size, but it's also unlikely that any PS has a single
+  // subset. Provable? If so, with a better bound?
+  static bool shouldUseType(uint32_t possibleSolutionsCount) {
+    return possibleSolutionsCount < numeric_limits<SubsetSizeT>::max() ||
+           sizeof(SubsetSizeOverrideT) == sizeof(typename SubsettingStrategyConfig::SubsetSizeT);
+  }
+
+  // Max threads we could put in a group given how much shared memory space we need for packed subset counters.
+  // This is rounded down to the prior power of two to satisfy the final reduction step.
+  template <typename T>
+  constexpr static uint32_t maxThreadsFromSubsetType() {
+    uint32_t sharedMemSize = 48 * 1024;  // Default on 8.6
+    uint32_t sharedMemPerThread = sizeof(T) * TOTAL_PACKED_SCORES;
+    uint32_t threadsPerBlock = nextPowerOfTwo((sharedMemSize / sharedMemPerThread) / 2);
+    return threadsPerBlock;
+  }
+
+  // How many threads will be put in each block. Always at least one warp, but no more than 512 (which needs to be tuned
+  // more; 512 is picked based on results from 8p5c runs on MostParts and Knuth.)
+  template <typename T>
+  constexpr static uint32_t threadsPerBlock() {
+    return std::clamp(std::min(static_cast<uint64_t>(maxThreadsFromSubsetType<T>()), CodewordT::TOTAL_CODEWORDS), 32ul,
+                      512ul);
+  }
+  static constexpr uint32_t THREADS_PER_BLOCK = threadsPerBlock<SubsetSizeT>();
+
+  // How many blocks we'll launch. This is rounded up to ensure we capture the last partial block. All kernels are
+  // written to tolerate an incomplete final block.
+  constexpr static uint32_t numBlocks(const uint32_t threadsPerBlock) {
+    return (CodewordT::TOTAL_CODEWORDS + threadsPerBlock - 1) / threadsPerBlock;
+  }
+  static constexpr uint32_t NUM_BLOCKS = numBlocks(THREADS_PER_BLOCK);
+  static constexpr uint32_t ROUNDED_TOTAL_CODEWORDS = NUM_BLOCKS * THREADS_PER_BLOCK;
+
+  // These are the worst-case values over all types this config will be specialized with. Currently, those are 1, 2, and
+  // 4 byte types. We use the most blocks with the largest type, but we need the most space for codewords with the
+  // smallest type since the block size is larger, and we round up a full block.
+  static constexpr uint32_t LARGEST_NUM_BLOCKS = numBlocks(threadsPerBlock<uint32_t>());
+  static constexpr uint32_t LARGEST_ROUNDED_TOTAL_CODEWORDS =
+      numBlocks(threadsPerBlock<uint8_t>()) * threadsPerBlock<uint8_t>();
 
   using BlockReduce = cub::BlockReduce<GPUInterface::IndexAndScore, THREADS_PER_BLOCK>;
 
   union SharedMemLayout {
-    typename SubsettingStrategyConfig::SubsetSizeT subsetSizes[TOTAL_PACKED_SCORES * THREADS_PER_BLOCK];
+    SubsetSizeT subsetSizes[TOTAL_PACKED_SCORES * THREADS_PER_BLOCK];
     typename BlockReduce::TempStorage reducerTmpStorage;
     GPUInterface::IndexAndScore aggregate;  // Ensure alignment for these
   };
@@ -111,8 +153,14 @@ struct SubsettingAlgosKernelConfig {
       sizeof(SharedMemLayout) ==
       std::max(std::max(1 * sizeof(GPUInterface::IndexAndScore),
                         sizeof(typename cub::BlockReduce<GPUInterface::IndexAndScore, THREADS_PER_BLOCK>::TempStorage)),
-               sizeof(typename SubsettingStrategyConfig::SubsetSizeT) * TOTAL_PACKED_SCORES * THREADS_PER_BLOCK));
+               sizeof(SubsetSizeT) * TOTAL_PACKED_SCORES * THREADS_PER_BLOCK));
 };
+
+// Little tests
+using testConfig = SubsettingAlgosKernelConfig<SubsettingStrategyConfig<8, 5, false, Algo::Knuth, uint32_t>>;
+static_assert(nextPowerOfTwo(uint32_t(136)) == 256);
+static_assert(testConfig::maxThreadsFromSubsetType<uint32_t>() == 256);
+static_assert(testConfig::numBlocks(testConfig::threadsPerBlock<uint32_t>()) == 1526);
 
 // Reducer for per-thread scores, used for CUB per-block and device reductions.
 struct IndexAndScoreReducer {
@@ -265,8 +313,10 @@ CUDAGPUInterface<SubsettingStrategyConfig>::CUDAGPUInterface() {
 
   printf("Using GPU: %s\n\n", gpuInfo["GPU Name"].c_str());
 
-  auto roundedTotalCodewords = SubsettingAlgosKernelConfig<SubsettingStrategyConfig>::roundedTotalCodewords;
-  auto numBlocks = SubsettingAlgosKernelConfig<SubsettingStrategyConfig>::NUM_BLOCKS;
+  // nb: the subset size type doesn't matter for this config since we only use the largest values and nothing else.
+  using config = SubsettingAlgosKernelConfig<SubsettingStrategyConfig>;
+  auto roundedTotalCodewords = config::LARGEST_ROUNDED_TOTAL_CODEWORDS;
+  auto numBlocks = config::LARGEST_NUM_BLOCKS;
 
   CubDebugExit(cudaMallocManaged((void **)&dAllCodewords, sizeof(*dAllCodewords) * roundedTotalCodewords));
   CubDebugExit(cudaMallocManaged((void **)&dAllCodewordsColors, sizeof(*dAllCodewordsColors) * roundedTotalCodewords));
@@ -285,6 +335,21 @@ CUDAGPUInterface<SubsettingStrategyConfig>::CUDAGPUInterface() {
 }
 
 template <typename SubsettingStrategyConfig>
+template <typename SubsettingAlgosKernelConfig>
+void CUDAGPUInterface<SubsettingStrategyConfig>::launchSubsettingKernel() {
+  subsettingAlgosKernel<SubsettingAlgosKernelConfig>
+      <<<SubsettingAlgosKernelConfig::NUM_BLOCKS, SubsettingAlgosKernelConfig::THREADS_PER_BLOCK>>>(
+          dAllCodewords, reinterpret_cast<const uint4 *>(dAllCodewordsColors), possibleSolutionsCount,
+          dPossibleSolutions, reinterpret_cast<uint4 *>(dPossibleSolutionsColors), usedCodewordsCount, dUsedCodewords,
+          dFdGuess, dPerBlockSolutions);
+  CubDebugExit(cudaGetLastError());
+
+  // nb: block size on this one must be a power of 2
+  reduceMaxScore<128><<<1, 128>>>(dPerBlockSolutions, SubsettingAlgosKernelConfig::NUM_BLOCKS);
+  CubDebugExit(cudaGetLastError());
+}
+
+template <typename SubsettingStrategyConfig>
 void CUDAGPUInterface<SubsettingStrategyConfig>::sendComputeCommand() {
   *dFdGuess = Codeword<SubsettingStrategyConfig::PIN_COUNT, SubsettingStrategyConfig::COLOR_COUNT>::TOTAL_CODEWORDS;
 
@@ -293,18 +358,21 @@ void CUDAGPUInterface<SubsettingStrategyConfig>::sendComputeCommand() {
   CubDebugExit(cudaMemcpyAsync(dPossibleSolutionsColors, dPossibleSolutionsColorsHost,
                                sizeof(*dPossibleSolutionsColors) * possibleSolutionsCount, cudaMemcpyHostToDevice));
 
-  subsettingAlgosKernel<SubsettingAlgosKernelConfig<SubsettingStrategyConfig>>
-      <<<SubsettingAlgosKernelConfig<SubsettingStrategyConfig>::NUM_BLOCKS,
-         SubsettingAlgosKernelConfig<SubsettingStrategyConfig>::THREADS_PER_BLOCK>>>(
-          dAllCodewords, reinterpret_cast<const uint4 *>(dAllCodewordsColors), possibleSolutionsCount,
-          dPossibleSolutions, reinterpret_cast<uint4 *>(dPossibleSolutionsColors), usedCodewordsCount, dUsedCodewords,
-          dFdGuess, dPerBlockSolutions);
-  CubDebugExit(cudaGetLastError());
+  using config8 = SubsettingAlgosKernelConfig<SubsettingStrategyConfig, uint8_t>;
+  using config16 = SubsettingAlgosKernelConfig<SubsettingStrategyConfig, uint16_t>;
+  using config32 = SubsettingAlgosKernelConfig<SubsettingStrategyConfig, uint32_t>;
 
-  // nb: block size on this one must be a power of 2
-  reduceMaxScore<128>
-      <<<1, 128>>>(dPerBlockSolutions, SubsettingAlgosKernelConfig<SubsettingStrategyConfig>::NUM_BLOCKS);
-  CubDebugExit(cudaGetLastError());
+  totalSubsettingKernels++;
+  if (config8::shouldUseType(possibleSolutionsCount)) {
+    psSizesIn8Bits++;
+    launchSubsettingKernel<config8>();
+  } else if (config16::shouldUseType(possibleSolutionsCount)) {
+    psSizesIn16Bits++;
+    launchSubsettingKernel<config16>();
+  } else {
+    psSizesIn32Bits++;
+    launchSubsettingKernel<config32>();
+  }
 
   CubDebugExit(cudaDeviceSynchronize());
 }
@@ -539,74 +607,16 @@ void CUDAGPUInterface<SubsettingStrategyConfig>::dumpDeviceInfo() {
 // INST_L(true)
 // INST_L(false)
 
-//INST_PCL(4, 6, true)
-//INST_PCL(4, 6, false)
-// INST_PCL(8, 5, false)
+// INST_PCL(4, 6, true)
+// INST_PCL(4, 6, false)
+//INST_PCL(8, 5, false)
+//INST_PCL(8, 6, false)
 
 // The unit test needs this one all the time
- template class CUDAGPUInterface<SubsettingStrategyConfig<4, 6, true, Algo::Knuth, uint32_t>>;
+template class CUDAGPUInterface<SubsettingStrategyConfig<4, 6, true, Algo::Knuth, uint32_t>>;
 
 // Specializations for whatever experiments you want to run. Keep this list fairly small to keep compilation speeds
 // reasonable. Use the macros above to enable lots of things at once, but with long comp times.
 template class CUDAGPUInterface<SubsettingStrategyConfig<4, 6, false, Algo::Knuth, uint32_t>>;
-template class CUDAGPUInterface<SubsettingStrategyConfig<8, 5, false, Algo::Knuth, uint32_t>>;
-template class CUDAGPUInterface<SubsettingStrategyConfig<8, 5, false, Algo::MostParts, uint8_t>>;
-
-// Device 0: "NVIDIA GeForce RTX 3070"
-//  CUDA Driver Version / Runtime Version          11.7 / 11.7
-//  CUDA Capability Major/Minor version number:    8.6
-//  Total amount of global memory:                 7949 MBytes (8334737408 bytes)
-//  (046) Multiprocessors, (128) CUDA Cores/MP:    5888 CUDA Cores
-//  GPU Max Clock rate:                            1755 MHz (1.75 GHz)
-//  Memory Clock rate:                             7001 Mhz
-//  Memory Bus Width:                              256-bit
-//  L2 Cache Size:                                 4194304 bytes
-//  Maximum Texture Dimension Size (x,y,z)         1D=(131072), 2D=(131072, 65536), 3D=(16384, 16384, 16384)
-//  Maximum Layered 1D Texture Size, (num) layers  1D=(32768), 2048 layers
-//  Maximum Layered 2D Texture Size, (num) layers  2D=(32768, 32768), 2048 layers
-//  Total amount of constant memory:               65536 bytes
-//  Total amount of shared memory per block:       49152 bytes
-//  Total shared memory per multiprocessor:        102400 bytes
-//  Total number of registers available per block: 65536
-//  Warp size:                                     32
-//  Maximum number of threads per multiprocessor:  1536
-//  Maximum number of threads per block:           1024
-//  Max dimension size of a thread block (x,y,z): (1024, 1024, 64)
-//  Max dimension size of a grid size    (x,y,z): (2147483647, 65535, 65535)
-//  Maximum memory pitch:                          2147483647 bytes
-//  Texture alignment:                             512 bytes
-//  Concurrent copy and kernel execution:          Yes with 2 copy engine(s)
-//  Run time limit on kernels:                     Yes
-//  Integrated GPU sharing Host Memory:            No
-//  Support host page-locked memory mapping:       Yes
-//  Alignment requirement for Surfaces:            Yes
-//  Device has ECC support:                        Disabled
-//  Device supports Unified Addressing (UVA):      Yes
-//  Device supports Managed Memory:                Yes
-//  Device supports Direct Mgd Access From Host:   No
-//  Device supports Compute Preemption:            Yes
-//  Supports Cooperative Kernel Launch:            Yes
-//  Supports MultiDevice Co-op Kernel Launch:      Yes
-//  Device PCI Domain ID / Bus ID / location ID:   0 / 1 / 0
-//  Compute Mode:
-//     < Default (multiple host threads can use ::cudaSetDevice() with device simultaneously) >
-// Playing all 8 pin 7 color games using algorithm 'Most Parts' for every possible secret...
-// Total codewords: 5,764,801
-// Initial guess: 11112222
-// Completed 11113736, 4.0246s per 1000, 0.02%, ETA 23197.00s
-// Completed 11116665, 0.4654s per 1000, 0.03%, ETA 2681.77s
-// Completed 11122624, 6.4588s per 1000, 0.05%, ETA 37214.42s
-// ...
-// Completed 77766666, 0.0017s per 1000, 99.95%, ETA 0.00s
-// Completed 77772625, 0.0065s per 1000, 99.97%, ETA 0.01s
-// Completed 77775554, 0.0042s per 1000, 99.99%, ETA 0.00s
-// Average number of turns was 6.8241
-//     Maximum number of turns over all possible secrets was 12 with secret 31624257
-//     Elapsed time 1,319.6678s, average search 0.2289ms
-//                Codeword comparisons: CPU = 1,174,260,095, GPU = 150,214,203,669,936, total = 150,215,377,930,031
-//     GPU kernels executed: 519,935  FPS: 393.99
-//
-//     1: 1  2: 21  3: 506  4: 11,838  5: 261,471  6: 1,825,202  7: 2,446,268  8: 1,072,842  9: 141,380 10: 5,192 11: 79
-//     12: 1
-// Done
-// Writing all game stats to mastermind_run_stats_20220618_230115_3350c87.csv
+ template class CUDAGPUInterface<SubsettingStrategyConfig<8, 5, false, Algo::Knuth, uint32_t>>;
+ template class CUDAGPUInterface<SubsettingStrategyConfig<8, 5, false, Algo::MostParts, uint8_t>>;

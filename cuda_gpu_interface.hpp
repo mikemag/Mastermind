@@ -52,10 +52,19 @@ class CUDAGPUInterface : public GPUInterface {
     return dPerBlockSolutions[0];
   }
 
-  std::unordered_map<std::string, std::string>& getGPUInfo() override { return gpuInfo; }
+  std::unordered_map<std::string, std::string>& getGPUInfo() override {
+    gpuInfo["GPU Subsetting Kernels Executed"] = to_string(totalSubsettingKernels);
+    gpuInfo["GPU PS Size in 32bits"] = to_string(psSizesIn32Bits);
+    gpuInfo["GPU PS Size in 16bits"] = to_string(psSizesIn16Bits);
+    gpuInfo["GPU PS Size in 8bits"] = to_string(psSizesIn8Bits);
+    return gpuInfo;
+  }
 
  private:
   void dumpDeviceInfo();
+
+  template <typename SubsettingAlgosKernelConfig>
+  void launchSubsettingKernel();
 
   uint32_t* dAllCodewords;
   unsigned __int128* dAllCodewordsColors;
@@ -72,4 +81,9 @@ class CUDAGPUInterface : public GPUInterface {
   IndexAndScore* dPerBlockSolutions;
 
   unordered_map<string, string> gpuInfo;
+
+  uint64_t totalSubsettingKernels = 0;
+  uint64_t psSizesIn32Bits = 0;
+  uint64_t psSizesIn16Bits = 0;
+  uint64_t psSizesIn8Bits = 0;
 };

@@ -189,7 +189,7 @@ void StrategySubsettingGPU<StrategyConfig, Derived>::recordStats(StatsRecorder &
   sr.add("GPU FPS", (float)gpuRootData->kernelsExecuted / (elapsedMS.count() / 1000.0));
   if (gpuRootData->gpuInterface && gpuRootData->gpuInterface->gpuAvailable()) {
     for (const auto &a : gpuRootData->gpuInterface->getGPUInfo()) {
-      sr.addAll(a.first, a.second);
+      sr.add(a.first, a.second);
     }
   }
 }
