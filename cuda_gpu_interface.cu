@@ -149,11 +149,12 @@ struct SubsettingAlgosKernelConfig {
   };
 
   // Confirm the shared mem size is as expected
-  static_assert(
-      sizeof(SharedMemLayout) ==
-      std::max(std::max(1 * sizeof(GPUInterface::IndexAndScore),
-                        sizeof(typename cub::BlockReduce<GPUInterface::IndexAndScore, THREADS_PER_BLOCK>::TempStorage)),
-               sizeof(SubsetSizeT) * TOTAL_PACKED_SCORES * THREADS_PER_BLOCK));
+  static_assert(sizeof(SharedMemLayout) ==
+                std::max({
+                    sizeof(SubsetSizeT) * TOTAL_PACKED_SCORES * THREADS_PER_BLOCK,
+                    sizeof(typename cub::BlockReduce<GPUInterface::IndexAndScore, THREADS_PER_BLOCK>::TempStorage),
+                    1 * sizeof(GPUInterface::IndexAndScore),
+                }));
 };
 
 // Little tests
@@ -277,33 +278,37 @@ __global__ void subsettingAlgosKernel(const uint32_t *__restrict__ allCodewords,
   // the same as the ordinal for each member of allCodewords, so we can simply take the min tidGrid.
   if (possibleSolutionsCount <= SubsettingAlgosKernelConfig::TOTAL_PACKED_SCORES) {
     if (totalUsedSubsets == possibleSolutionsCount) {
+      // I don't really like this, but it's tested out faster than doing a per-block reduction and a subsequent
+      // device-wide reduction, like for the index and score above.
       atomicMin(fdGuess, tidGrid);
     }
   }
 }
 
-// @TODO: try cub::DeviceReduce::Reduce instead.
+// cub::DeviceReduce::Reduce is a slight loss to this, not sure why, so keeping the custom kernel for now.
 template <uint32_t blockSize>
 __global__ void reduceMaxScore(GPUInterface::IndexAndScore *__restrict__ perBlockSolutions,
                                const uint32_t solutionsCount) {
   uint32_t idx = threadIdx.x;
   IndexAndScoreReducer reduce;
   GPUInterface::IndexAndScore bestScore{0, 0, false};
-  for (uint32_t i = idx; i < solutionsCount; i += blockDim.x) {
+  for (uint32_t i = idx; i < solutionsCount; i += blockSize) {
     bestScore = reduce(bestScore, perBlockSolutions[i]);
   }
 
-  __shared__ GPUInterface::IndexAndScore r[blockSize];
-  r[idx] = bestScore;
+  __shared__ GPUInterface::IndexAndScore shared[blockSize];
+  shared[idx] = bestScore;
   __syncthreads();
 
-  for (uint32_t size = blockDim.x / 2; size > 0; size /= 2) {
-    if (idx < size) r[idx] = reduce(r[idx], r[idx + size]);
+  for (uint32_t size = blockSize / 2; size > 0; size /= 2) {
+    if (idx < size) {
+      shared[idx] = reduce(shared[idx], shared[idx + size]);
+    }
     __syncthreads();
   }
 
   if (idx == 0) {
-    perBlockSolutions[0] = r[0];
+    perBlockSolutions[0] = shared[0];
   }
 }
 
@@ -347,6 +352,8 @@ void CUDAGPUInterface<SubsettingStrategyConfig>::launchSubsettingKernel() {
   // nb: block size on this one must be a power of 2
   reduceMaxScore<128><<<1, 128>>>(dPerBlockSolutions, SubsettingAlgosKernelConfig::NUM_BLOCKS);
   CubDebugExit(cudaGetLastError());
+
+  CubDebugExit(cudaDeviceSynchronize());
 }
 
 template <typename SubsettingStrategyConfig>
@@ -373,8 +380,6 @@ void CUDAGPUInterface<SubsettingStrategyConfig>::sendComputeCommand() {
     psSizesIn32Bits++;
     launchSubsettingKernel<config32>();
   }
-
-  CubDebugExit(cudaDeviceSynchronize());
 }
 
 template <typename SubsettingStrategyConfig>
@@ -609,8 +614,8 @@ void CUDAGPUInterface<SubsettingStrategyConfig>::dumpDeviceInfo() {
 
 // INST_PCL(4, 6, true)
 // INST_PCL(4, 6, false)
-//INST_PCL(8, 5, false)
-//INST_PCL(8, 6, false)
+// INST_PCL(8, 5, false)
+// INST_PCL(8, 6, false)
 
 // The unit test needs this one all the time
 template class CUDAGPUInterface<SubsettingStrategyConfig<4, 6, true, Algo::Knuth, uint32_t>>;
@@ -618,5 +623,5 @@ template class CUDAGPUInterface<SubsettingStrategyConfig<4, 6, true, Algo::Knuth
 // Specializations for whatever experiments you want to run. Keep this list fairly small to keep compilation speeds
 // reasonable. Use the macros above to enable lots of things at once, but with long comp times.
 template class CUDAGPUInterface<SubsettingStrategyConfig<4, 6, false, Algo::Knuth, uint32_t>>;
- template class CUDAGPUInterface<SubsettingStrategyConfig<8, 5, false, Algo::Knuth, uint32_t>>;
- template class CUDAGPUInterface<SubsettingStrategyConfig<8, 5, false, Algo::MostParts, uint8_t>>;
+template class CUDAGPUInterface<SubsettingStrategyConfig<8, 5, false, Algo::Knuth, uint32_t>>;
+template class CUDAGPUInterface<SubsettingStrategyConfig<8, 5, false, Algo::MostParts, uint8_t>>;

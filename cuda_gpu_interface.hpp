@@ -66,19 +66,19 @@ class CUDAGPUInterface : public GPUInterface {
   template <typename SubsettingAlgosKernelConfig>
   void launchSubsettingKernel();
 
-  uint32_t* dAllCodewords;
-  unsigned __int128* dAllCodewordsColors;
-  uint32_t* dPossibleSolutions;
-  unsigned __int128* dPossibleSolutionsColors;
-  uint32_t possibleSolutionsCount;
-  uint32_t* dPossibleSolutionsHost;
-  unsigned __int128* dPossibleSolutionsColorsHost;
+  uint32_t* dAllCodewords{};
+  unsigned __int128* dAllCodewordsColors{};
+  uint32_t* dPossibleSolutions{};
+  unsigned __int128* dPossibleSolutionsColors{};
+  uint32_t possibleSolutionsCount{};
+  uint32_t* dPossibleSolutionsHost{};
+  unsigned __int128* dPossibleSolutionsColorsHost{};
 
-  uint32_t* dUsedCodewords;
-  uint32_t usedCodewordsCount;
+  uint32_t* dUsedCodewords{};
+  uint32_t usedCodewordsCount{};
 
-  uint32_t* dFdGuess;
-  IndexAndScore* dPerBlockSolutions;
+  uint32_t* dFdGuess{};
+  IndexAndScore* dPerBlockSolutions{};
 
   unordered_map<string, string> gpuInfo;
 
