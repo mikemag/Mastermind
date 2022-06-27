@@ -38,7 +38,10 @@ set_target_properties(mastermind-cpu PROPERTIES
         CXX_STANDARD 20
         CXX_STANDARD_REQUIRED ON
         )
-target_compile_options(mastermind-cpu PRIVATE -march=native)
+target_compile_options(mastermind-cpu PRIVATE
+        -march=native
+        -fno-omit-frame-pointer
+        )
 
 # https://github.com/anrieff/libcpuid to get CPU info like number of processors, L1 cache size, etc.
 # On Ubuntu: sudo apt install cpuidtool libcpuid15 libcpuid-dev
@@ -77,11 +80,16 @@ if (CMAKE_CUDA_COMPILER)
             CUDA_STANDARD_REQUIRED ON
             CUDA_SEPARABLE_COMPILATION ON
             CUDA_ARCHITECTURES "86")
-    target_compile_options(mastermind-cuda PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-march=native>)
+    target_compile_options(mastermind-cuda PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
+            -march=native
+            -fno-omit-frame-pointer
+            >)
     target_compile_options(mastermind-cuda PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:
             --generate-line-info
             --use_fast_math
             --relocatable-device-code=true
+            --default-stream per-thread
+            -fno-omit-frame-pointer
             --std=c++17
             --forward-unknown-to-host-compiler -march=native
             >)

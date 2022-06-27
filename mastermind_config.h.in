@@ -6,3 +6,5 @@
 #define MASTERMIND_GIT_BRANCH "@GIT_BRANCH@"
 #define MASTERMIND_GIT_COMMIT_HASH "@GIT_COMMIT_HASH@"
 #define MASTERMIND_GIT_COMMIT_DATE "@GIT_COMMIT_DATE@"
+
+// TODO: capture compiler version info. gcc, llvm, xcode, nvcc, libc, glibc,

@@ -15,7 +15,7 @@ using namespace std;
 // The core of the gameplay, this does one level of the search for a secret based on the algorithm implemented in
 // various subclasses. Returns the number of moves needed to find the secret.
 template <typename StrategyConfig>
-uint32_t Strategy<StrategyConfig>::findSecret(CodewordT secret, int depth) {
+uint32_t Strategy<StrategyConfig>::findSecret(const CodewordT &secret, int depth) {
   if (depth == 0) {
     if (StrategyConfig::LOG) {
       cout << "Starting search for secret " << secret << ", initial guess is " << guess << " with "
@@ -90,7 +90,7 @@ void Strategy<StrategyConfig>::removeImpossibleSolutions(Score r) {
   }
   rootData->scoreCounterCPU += possibleSolutions.size();
   possibleSolutions.erase(remove_if(possibleSolutions.begin(), possibleSolutions.end(),
-                                    [&](CodewordT CodewordT) { return CodewordT.score(guess) != r; }),
+                                    [&](const CodewordT &CodewordT) { return CodewordT.score(guess) != r; }),
                           possibleSolutions.end());
 
   // This will result in an extra allocation and copy, but it is worth it to keep memory use in check. It actually makes

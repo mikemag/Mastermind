@@ -40,7 +40,7 @@ class Strategy {
   virtual std::string getName() const = 0;
   CodewordT currentGuess() const { return guess; }
 
-  uint32_t findSecret(CodewordT secret, int depth = 0);
+  uint32_t findSecret(const CodewordT &secret, int depth = 0);
 
   virtual void printStats(std::chrono::duration<float, std::milli> elapsedMS);
   virtual void recordStats(StatsRecorder &sr, std::chrono::duration<float, std::milli> elapsedMS);

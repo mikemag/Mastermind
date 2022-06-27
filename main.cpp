@@ -70,7 +70,8 @@ void runUnitTests() {
 void runKnuthTest() {
   printf("\nRun the example from Knuth's paper to compare with his results.\n");
   StrategyKnuth<StrategyConfig<4, 6, true>> s(Codeword<4, 6>(0x1122));
-  s.findSecret(Codeword<4, 6>(0x3632));
+  Codeword<4, 6> secret(0x3632);
+  s.findSecret(secret);
   printf("\n");
 }
 
