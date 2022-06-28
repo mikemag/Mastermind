@@ -9,7 +9,9 @@
 
 #include "cuda_gpu_interface.hpp"
 #include "gpu_interface.hpp"
+#ifdef __MM_GPU_METAL__
 #include "metal_gpu_interface_wrapper.hpp"
+#endif
 #include "no_gpu_interface.hpp"
 #include "strategy.hpp"
 
@@ -109,8 +111,9 @@ class StrategySubsetting : public Strategy<StrategyConfig> {
 enum GPUMode { Both, GPU, CPU };
 const char *GPUModeNames[] = {"Both", "GPU", "CPU"};
 
+template <typename CodewordT>
 struct StrategySubsettingGPURootData {
-  GPUInterface *gpuInterface = nullptr;
+  GPUInterface<CodewordT> *gpuInterface = nullptr;
   uint64_t kernelsExecuted = 0;
 
   ~StrategySubsettingGPURootData();
@@ -123,7 +126,7 @@ class StrategySubsettingGPU : public StrategySubsetting<StrategyConfig, Derived>
 
   StrategySubsettingGPU(CodewordT initialGuess, GPUMode mode)
       : StrategySubsetting<StrategyConfig, Derived>{initialGuess}, mode(mode) {
-    gpuRootData = make_shared<StrategySubsettingGPURootData>();
+    gpuRootData = make_shared<StrategySubsettingGPURootData<CodewordT>>();
   }
 
   StrategySubsettingGPU(StrategySubsettingGPU &parent, CodewordT nextGuess,
@@ -145,7 +148,7 @@ class StrategySubsettingGPU : public StrategySubsetting<StrategyConfig, Derived>
 
  protected:
   GPUMode mode = Both;
-  shared_ptr<StrategySubsettingGPURootData> gpuRootData = nullptr;
+  shared_ptr<StrategySubsettingGPURootData<CodewordT>> gpuRootData = nullptr;
 
   template <typename SubsettingStrategyConfig>
   void setupGPUInterface(const char *kernelName) {
@@ -156,7 +159,7 @@ class StrategySubsettingGPU : public StrategySubsetting<StrategyConfig, Derived>
 #elif MASTERMIND_CUDA
       gpuRootData->gpuInterface = new CUDAGPUInterface<SubsettingStrategyConfig>();
 #else
-      gpuRootData->gpuInterface = new NoGPUInterface();
+      gpuRootData->gpuInterface = new NoGPUInterface<CodewordT>();
 #endif
 
       if (gpuRootData->gpuInterface->gpuAvailable()) {

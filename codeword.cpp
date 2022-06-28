@@ -71,6 +71,7 @@ Score Codeword<PIN_COUNT, COLOR_COUNT>::scoreSimpleLoops(const Codeword &guess) 
 // big improvement for larger games and surprisingly efficient overall.
 //
 // Elapsed time 3.1218s, average search 2.4088ms
+#if 0
 template <uint8_t PIN_COUNT, uint8_t COLOR_COUNT>
 Score Codeword<PIN_COUNT, COLOR_COUNT>::scoreCountingScalar(const Codeword &guess) const {
   constexpr static uint32_t unusedPinsMask = (uint32_t)(0xFFFFFFFFlu << (PIN_COUNT * 4u));
@@ -90,6 +91,7 @@ Score Codeword<PIN_COUNT, COLOR_COUNT>::scoreCountingScalar(const Codeword &gues
 
   return Score(b, allHits - b);
 }
+#endif
 
 // This uses the full counting method from Knuth, but is organized to allow auto-vectorization of the second part.
 // When properly vectorized by the compiler, this method is O(1) time and space.

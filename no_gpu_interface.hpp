@@ -10,7 +10,8 @@
 
 #include "gpu_interface.hpp"
 
-class NoGPUInterface : public GPUInterface {
+template <typename CodewordT>
+class NoGPUInterface : public GPUInterface<CodewordT> {
   unordered_map<string, string> gpuInfo;
 
  public:
@@ -23,24 +24,11 @@ class NoGPUInterface : public GPUInterface {
   void setAllCodewordsCount(uint32_t count) override {}
   void syncAllCodewords(uint32_t count) override {}
 
-  uint32_t* getPossibleSolutionsBuffer() override { return nullptr; }
-  unsigned __int128* getPossibleSolutionsColorsBuffer() override { return nullptr; }
-  void setPossibleSolutionsCount(uint32_t count) override {}
+  void sendComputeCommand(const std::vector<CodewordT>& possibleSolutions,
+                          const std::vector<uint32_t>& usedCodewords) override {}
 
-  uint32_t* getUsedCodewordsBuffer() override { return nullptr; }
-  void setUsedCodewordsCount(uint32_t count) override {}
+  uint32_t getFullyDiscriminatingGuess() override { return UINT32_MAX; }
+  IndexAndScore getBestGuess() override { return {UINT32_MAX, 0, false}; }
 
-  void sendComputeCommand() override {}
-
-  uint32_t* getScores() override { return nullptr; }
-  bool* getRemainingIsPossibleSolution() override { return nullptr; }
-
-  uint32_t* getFullyDiscriminatingCodewords(uint32_t& count) override { return nullptr; }
-  uint32_t getFDGuess() override { return UINT32_MAX; }
-  IndexAndScore getBestGuess(uint32_t allCodewordsCount, std::vector<uint32_t>& usedCodewords,
-                             uint32_t (*codewordGetter)(uint32_t)) override {
-    return {UINT32_MAX, 0, false};
-  }
-
-  std::unordered_map<std::string, std::string> &getGPUInfo() override { return gpuInfo; }
+  std::unordered_map<std::string, std::string>& getGPUInfo() override { return gpuInfo; }
 };

@@ -11,6 +11,12 @@
 #include "score.hpp"
 #include "utils.hpp"
 
+#if defined(__CUDA_ARCH__)
+#define DEVICE_ANNOTATION __device__ __host__
+#else
+#define DEVICE_ANNOTATION
+#endif
+
 // Class to hold a codeword for the Mastermind game.
 //
 // This is represented as a packed group of 4-bit digits, up to 8 digits. Colors are pre-computed and packed into 64 or
@@ -18,17 +24,16 @@
 template <uint8_t PIN_COUNT, uint8_t COLOR_COUNT>
 class Codeword {
  public:
-  constexpr Codeword() noexcept : codeword(0xFFFFFFFF), colorCounts4(0), colorCounts8(0) {}
+  constexpr Codeword() noexcept : codeword(0xFFFFFFFF), colorCounts8(0) {}
 
-  constexpr Codeword(uint32_t codeword) noexcept
-      : codeword(codeword), colorCounts4(computeColorCounts4(codeword)), colorCounts8(computeColorCounts8(codeword)) {}
+  constexpr Codeword(uint32_t codeword) noexcept : codeword(codeword), colorCounts8(computeColorCounts8(codeword)) {}
 
   bool isInvalid() const { return codeword == -0xFFFFFFFF; }
 
   bool operator==(const Codeword other) const { return codeword == other.codeword; }
 
-  uint32_t packedCodeword() const { return codeword; }
-  unsigned __int128 packedColors8() const { return colorCounts8; }
+  DEVICE_ANNOTATION uint32_t packedCodeword() const { return codeword; }
+  DEVICE_ANNOTATION unsigned __int128 packedColors8() const { return colorCounts8; }
 
   constexpr static uint64_t TOTAL_CODEWORDS = constPow<uint64_t>(COLOR_COUNT, PIN_COUNT);
   constexpr static Score WINNING_SCORE = Score(PIN_COUNT, 0);  // "0x40" for a 4-pin game.
@@ -41,9 +46,8 @@ class Codeword {
   std::ostream &dump(std::ostream &stream) const;
 
  private:
-  uint32_t codeword;
-  uint64_t colorCounts4;           // Room for 16 4-bit counters
   unsigned __int128 colorCounts8;  // Room for 16 8-bit counters
+  uint32_t codeword;
 
   // All codewords for the given pin and color counts.
   static inline std::vector<Codeword> allCodewords;

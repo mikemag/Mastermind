@@ -10,6 +10,10 @@
 
 #import "metal_gpu_interface.h"
 
+// TODO: the Metal impl is completely broken now. I didn't want to keep hacking up the current work advancing w/ CUDA
+// just to keep this working. I need to get back to this at some point and fix it all up, implement the new things in
+// the Metal kernels, etc.
+
 MetalGPUInterfaceWrapper::MetalGPUInterfaceWrapper(unsigned int pinCount, unsigned int totalCodewords, const char *kernelName) {
   NSString *nsKernelName = [[NSString alloc] initWithUTF8String:kernelName];
   wrapped = [[MetalGPUInterface alloc] initWithPinCount:pinCount totalCodewords:totalCodewords kernelName:nsKernelName];

@@ -6,6 +6,10 @@
 #import <Foundation/Foundation.h>
 #import <Metal/Metal.h>
 
+// TODO: the Metal impl is completely broken now. I didn't want to keep hacking up the current work advancing w/ CUDA
+// just to keep this working. I need to get back to this at some point and fix it all up, implement the new things in
+// the Metal kernels, etc.
+
 NS_ASSUME_NONNULL_BEGIN
 
 @interface MetalGPUInterface : NSObject

@@ -66,13 +66,13 @@ __device__ uint scoreCodewords(const uint32_t secret, const uint4 secretColors, 
 
 // The common portion of the kernels which scores all possible solutions against a given secret and computes subset
 // sizes, i.e., for each score the number of codewords with that score.
-template <uint32_t PIN_COUNT, Algo ALGO, typename SubsetSizeT>
+template <uint32_t PIN_COUNT, Algo ALGO, typename SubsetSizeT, typename CodewordT>
 __device__ void computeSubsetSizes(SubsetSizeT *__restrict__ subsetSizes, const uint32_t secret,
                                    const uint4 secretColors, const uint32_t possibleSolutionsCount,
-                                   const uint32_t *__restrict__ possibleSolutions,
-                                   const uint4 *__restrict__ possibleSolutionsColors) {
+                                   const CodewordT *__restrict__ possibleSolutions) {
   for (uint32_t i = 0; i < possibleSolutionsCount; i++) {
-    uint score = scoreCodewords<PIN_COUNT>(secret, secretColors, possibleSolutions[i], possibleSolutionsColors[i]);
+    unsigned __int128 pc8 = possibleSolutions[i].packedColors8();  // Annoying...
+    uint score = scoreCodewords<PIN_COUNT>(secret, secretColors, possibleSolutions[i].packedCodeword(), *(uint4 *)&pc8);
     if (ALGO == Algo::MostParts) {
       subsetSizes[score] = 1;
     } else {
@@ -141,20 +141,20 @@ struct SubsettingAlgosKernelConfig {
   static constexpr uint32_t LARGEST_ROUNDED_TOTAL_CODEWORDS =
       numBlocks(threadsPerBlock<uint8_t>()) * threadsPerBlock<uint8_t>();
 
-  using BlockReduce = cub::BlockReduce<GPUInterface::IndexAndScore, THREADS_PER_BLOCK>;
+  using BlockReduce = cub::BlockReduce<IndexAndScore, THREADS_PER_BLOCK>;
 
   union SharedMemLayout {
     SubsetSizeT subsetSizes[TOTAL_PACKED_SCORES * THREADS_PER_BLOCK];
     typename BlockReduce::TempStorage reducerTmpStorage;
-    GPUInterface::IndexAndScore aggregate;  // Ensure alignment for these
+    IndexAndScore aggregate;  // Ensure alignment for these
   };
 
   // Confirm the shared mem size is as expected
   static_assert(sizeof(SharedMemLayout) ==
                 std::max({
                     sizeof(SubsetSizeT) * TOTAL_PACKED_SCORES * THREADS_PER_BLOCK,
-                    sizeof(typename cub::BlockReduce<GPUInterface::IndexAndScore, THREADS_PER_BLOCK>::TempStorage),
-                    1 * sizeof(GPUInterface::IndexAndScore),
+                    sizeof(typename cub::BlockReduce<IndexAndScore, THREADS_PER_BLOCK>::TempStorage),
+                    1 * sizeof(IndexAndScore),
                 }));
 };
 
@@ -166,8 +166,7 @@ static_assert(testConfig::numBlocks(testConfig::threadsPerBlock<uint32_t>()) == 
 
 // Reducer for per-thread scores, used for CUB per-block and device reductions.
 struct IndexAndScoreReducer {
-  __device__ __forceinline__ GPUInterface::IndexAndScore operator()(const GPUInterface::IndexAndScore &a,
-                                                                    const GPUInterface::IndexAndScore &b) const {
+  __device__ __forceinline__ IndexAndScore operator()(const IndexAndScore &a, const IndexAndScore &b) const {
     // Always take the best score. If it's a tie, take the one that could be a solution. If that's a tie, take lexically
     // first.
     if (b.score > a.score) return b;
@@ -195,12 +194,11 @@ struct IndexAndScoreReducer {
 // Finally, there's shared block memory for each thread with enough room for all the intermediate subset sizes,
 // reduction space, etc.
 template <typename SubsettingAlgosKernelConfig, typename LittleStuffT>
-__global__ void subsettingAlgosKernel(const uint32_t *__restrict__ allCodewords,
-                                      const uint4 *__restrict__ allCodewordsColors, uint32_t possibleSolutionsCount,
-                                      const uint32_t *__restrict__ possibleSolutions,
-                                      const uint4 *__restrict__ possibleSolutionsColors,
-                                      LittleStuffT *__restrict__ littleStuff,
-                                      GPUInterface::IndexAndScore *__restrict__ perBlockSolutions) {
+__global__ void subsettingAlgosKernel(
+    const uint32_t *__restrict__ allCodewords, const uint4 *__restrict__ allCodewordsColors,
+    uint32_t possibleSolutionsCount,
+    const typename SubsettingAlgosKernelConfig::CodewordT *__restrict__ possibleSolutions,
+    LittleStuffT *__restrict__ littleStuff, IndexAndScore *__restrict__ perBlockSolutions) {
   __shared__ typename SubsettingAlgosKernelConfig::SharedMemLayout sharedMem;
 
   uint tidGrid = blockDim.x * blockIdx.x + threadIdx.x;
@@ -208,8 +206,7 @@ __global__ void subsettingAlgosKernel(const uint32_t *__restrict__ allCodewords,
   for (int i = 0; i < SubsettingAlgosKernelConfig::TOTAL_PACKED_SCORES; i++) subsetSizes[i] = 0;
 
   computeSubsetSizes<SubsettingAlgosKernelConfig::PIN_COUNT, SubsettingAlgosKernelConfig::ALGO>(
-      subsetSizes, allCodewords[tidGrid], allCodewordsColors[tidGrid], possibleSolutionsCount, possibleSolutions,
-      possibleSolutionsColors);
+      subsetSizes, allCodewords[tidGrid], allCodewordsColors[tidGrid], possibleSolutionsCount, possibleSolutions);
 
   bool isPossibleSolution = subsetSizes[SubsettingAlgosKernelConfig::TOTAL_PACKED_SCORES - 1] > 0;
 
@@ -266,10 +263,9 @@ __global__ void subsettingAlgosKernel(const uint32_t *__restrict__ allCodewords,
   // Reduce to find the best solution we have in this block. This keeps the codeword index, score, and possible solution
   // indicator together.
   __syncthreads();
-  GPUInterface::IndexAndScore ias{tidGrid, score, isPossibleSolution};
-  GPUInterface::IndexAndScore bestSolution =
-      typename SubsettingAlgosKernelConfig::BlockReduce(sharedMem.reducerTmpStorage)
-          .Reduce(ias, IndexAndScoreReducer());
+  IndexAndScore ias{tidGrid, score, isPossibleSolution};
+  IndexAndScore bestSolution = typename SubsettingAlgosKernelConfig::BlockReduce(sharedMem.reducerTmpStorage)
+                                   .Reduce(ias, IndexAndScoreReducer());
 
   if (threadIdx.x == 0) {
     perBlockSolutions[blockIdx.x] = bestSolution;
@@ -289,16 +285,16 @@ __global__ void subsettingAlgosKernel(const uint32_t *__restrict__ allCodewords,
 
 // cub::DeviceReduce::Reduce is a slight loss to this, not sure why, so keeping the custom kernel for now.
 template <uint32_t blockSize, typename LittleStuffT>
-__global__ void reduceMaxScore(GPUInterface::IndexAndScore *__restrict__ perBlockSolutions,
-                               const uint32_t solutionsCount, LittleStuffT *__restrict__ littleStuff) {
+__global__ void reduceMaxScore(IndexAndScore *__restrict__ perBlockSolutions, const uint32_t solutionsCount,
+                               LittleStuffT *__restrict__ littleStuff) {
   uint32_t idx = threadIdx.x;
   IndexAndScoreReducer reduce;
-  GPUInterface::IndexAndScore bestScore{0, 0, false};
+  IndexAndScore bestScore{0, 0, false};
   for (uint32_t i = idx; i < solutionsCount; i += blockSize) {
     bestScore = reduce(bestScore, perBlockSolutions[i]);
   }
 
-  __shared__ GPUInterface::IndexAndScore shared[blockSize];
+  __shared__ IndexAndScore shared[blockSize];
   shared[idx] = bestScore;
   __syncthreads();
 
@@ -328,22 +324,17 @@ CUDAGPUInterface<SubsettingStrategyConfig>::CUDAGPUInterface() {
   CubDebugExit(cudaMallocManaged((void **)&dAllCodewords, sizeof(*dAllCodewords) * roundedTotalCodewords));
   CubDebugExit(cudaMallocManaged((void **)&dAllCodewordsColors, sizeof(*dAllCodewordsColors) * roundedTotalCodewords));
   CubDebugExit(cudaMalloc((void **)&dPossibleSolutions, sizeof(*dPossibleSolutions) * roundedTotalCodewords));
-  CubDebugExit(
-      cudaMalloc((void **)&dPossibleSolutionsColors, sizeof(*dPossibleSolutionsColors) * roundedTotalCodewords));
-  possibleSolutionsHost = (uint32_t *)malloc(sizeof(*possibleSolutionsHost) * roundedTotalCodewords);
-  possibleSolutionsColorsHost =
-      (unsigned __int128 *)malloc(sizeof(*possibleSolutionsColorsHost) * roundedTotalCodewords);
   CubDebugExit(cudaMalloc((void **)&dLittleStuff, sizeof(*dLittleStuff)));
   CubDebugExit(cudaMalloc((void **)&dPerBlockSolutions, sizeof(*dPerBlockSolutions) * numBlocks));
 }
 
 template <typename SubsettingStrategyConfig>
 template <typename SubsettingAlgosKernelConfig>
-void CUDAGPUInterface<SubsettingStrategyConfig>::launchSubsettingKernel() {
+void CUDAGPUInterface<SubsettingStrategyConfig>::launchSubsettingKernel(uint32_t possibleSolutionsCount) {
   subsettingAlgosKernel<SubsettingAlgosKernelConfig>
       <<<SubsettingAlgosKernelConfig::NUM_BLOCKS, SubsettingAlgosKernelConfig::THREADS_PER_BLOCK>>>(
           dAllCodewords, reinterpret_cast<const uint4 *>(dAllCodewordsColors), possibleSolutionsCount,
-          dPossibleSolutions, reinterpret_cast<uint4 *>(dPossibleSolutionsColors), dLittleStuff, dPerBlockSolutions);
+          dPossibleSolutions, dLittleStuff, dPerBlockSolutions);
   CubDebugExit(cudaGetLastError());
 
   // nb: block size on this one must be a power of 2
@@ -357,14 +348,17 @@ void CUDAGPUInterface<SubsettingStrategyConfig>::launchSubsettingKernel() {
 }
 
 template <typename SubsettingStrategyConfig>
-void CUDAGPUInterface<SubsettingStrategyConfig>::sendComputeCommand() {
+void CUDAGPUInterface<SubsettingStrategyConfig>::sendComputeCommand(
+    const std::vector<typename SubsettingStrategyConfig::CodewordT> &possibleSolutions,
+    const std::vector<uint32_t> &usedCodewords) {
+  auto psSize = possibleSolutions.size();
+  CubDebugExit(cudaMemcpyAsync(dPossibleSolutions, possibleSolutions.data(), sizeof(*dPossibleSolutions) * psSize,
+                               cudaMemcpyHostToDevice));
+
   littleStuff.fdGuess =
       Codeword<SubsettingStrategyConfig::PIN_COUNT, SubsettingStrategyConfig::COLOR_COUNT>::TOTAL_CODEWORDS;
-
-  CubDebugExit(cudaMemcpyAsync(dPossibleSolutions, possibleSolutionsHost,
-                               sizeof(*dPossibleSolutions) * possibleSolutionsCount, cudaMemcpyHostToDevice));
-  CubDebugExit(cudaMemcpyAsync(dPossibleSolutionsColors, possibleSolutionsColorsHost,
-                               sizeof(*dPossibleSolutionsColors) * possibleSolutionsCount, cudaMemcpyHostToDevice));
+  memcpy(littleStuff.usedCodewords, usedCodewords.data(), usedCodewords.size() * sizeof(*littleStuff.usedCodewords));
+  littleStuff.usedCodewordsCount = usedCodewords.size();
   CubDebugExit(cudaMemcpyAsync(dLittleStuff, &littleStuff, sizeof(littleStuff), cudaMemcpyHostToDevice));
 
   using config8 = SubsettingAlgosKernelConfig<SubsettingStrategyConfig, uint8_t>;
@@ -372,15 +366,15 @@ void CUDAGPUInterface<SubsettingStrategyConfig>::sendComputeCommand() {
   using config32 = SubsettingAlgosKernelConfig<SubsettingStrategyConfig, uint32_t>;
 
   totalSubsettingKernels++;
-  if (config8::shouldUseType(possibleSolutionsCount)) {
+  if (config8::shouldUseType(psSize)) {
     psSizesIn8Bits++;
-    launchSubsettingKernel<config8>();
-  } else if (config16::shouldUseType(possibleSolutionsCount)) {
+    launchSubsettingKernel<config8>(psSize);
+  } else if (config16::shouldUseType(psSize)) {
     psSizesIn16Bits++;
-    launchSubsettingKernel<config16>();
+    launchSubsettingKernel<config16>(psSize);
   } else {
     psSizesIn32Bits++;
-    launchSubsettingKernel<config32>();
+    launchSubsettingKernel<config32>(psSize);
   }
 }
 
@@ -389,9 +383,6 @@ CUDAGPUInterface<SubsettingStrategyConfig>::~CUDAGPUInterface() {
   CubDebugExit(cudaFree(dAllCodewords));
   CubDebugExit(cudaFree(dAllCodewordsColors));
   CubDebugExit(cudaFree(dPossibleSolutions));
-  CubDebugExit(cudaFree(dPossibleSolutionsColors));
-  free(possibleSolutionsHost);
-  free(possibleSolutionsColorsHost);
   CubDebugExit(cudaFree(dLittleStuff));
   CubDebugExit(cudaFree(dPerBlockSolutions));
 }
@@ -613,13 +604,13 @@ void CUDAGPUInterface<SubsettingStrategyConfig>::dumpDeviceInfo() {
 // INST_L(true)
 // INST_L(false)
 
-// INST_PCL(4, 6, true)
+INST_PCL(4, 6, true)
 // INST_PCL(4, 6, false)
 INST_PCL(8, 5, false)
 // INST_PCL(8, 6, false)
 
 // The unit test needs this one all the time
-template class CUDAGPUInterface<SubsettingStrategyConfig<4, 6, true, Algo::Knuth, uint32_t>>;
+// template class CUDAGPUInterface<SubsettingStrategyConfig<4, 6, true, Algo::Knuth, uint32_t>>;
 
 // Specializations for whatever experiments you want to run. Keep this list fairly small to keep compilation speeds
 // reasonable. Use the macros above to enable lots of things at once, but with long comp times.

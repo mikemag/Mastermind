@@ -84,9 +84,10 @@ int StrategySubsetting<StrategyConfig, Derived>::computeTotalSubsets() {
 
 template <typename StrategyConfig, class Derived>
 typename Strategy<StrategyConfig>::CodewordT StrategySubsettingGPU<StrategyConfig, Derived>::selectNextGuess() {
+  auto &allCodewords = CodewordT::getAllCodewords();
+
   // Cut off "small" work and just do it on the CPU.
-  if (mode == CPU ||
-      (mode == Both && CodewordT::getAllCodewords().size() * this->possibleSolutions.size() < 4 * 1024)) {
+  if (mode == CPU || (mode == Both && allCodewords.size() * this->possibleSolutions.size() < 4 * 1024)) {
     return StrategySubsetting<StrategyConfig, Derived>::selectNextGuess();
   }
 
@@ -94,37 +95,17 @@ typename Strategy<StrategyConfig>::CodewordT StrategySubsettingGPU<StrategyConfi
   this->usedCodewords = this->savedUsedCodewords;
   this->usedCodewords.emplace_back(this->guess.packedCodeword());
 
-  // Pull out the codewords and colors into individual arrays
-  // TODO: if this were separated into these two arrays throughout the Strategy then we could use a target-optimized
-  //  memcpy to blit them into the buffers, which would be much faster.
-  uint32_t *psw = gpuRootData->gpuInterface->getPossibleSolutionsBuffer();
-  unsigned __int128 *psc = gpuRootData->gpuInterface->getPossibleSolutionsColorsBuffer();
-  for (int i = 0; i < this->possibleSolutions.size(); i++) {
-    psw[i] = this->possibleSolutions[i].packedCodeword();
-    psc[i] = this->possibleSolutions[i].packedColors8();
-  }
-  gpuRootData->gpuInterface->setPossibleSolutionsCount((uint32_t)this->possibleSolutions.size());
-
-  uint32_t *uw = gpuRootData->gpuInterface->getUsedCodewordsBuffer();
-  if (uw) {
-    for (int i = 0; i < this->usedCodewords.size(); i++) {
-      uw[i] = this->usedCodewords[i];
-    }
-    gpuRootData->gpuInterface->setUsedCodewordsCount((uint32_t)this->usedCodewords.size());
-  }
-
-  gpuRootData->gpuInterface->sendComputeCommand();
+  gpuRootData->gpuInterface->sendComputeCommand(this->possibleSolutions, this->usedCodewords);
   gpuRootData->kernelsExecuted++;
-  this->rootData->scoreCounterGPU += CodewordT::getAllCodewords().size() * this->possibleSolutions.size();
+  this->rootData->scoreCounterGPU += allCodewords.size() * this->possibleSolutions.size();
 
   if (Strategy<StrategyConfig>::ENABLE_SMALL_PS_SHORTCUT_GPU &&
       this->possibleSolutions.size() <= StrategyConfig::TOTAL_SCORES) {
     // Shortcut small sets with fully discriminating codewords. Certain versions of the GPU kernels look for these and
-    // pass them back in a list of useful codewords per SIMD group. Running through the list in-order and taking the
-    // first one gives the first lexically ordered option.
-    uint32_t fd = gpuRootData->gpuInterface->getFDGuess();
+    // pass a fully descriminating guess back.
+    uint32_t fd = gpuRootData->gpuInterface->getFullyDiscriminatingGuess();
     if (fd < CodewordT::TOTAL_CODEWORDS) {
-      CodewordT g = CodewordT::getAllCodewords()[fd];
+      CodewordT g = allCodewords[fd];
       if (StrategyConfig::LOG) {
         cout << "Selecting fully discriminating guess from GPU: " << g << ", subsets: "
              << this->possibleSolutions.size()
@@ -135,13 +116,8 @@ typename Strategy<StrategyConfig>::CodewordT StrategySubsettingGPU<StrategyConfi
     }
   }
 
-  // TODO: this is a massive hack to keep the Metal version working for now. I pushed the CPU-side work down into its
-  // impl of getBestGuess and it's messy.
-  auto codewordGetter = [](uint32_t index) -> uint32_t { return CodewordT::getAllCodewords()[index].packedCodeword(); };
-
-  GPUInterface::IndexAndScore bestGPUGuess = gpuRootData->gpuInterface->getBestGuess(
-      (uint32_t)CodewordT::getAllCodewords().size(), this->usedCodewords, codewordGetter);
-  CodewordT bestGuess = CodewordT::getAllCodewords()[bestGPUGuess.index];
+  IndexAndScore bestGPUGuess = gpuRootData->gpuInterface->getBestGuess();
+  CodewordT bestGuess = allCodewords[bestGPUGuess.index];
   if (StrategyConfig::LOG) {
     cout << "Selecting best guess: " << bestGuess << "\tscore: " << bestGPUGuess.score << " (GPU)" << endl;
   }
@@ -182,7 +158,7 @@ void StrategySubsettingGPU<StrategyConfig, Derived>::printStats(chrono::duration
 
 template <typename StrategyConfig, class Derived>
 void StrategySubsettingGPU<StrategyConfig, Derived>::recordStats(StatsRecorder &sr,
-                                                                  std::chrono::duration<float, std::milli> elapsedMS) {
+                                                                 std::chrono::duration<float, std::milli> elapsedMS) {
   StrategySubsetting<StrategyConfig, Derived>::recordStats(sr, elapsedMS);
   sr.add("GPU Mode", GPUModeNames[mode]);
   sr.add("GPU Kernels", gpuRootData->kernelsExecuted);
@@ -194,7 +170,8 @@ void StrategySubsettingGPU<StrategyConfig, Derived>::recordStats(StatsRecorder &
   }
 }
 
-StrategySubsettingGPURootData::~StrategySubsettingGPURootData() {
+template <typename CodewordT>
+StrategySubsettingGPURootData<CodewordT>::~StrategySubsettingGPURootData() {
   delete gpuInterface;
   gpuInterface = nullptr;
 }

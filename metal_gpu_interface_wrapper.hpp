@@ -20,6 +20,10 @@
 
 OBJC_CLASS(MetalGPUInterface);
 
+// TODO: the Metal impl is completely broken now. I didn't want to keep hacking up the current work advancing w/ CUDA
+// just to keep this working. I need to get back to this at some point and fix it all up, implement the new things in
+// the Metal kernels, etc.
+
 class MetalGPUInterfaceWrapper : public GPUInterface {
   MetalGPUInterface* wrapped;
   std::unordered_map<std::string, std::string> gpuInfo;
@@ -49,7 +53,7 @@ class MetalGPUInterfaceWrapper : public GPUInterface {
 
   uint32_t* getFullyDiscriminatingCodewords(uint32_t& count) override;
 
-  uint32_t getFDGuess() override {
+  uint32_t GetFullyDiscriminatingGuess() override {
     // TODO: impl for Metal
     uint32_t discriminatingCount = 0;
     uint32_t* smallOptsOut = getFullyDiscriminatingCodewords(discriminatingCount);

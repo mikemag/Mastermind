@@ -13,7 +13,8 @@
 #include "strategy_config.hpp"
 
 template <typename SubsettingStrategyConfig>
-class CUDAGPUInterface : public GPUInterface {
+class CUDAGPUInterface : public GPUInterface<typename SubsettingStrategyConfig::CodewordT> {
+
  public:
   CUDAGPUInterface();
   ~CUDAGPUInterface() override;
@@ -30,25 +31,11 @@ class CUDAGPUInterface : public GPUInterface {
     // TODO: let it page fault for now, come back and add movement hints if necessary.
   }
 
-  uint32_t* getPossibleSolutionsBuffer() override { return possibleSolutionsHost; }
-  unsigned __int128* getPossibleSolutionsColorsBuffer() override { return possibleSolutionsColorsHost; }
-  void setPossibleSolutionsCount(uint32_t count) override { possibleSolutionsCount = count; }
+  void sendComputeCommand(const std::vector<typename SubsettingStrategyConfig::CodewordT>& possibleSolutions,
+                          const std::vector<uint32_t>& usedCodewords) override;
 
-  uint32_t* getUsedCodewordsBuffer() override { return littleStuff.usedCodewords; }
-  void setUsedCodewordsCount(uint32_t count) override { littleStuff.usedCodewordsCount = count; }
-
-  void sendComputeCommand() override;
-
-  uint32_t* getScores() override { return nullptr; }
-  bool* getRemainingIsPossibleSolution() override { return nullptr; }
-
-  uint32_t* getFullyDiscriminatingCodewords(uint32_t& count) override {
-    count = 0;
-    return nullptr;
-  }
-  uint32_t getFDGuess() override { return littleStuff.fdGuess; }
-  IndexAndScore getBestGuess(uint32_t allCodewordsCount, std::vector<uint32_t>& usedCodewords,
-                             uint32_t (*codewordGetter)(uint32_t)) override {
+  uint32_t getFullyDiscriminatingGuess() override { return littleStuff.fdGuess; }
+  IndexAndScore getBestGuess() override {
     return littleStuff.bestGuess;
   }
 
@@ -62,7 +49,7 @@ class CUDAGPUInterface : public GPUInterface {
 
   // A grab bag of small things we need to send back and forth to our kernels.
   struct LittleStuff {
-    GPUInterface::IndexAndScore bestGuess;
+    IndexAndScore bestGuess;
     uint32_t fdGuess;
     uint32_t usedCodewordsCount;
     uint32_t usedCodewords[100];
@@ -72,19 +59,14 @@ class CUDAGPUInterface : public GPUInterface {
   void dumpDeviceInfo();
 
   template <typename SubsettingAlgosKernelConfig>
-  void launchSubsettingKernel();
+  void launchSubsettingKernel(uint32_t possibleSolutionsCount);
 
   uint32_t* dAllCodewords{};
   unsigned __int128* dAllCodewordsColors{};
-  uint32_t* dPossibleSolutions{};
-  unsigned __int128* dPossibleSolutionsColors{};
-  uint32_t possibleSolutionsCount{};
-  uint32_t* possibleSolutionsHost{};
-  unsigned __int128* possibleSolutionsColorsHost{};
-
+  Codeword<SubsettingStrategyConfig::PIN_COUNT, SubsettingStrategyConfig::COLOR_COUNT>* dPossibleSolutions{};
   IndexAndScore* dPerBlockSolutions{};
-
   LittleStuff* dLittleStuff{};
+
   LittleStuff littleStuff;
 
   unordered_map<string, string> gpuInfo;

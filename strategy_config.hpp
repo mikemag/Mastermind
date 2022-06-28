@@ -7,6 +7,8 @@
 
 #include <cstdint>
 
+#include "codeword.hpp"
+
 // Holds all the constants we need to use any of our gameplay strategies.
 template <uint8_t PIN_COUNT_, uint8_t COLOR_COUNT_, bool LOG_>
 struct StrategyConfig {
@@ -22,4 +24,5 @@ template <uint8_t PIN_COUNT_, uint8_t COLOR_COUNT_, bool LOG_, Algo ALGO_, typen
 struct SubsettingStrategyConfig : StrategyConfig<PIN_COUNT_, COLOR_COUNT_, LOG_> {
   static constexpr Algo ALGO = ALGO_;
   using SubsetSizeT = SubsetSizeT_;
+  using CodewordT = Codeword<PIN_COUNT_, COLOR_COUNT_>;
 };
