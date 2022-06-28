@@ -157,21 +157,16 @@ class StrategySubsettingGPU : public StrategySubsetting<StrategyConfig, Derived>
       gpuRootData->gpuInterface = new MetalGPUInterfaceWrapper(SubsettingStrategyConfig::PIN_COUNT,
                                                                (uint)CodewordT::TOTAL_CODEWORDS, kernelName);
 #elif MASTERMIND_CUDA
-      gpuRootData->gpuInterface = new CUDAGPUInterface<SubsettingStrategyConfig>();
+      gpuRootData->gpuInterface = new CUDAGPUInterface<SubsettingStrategyConfig>(CodewordT::getAllCodewords());
 #else
       gpuRootData->gpuInterface = new NoGPUInterface<CodewordT>();
 #endif
 
-      if (gpuRootData->gpuInterface->gpuAvailable()) {
-        copyAllCodewordsToGPU();
-      } else {
+      if (!gpuRootData->gpuInterface->gpuAvailable()) {
         mode = CPU;
       }
     }
   }
-
- private:
-  void copyAllCodewordsToGPU();
 };
 
 // --------------------------------------------------------------------------------------------------------------------

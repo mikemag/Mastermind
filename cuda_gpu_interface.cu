@@ -311,7 +311,8 @@ __global__ void reduceMaxScore(IndexAndScore *__restrict__ perBlockSolutions, co
 }
 
 template <typename SubsettingStrategyConfig>
-CUDAGPUInterface<SubsettingStrategyConfig>::CUDAGPUInterface() {
+CUDAGPUInterface<SubsettingStrategyConfig>::CUDAGPUInterface(
+    const std::vector<typename SubsettingStrategyConfig::CodewordT> &allCodewords) {
   dumpDeviceInfo();
 
   printf("Using GPU: %s\n\n", gpuInfo["GPU Name"].c_str());
@@ -326,6 +327,19 @@ CUDAGPUInterface<SubsettingStrategyConfig>::CUDAGPUInterface() {
   CubDebugExit(cudaMalloc((void **)&dPossibleSolutions, sizeof(*dPossibleSolutions) * roundedTotalCodewords));
   CubDebugExit(cudaMalloc((void **)&dLittleStuff, sizeof(*dLittleStuff)));
   CubDebugExit(cudaMalloc((void **)&dPerBlockSolutions, sizeof(*dPerBlockSolutions) * numBlocks));
+
+  // Setup AC set once
+  uint32_t *acw = dAllCodewords;
+  unsigned __int128 *acc = dAllCodewordsColors;
+  for (int i = 0; i < allCodewords.size(); i++) {
+    acw[i] = allCodewords[i].packedCodeword();
+    acc[i] = allCodewords[i].packedColors8();
+  }
+
+  CubDebugExit(
+      cudaMemAdvise(dAllCodewords, sizeof(*dAllCodewords) * roundedTotalCodewords, cudaMemAdviseSetReadMostly, 0));
+  CubDebugExit(cudaMemAdvise(dAllCodewordsColors, sizeof(*dAllCodewordsColors) * roundedTotalCodewords,
+                             cudaMemAdviseSetReadMostly, 0));
 }
 
 template <typename SubsettingStrategyConfig>

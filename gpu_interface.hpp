@@ -29,11 +29,6 @@ class GPUInterface {
 
   virtual bool gpuAvailable() const = 0;
 
-  virtual uint32_t* getAllCodewordsBuffer() = 0;
-  virtual unsigned __int128* getAllCodewordsColorsBuffer() = 0;
-  virtual void setAllCodewordsCount(uint32_t count) = 0;
-  virtual void syncAllCodewords(uint32_t count) = 0;
-
   virtual void sendComputeCommand(const std::vector<CodewordT>& possibleSolutions,
                                   const std::vector<uint32_t>& usedCodewords) = 0;
 

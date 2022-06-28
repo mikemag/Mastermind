@@ -125,28 +125,6 @@ typename Strategy<StrategyConfig>::CodewordT StrategySubsettingGPU<StrategyConfi
   return bestGuess;
 }
 
-// This moves all the codewords into the correct device-private buffers just once, since it's a) read only and b)
-// quite large.
-template <typename StrategyConfig, class Derived>
-void StrategySubsettingGPU<StrategyConfig, Derived>::copyAllCodewordsToGPU() {
-  if (!gpuRootData->gpuInterface->gpuAvailable()) {
-    return;
-  }
-
-  // Pull out the codewords and colors into individual arrays
-  uint32_t *acw = gpuRootData->gpuInterface->getAllCodewordsBuffer();
-  unsigned __int128 *acc = gpuRootData->gpuInterface->getAllCodewordsColorsBuffer();
-  for (int i = 0; i < CodewordT::getAllCodewords().size(); i++) {
-    acw[i] = CodewordT::getAllCodewords()[i].packedCodeword();
-    acc[i] = CodewordT::getAllCodewords()[i].packedColors8();
-  }
-  gpuRootData->gpuInterface->setAllCodewordsCount((uint32_t)CodewordT::getAllCodewords().size());
-
-  // This shoves both buffers over into GPU memory just once, where they remain constant after that. No need to touch
-  // them again.
-  gpuRootData->gpuInterface->syncAllCodewords((uint32_t)CodewordT::getAllCodewords().size());
-}
-
 template <typename StrategyConfig, class Derived>
 void StrategySubsettingGPU<StrategyConfig, Derived>::printStats(chrono::duration<float, milli> elapsedMS) {
   StrategySubsetting<StrategyConfig, Derived>::printStats(elapsedMS);

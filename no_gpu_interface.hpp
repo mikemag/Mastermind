@@ -19,11 +19,6 @@ class NoGPUInterface : public GPUInterface<CodewordT> {
 
   bool gpuAvailable() const override { return false; }
 
-  uint32_t* getAllCodewordsBuffer() override { return nullptr; }
-  unsigned __int128* getAllCodewordsColorsBuffer() override { return nullptr; }
-  void setAllCodewordsCount(uint32_t count) override {}
-  void syncAllCodewords(uint32_t count) override {}
-
   void sendComputeCommand(const std::vector<CodewordT>& possibleSolutions,
                           const std::vector<uint32_t>& usedCodewords) override {}
 

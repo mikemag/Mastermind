@@ -16,20 +16,10 @@ template <typename SubsettingStrategyConfig>
 class CUDAGPUInterface : public GPUInterface<typename SubsettingStrategyConfig::CodewordT> {
 
  public:
-  CUDAGPUInterface();
+  CUDAGPUInterface(const std::vector<typename SubsettingStrategyConfig::CodewordT>& allCodewords);
   ~CUDAGPUInterface() override;
 
   bool gpuAvailable() const override { return true; }
-
-  uint32_t* getAllCodewordsBuffer() override { return dAllCodewords; }
-  unsigned __int128* getAllCodewordsColorsBuffer() override { return dAllCodewordsColors; }
-
-  void setAllCodewordsCount(uint32_t count) override {
-    // TODO: this is redundant for this impl, and likely for the Metal impl too. Need to fix this up.
-  }
-  void syncAllCodewords(uint32_t count) override {
-    // TODO: let it page fault for now, come back and add movement hints if necessary.
-  }
 
   void sendComputeCommand(const std::vector<typename SubsettingStrategyConfig::CodewordT>& possibleSolutions,
                           const std::vector<uint32_t>& usedCodewords) override;
