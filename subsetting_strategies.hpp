@@ -7,11 +7,15 @@
 
 #include <unordered_map>
 
-#include "cuda_gpu_interface.hpp"
-#include "gpu_interface.hpp"
+#ifdef __CUDACC__
+#include "cuda_gpu_interface.cuh"
+#endif
+
 #ifdef __MM_GPU_METAL__
 #include "metal_gpu_interface_wrapper.hpp"
 #endif
+
+#include "gpu_interface.hpp"
 #include "no_gpu_interface.hpp"
 #include "strategy.hpp"
 
@@ -156,7 +160,7 @@ class StrategySubsettingGPU : public StrategySubsetting<StrategyConfig, Derived>
 #ifdef __MM_GPU_METAL__
       gpuRootData->gpuInterface = new MetalGPUInterfaceWrapper(SubsettingStrategyConfig::PIN_COUNT,
                                                                (uint)CodewordT::TOTAL_CODEWORDS, kernelName);
-#elif MASTERMIND_CUDA
+#elif __CUDACC__
       gpuRootData->gpuInterface = new CUDAGPUInterface<SubsettingStrategyConfig>(CodewordT::getAllCodewords());
 #else
       gpuRootData->gpuInterface = new NoGPUInterface<CodewordT>();
@@ -344,4 +348,4 @@ class StrategyEntropy : public StrategySubsettingGPU<StrategyConfig, StrategyEnt
   typedef uint32_t SubsetSize;
 };
 
-#include "subsetting_strategies.cpp"
+#include "subsetting_strategies.inl"

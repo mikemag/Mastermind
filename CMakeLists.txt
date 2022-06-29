@@ -27,18 +27,19 @@ configure_file(
         "${PROJECT_SOURCE_DIR}/mastermind_config.h"
 )
 
-add_executable(mastermind-cpu
-        main.cpp
-        score.cpp
-        utils.hpp
-        utils.cpp
+set(MASTERMIND_SOURCES_LIST
+        ${PROJECT_SOURCE_DIR}/main.cpp
+        ${PROJECT_SOURCE_DIR}/score.cpp
+        ${PROJECT_SOURCE_DIR}/utils.cpp
         )
-target_include_directories(mastermind-cpu PUBLIC .)
-set_target_properties(mastermind-cpu PROPERTIES
-        CXX_STANDARD 20
+
+add_executable(mastermind ${MASTERMIND_SOURCES_LIST})
+target_include_directories(mastermind PUBLIC SYSTEM .)
+set_target_properties(mastermind PROPERTIES
+        CXX_STANDARD 17
         CXX_STANDARD_REQUIRED ON
         )
-target_compile_options(mastermind-cpu PRIVATE
+target_compile_options(mastermind PRIVATE
         -march=native
         -fno-omit-frame-pointer
         )
@@ -58,7 +59,7 @@ if (LIBCPUID_FOUND AND NOT TARGET LIBCPUID)
             IMPORTED_LOCATION "${LIBCPUID_LIBRARY}"
             INTERFACE_INCLUDE_DIRECTORIES "${LIBCPUID_INCLUDE_DIR}/libcpuid"
             )
-    target_link_libraries(mastermind-cpu PUBLIC LIBCPUID)
+    target_link_libraries(mastermind PUBLIC LIBCPUID)
 endif ()
 
 include(CheckLanguage)
@@ -66,25 +67,14 @@ check_language(CUDA)
 
 if (CMAKE_CUDA_COMPILER)
     enable_language(CUDA)
-    add_executable(mastermind-cuda
-            main.cpp
-            score.cpp
-            utils.cpp
-            cuda_gpu_interface.cu
-            )
-    target_compile_definitions(mastermind-cuda PUBLIC MASTERMIND_CUDA)
-    target_include_directories(mastermind-cuda PUBLIC .)
-    set_target_properties(mastermind-cuda PROPERTIES
-            CXX_STANDARD 20
+    set_source_files_properties(${MASTERMIND_SOURCES_LIST} PROPERTIES LANGUAGE CUDA)
+    set_target_properties(mastermind PROPERTIES
+            CXX_STANDARD 17
             CUDA_STANDARD 17
             CUDA_STANDARD_REQUIRED ON
             CUDA_SEPARABLE_COMPILATION ON
             CUDA_ARCHITECTURES "86")
-    target_compile_options(mastermind-cuda PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
-            -march=native
-            -fno-omit-frame-pointer
-            >)
-    target_compile_options(mastermind-cuda PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:
+    target_compile_options(mastermind PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:
             --generate-line-info
             --use_fast_math
             --relocatable-device-code=true
@@ -93,9 +83,4 @@ if (CMAKE_CUDA_COMPILER)
             --std=c++17
             --forward-unknown-to-host-compiler -march=native
             >)
-    if (LIBCPUID_FOUND)
-        target_link_libraries(mastermind-cuda PUBLIC LIBCPUID)
-    endif ()
-
-    # https://developer.nvidia.com/blog/building-cuda-4applications-cmake/
 endif ()

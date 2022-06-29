@@ -16,7 +16,7 @@ template <typename SubsettingStrategyConfig>
 class CUDAGPUInterface : public GPUInterface<typename SubsettingStrategyConfig::CodewordT> {
 
  public:
-  CUDAGPUInterface(const std::vector<typename SubsettingStrategyConfig::CodewordT>& allCodewords);
+  explicit CUDAGPUInterface(const std::vector<typename SubsettingStrategyConfig::CodewordT>& allCodewords);
   ~CUDAGPUInterface() override;
 
   bool gpuAvailable() const override { return true; }
@@ -66,3 +66,5 @@ class CUDAGPUInterface : public GPUInterface<typename SubsettingStrategyConfig::
   uint64_t psSizesIn16Bits = 0;
   uint64_t psSizesIn8Bits = 0;
 };
+
+#include "cuda_gpu_interface.cu"

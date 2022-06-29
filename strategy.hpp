@@ -114,4 +114,4 @@ struct StrategyRootData {
       ExperimentCounter<ENABLE_SMALL_PS_METRICS>("Exp: Small PS Inner Scores Skipped");
 };
 
-#include "strategy.cpp"
+#include "strategy.inl"

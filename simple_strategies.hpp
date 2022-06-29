@@ -62,4 +62,4 @@ class StrategyRandom : public Strategy<StrategyConfig> {
   std::shared_ptr<Strategy<StrategyConfig>> createNewMove(Score r, CodewordT nextGuess) override;
 };
 
-#include "simple_strategies.cpp"
+#include "simple_strategies.inl"

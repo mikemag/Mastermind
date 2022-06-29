@@ -94,4 +94,4 @@ class Codeword {
 template <uint8_t PIN_COUNT, uint8_t COLOR_COUNT>
 std::ostream &operator<<(std::ostream &stream, const Codeword<PIN_COUNT, COLOR_COUNT> &codeword);
 
-#include "codeword.cpp"
+#include "codeword.inl"

@@ -12,7 +12,7 @@ and I found attempting to play all games efficiently to be a pretty fun challeng
 This repo holds most of my work on playing all games of various sizes quickly:
 
 - Multiple versions of the scoring function, including a vectorized version using SSE2. See the comments
-  in [codeword.cpp](codeword.cpp)
+  in [codeword.inl](codeword.inl)
   for details, and Compiler Explorer links showing the generated code.
 - The following algorithms for playing all games. See [strategy.hpp](strategy.hpp)
   and [subsetting_strategies.hpp](subsetting_strategies.hpp) for more details.

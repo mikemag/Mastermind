@@ -15,7 +15,6 @@
 
 #include "codeword.hpp"
 #include "compute_kernel_constants.h"
-#include "cuda_gpu_interface.hpp"
 #include "utils.hpp"
 
 using namespace std;
@@ -577,58 +576,3 @@ void CUDAGPUInterface<SubsettingStrategyConfig>::dumpDeviceInfo() {
 
   printf("\n");
 }
-
-// -----------------------------------------------------------------------------------
-// Explicit specializations
-//
-// These are annoying, but at this time I prefer to keep the CUDA support optional, which means not having everything
-// be a CUDA file, and thus no good way to avoid these.
-
-#define INST_PCL(p, c, l)                                                                           \
-  template class CUDAGPUInterface<SubsettingStrategyConfig<p, c, l, Algo::Knuth, uint32_t>>;        \
-  template class CUDAGPUInterface<SubsettingStrategyConfig<p, c, l, Algo::MostParts, uint8_t>>;     \
-  template class CUDAGPUInterface<SubsettingStrategyConfig<p, c, l, Algo::ExpectedSize, uint32_t>>; \
-  template class CUDAGPUInterface<SubsettingStrategyConfig<p, c, l, Algo::Entropy, uint32_t>>;
-
-#define INST_CL(c, l) \
-  INST_PCL(2, c, l)   \
-  INST_PCL(3, c, l)   \
-  INST_PCL(4, c, l)   \
-  INST_PCL(5, c, l)   \
-  INST_PCL(6, c, l)   \
-  INST_PCL(7, c, l)   \
-  INST_PCL(8, c, l)
-
-#define INST_L(l) \
-  INST_CL(2, l)   \
-  INST_CL(3, l)   \
-  INST_CL(4, l)   \
-  INST_CL(5, l)   \
-  INST_CL(6, l)   \
-  INST_CL(7, l)   \
-  INST_CL(8, l)   \
-  INST_CL(9, l)   \
-  INST_CL(10, l)  \
-  INST_CL(11, l)  \
-  INST_CL(12, l)  \
-  INST_CL(13, l)  \
-  INST_CL(14, l)  \
-  INST_CL(15, l)
-
-// INST_L(true)
-// INST_L(false)
-
-INST_PCL(4, 6, true)
-// INST_PCL(4, 6, false)
-INST_PCL(8, 5, false)
-// INST_PCL(8, 6, false)
-
-// The unit test needs this one all the time
-// template class CUDAGPUInterface<SubsettingStrategyConfig<4, 6, true, Algo::Knuth, uint32_t>>;
-
-// Specializations for whatever experiments you want to run. Keep this list fairly small to keep compilation speeds
-// reasonable. Use the macros above to enable lots of things at once, but with long comp times.
-template class CUDAGPUInterface<SubsettingStrategyConfig<4, 6, false, Algo::Knuth, uint32_t>>;
-// template class CUDAGPUInterface<SubsettingStrategyConfig<8, 5, false, Algo::Knuth, uint32_t>>;
-// template class CUDAGPUInterface<SubsettingStrategyConfig<8, 5, false, Algo::MostParts, uint8_t>>;
-template class CUDAGPUInterface<SubsettingStrategyConfig<7, 7, false, Algo::Knuth, uint32_t>>;

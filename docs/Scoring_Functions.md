@@ -4,7 +4,7 @@ This implementation has four variations on the scoring function. The original, s
 consumes roughly 4.4948s for all scores necessary to apply Knuth's algorithm to a $4p6c$ game. The most optimized version
 here requires just 0.9237s.
 
-I'm not going to describe the details of each variation. There are comments above each one in [codeword.cpp](../codeword.cpp).
+I'm not going to describe the details of each variation. There are comments above each one in [codeword.inl](../codeword.inl).
 Instead, I'll just describe the final one here.
 
 ## Scoring
@@ -22,7 +22,7 @@ of times when playing all games of larger sizes. It's important that it is fast.
 
 ## scoreCountingHandVec()
 
-The current implementation is in [codeword.cpp](../codeword.cpp). I'll copy it here for reference. For codegen, see
+The current implementation is in [codeword.inl](../codeword.inl). I'll copy it here for reference. For codegen, see
 it on [Compiler Explorer](https://godbolt.org/z/KvPf1Y), it's only 21 instructions.
 
 ````c++

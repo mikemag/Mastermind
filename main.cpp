@@ -196,7 +196,7 @@ shared_ptr<Strategy<StrategyConfig>> makeStrategy(Algo algorithm, GPUMode mode) 
     default:
       return nullptr;
   }
-};
+}
 
 template <typename StrategyConfig>
 shared_ptr<Strategy<StrategyConfig>> makeStrategy(Algo algorithm, uint32_t initialGuessPacked, GPUMode mode) {
@@ -217,7 +217,7 @@ shared_ptr<Strategy<StrategyConfig>> makeStrategy(Algo algorithm, uint32_t initi
     default:
       return nullptr;
   }
-};
+}
 
 // Find a unique set of initial guesses. Using different digits for the same pattern isn't useful, nor are shuffled
 // patterns. For 4p6c the unique initial guesses ae 1111, 1112, 1122, 1123, 1234. Repetitions of the same pattern, such
@@ -317,18 +317,23 @@ int main(int argc, const char* argv[]) {
     // development.
     csvTag = "6_7_8_med_";
     static vector<void (*)(Algo, GPUMode, StatsRecorder&)> games = {
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<StrategyConfig<6, 9, false>>(a, m), s); },
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<StrategyConfig<6, 10, false>>(a, m), s); },
+        //        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<StrategyConfig<6, 9,
+        //        false>>(a, m), s); },
+        //        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<StrategyConfig<6, 10,
+        //        false>>(a, m), s); },
 
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<StrategyConfig<7, 7, false>>(a, m), s); },
+        //        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<StrategyConfig<7, 7,
+        //        false>>(a, m), s); },
 
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<StrategyConfig<8, 5, false>>(a, m), s); },
-        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<StrategyConfig<8, 6, false>>(a, m), s); },
+        //        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<StrategyConfig<8, 5,
+        //        false>>(a, m), s); },
+        //        [](Algo a, GPUMode m, StatsRecorder& s) { playAllGamesForStrategy(makeStrategy<StrategyConfig<8, 6,
+        //        false>>(a, m), s); },
     };
 
     static vector<Algo> interestingAlgos = {Knuth, MostParts, Entropy, ExpectedSize, FirstOne};
 
-#if defined(__MM_GPU_METAL__) || defined(MASTERMIND_CUDA)
+#if defined(__MM_GPU_METAL__) || defined(__CUDACC__)
     static vector<GPUMode> gpuModes = {CPU, Both};
 #else
     static vector<GPUMode> gpuModes = {CPU};
@@ -346,13 +351,13 @@ int main(int argc, const char* argv[]) {
 
   if (findBestFirstGuesses) {
     csvTag = "find_ig_first_one_8_";
-    constexpr static uint8_t pc = 8;
+    //    constexpr static uint8_t pc = 8;
     static vector<void (*)(Algo, StatsRecorder&)> games = {
-        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 2>(a, s); },
-        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 3>(a, s); },
-        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 4>(a, s); },
-        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 5>(a, s); },
-        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 6>(a, s); },
+        //        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 2>(a, s); },
+        //        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 3>(a, s); },
+        //        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 4>(a, s); },
+        //        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 5>(a, s); },
+        //        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 6>(a, s); },
         //        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 7>(a, s); },
         //        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 8>(a, s); },
         //        [](Algo a, StatsRecorder& s) { runWithAllInitialGuesses<pc, 9>(a, s); },

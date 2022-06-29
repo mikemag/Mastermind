@@ -69,7 +69,7 @@ it finds and play it. This avoids looking at the full results for $AS$ and ends 
 
 ## Scoring Function on the GPU
 
-The scoring function used is based on the hand-vectorized version in [codeword.cpp](../codeword.cpp). The first portion,
+The scoring function used is based on the hand-vectorized version in [codeword.inl](../codeword.inl). The first portion,
 computing $b$ with the constant operations on a single 32 bit value was kept unchanged. Happily, GPU's provide popcount.
 
 The second part changed a bit. Metal provides vector data types, like `uint4` and `uchar4`, and automatically turns common
