@@ -28,7 +28,7 @@ class Codeword {
 
   constexpr Codeword(uint32_t codeword) noexcept : codeword(codeword), colorCounts8(computeColorCounts8(codeword)) {}
 
-  bool isInvalid() const { return codeword == -0xFFFFFFFF; }
+  bool isInvalid() const { return codeword == 0xFFFFFFFF; }
 
   bool operator==(const Codeword other) const { return codeword == other.codeword; }
 

@@ -13,6 +13,7 @@
 #include "simple_strategies.hpp"
 #include "strategy.hpp"
 #include "subsetting_strategies.hpp"
+#include "new_algo.h"
 
 using namespace std;
 
@@ -30,8 +31,8 @@ using namespace std;
 static constexpr bool playSingleGame = true;
 static constexpr Algo singleGameAlgo = Algo::Knuth;
 static constexpr GPUMode singleGameGPUMode = Both;
-static constexpr uint8_t singleGamePinCount = 8;    // 1-8, 4 is classic
-static constexpr uint8_t singleGameColorCount = 5;  // 1-15, 6 is classic
+static constexpr uint8_t singleGamePinCount = 4;    // 1-8, 4 is classic
+static constexpr uint8_t singleGameColorCount = 6;  // 1-15, 6 is classic
 
 static constexpr bool playMultipleGames = false;     // Play a set of games defined below.
 static constexpr bool runTests = true;               // Run unit tests and play Knuth's game
@@ -292,6 +293,10 @@ void runWithAllInitialGuesses(Algo a, StatsRecorder& s) {
 }
 
 int main(int argc, const char* argv[]) {
+
+  new_algo::run();
+  return 0;
+
   setupHistogramHeaders();
 
   if (runTests) {
