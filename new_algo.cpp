@@ -32,6 +32,15 @@ using CodewordT = Codeword<PIN_COUNT, COLOR_COUNT>;
 constexpr static uint32_t MAX_SCORE_SLOTS = (PIN_COUNT << 4u) + 1;
 static constexpr int TOTAL_PACKED_SCORES = ((PIN_COUNT * (PIN_COUNT + 3)) / 2) + 1;
 
+using SC = SubsettingStrategyConfig<PIN_COUNT, COLOR_COUNT, false, Algo::Knuth, uint32_t>;
+
+struct LittleStuffNew {
+  IndexAndScore bestGuess;
+  //  uint32_t fdGuess;
+  //  uint32_t usedCodewordsCount;
+  //  uint32_t usedCodewords[100];
+};
+
 static CodewordT nextGuess(const vector<CodewordT>& possibleSolutions, const vector<CodewordT>& usedCodewords) {
   CodewordT bestGuess;
   size_t bestScore = 0;
@@ -356,14 +365,53 @@ __global__ void subsettingAlgosKernelNew(
   //  }
 }
 
-using SC = SubsettingStrategyConfig<PIN_COUNT, COLOR_COUNT, false, Algo::Knuth, uint32_t>;
+using config32 = SubsettingAlgosKernelConfig<SC, uint32_t>;
 
-struct LittleStuffNew {
-  IndexAndScore bestGuess;
-  //  uint32_t fdGuess;
-  //  uint32_t usedCodewordsCount;
-  //  uint32_t usedCodewords[100];
-};
+template <typename SubsettingAlgosKernelConfig, typename LittleStuffT>
+__global__ void newGuessForRegions(const typename SubsettingAlgosKernelConfig::CodewordT* __restrict__ allCodewords,
+                                   const RegionID* __restrict__ regions, int* __restrict__ nextMoves,
+                                   const RegionID* __restrict__ runRegions, const int* __restrict__ runStarts,
+                                   const int* __restrict__ runLengths, const int offset, const int runsCount,
+                                   LittleStuffT* __restrict__ littleStuffsPool,
+                                   IndexAndScore* __restrict__ perBlockSolutionsPool) {
+  uint tidGrid = blockDim.x * blockIdx.x + threadIdx.x;
+
+  if (tidGrid < runsCount) {
+//    auto& rid = runRegions[offset + tidGrid];
+    auto runStart = runStarts[offset + tidGrid];
+    auto runLength = runLengths[offset + tidGrid];
+
+    //    if (rid.isFinalPacked()) {
+    //      //      printf("%016lx-%016lx -- %d:%d -- win\n", *(((uint64_t*)&rid.value) + 1), *((uint64_t*)&rid.value),
+    //      //      runStart,
+    //      //             runLength);
+    //      for (int j = runStart; j < runStart + runLength; j++) {
+    //        nextMoves[regions[j].index] = -1;
+    //      }
+    //    } else {
+    auto littleStuff = &littleStuffsPool[tidGrid];
+    auto perBlockSolutions = &perBlockSolutionsPool[tidGrid * config32::NUM_BLOCKS];
+
+    subsettingAlgosKernelNew<config32><<<config32::NUM_BLOCKS, config32::THREADS_PER_BLOCK>>>(
+        allCodewords, regions, runStart, runLength, littleStuff, perBlockSolutions);
+    CubDebug(cudaGetLastError());
+
+    // nb: block size on this one must be a power of 2
+    reduceMaxScore<128><<<1, 128>>>(perBlockSolutions, config32::NUM_BLOCKS, littleStuff);
+    CubDebug(cudaGetLastError());
+    CubDebug(cudaDeviceSynchronize());
+
+    //      printf("%016lx-%016lx -- %d:%d -- ng = %x (%d)\n", *(((uint64_t*)&rid.value) + 1),
+    //      *((uint64_t*)&rid.value),
+    //             runStart, runLength, allCodewords[pdLS->bestGuess.index].packedCodeword(),
+    //             regions[runStart].index);
+
+    for (int j = runStart; j < runStart + runLength; j++) {
+      nextMoves[regions[j].index] = littleStuff->bestGuess.index;
+    }
+    //    }
+  }
+}
 
 void new_algo::runGPU() {
   auto gpuInterface = new CUDAGPUInterface<SC>(CodewordT::getAllCodewords());
@@ -388,6 +436,12 @@ void new_algo::runGPU() {
   thrust::device_vector<int> runStarts(dRegions.size());
   thrust::device_vector<int> runLengths(dRegions.size());
 
+  size_t chunkSize = 256;
+  thrust::device_vector<LittleStuffNew> dLittleStuffs(chunkSize);
+  thrust::device_vector<IndexAndScore> dPerBlockSolutions(config32::NUM_BLOCKS * chunkSize);
+  auto pdLittleStuffs = thrust::raw_pointer_cast(dLittleStuffs.data());
+  auto pdPerBlockSolutions = thrust::raw_pointer_cast(dPerBlockSolutions.data());
+
   auto dRegionsEnd = dRegions.end();
 
   int depth = 0;
@@ -395,6 +449,8 @@ void new_algo::runGPU() {
   // If no games have new moves, then we're done
   bool anyNewMoves = true;
   while (anyNewMoves) {
+    auto startTime = chrono::high_resolution_clock::now();
+
     depth++;
     printf("\n---------- depth = %d ----------\n\n", depth);
 
@@ -414,9 +470,9 @@ void new_algo::runGPU() {
       }
     });
 
-//    thrust::fill(dNextMoves.begin(), dNextMoves.end(), -1);
-//    dRegionsEnd = thrust::partition(dRegions.begin(), dRegionsEnd,
-//                                    [] __device__(const RegionID& r) { return !r.isFinalPacked(); });
+    thrust::fill(dNextMoves.begin(), dNextMoves.end(), -1);
+    dRegionsEnd = thrust::partition(dRegions.begin(), dRegionsEnd,
+                                    [] __device__(const RegionID& r) { return !r.isFinalPacked(); });
 
     // Sort all games by region id. This re-shuffles within each region only.
     thrust::sort(dRegions.begin(), dRegionsEnd,
@@ -436,6 +492,13 @@ void new_algo::runGPU() {
 
     thrust::exclusive_scan(runLengths.begin(), runLengths.begin() + num_runs, runStarts.begin());
 
+    {
+      auto endTime = chrono::high_resolution_clock::now();
+      chrono::duration<float, milli> elapsedMS = endTime - startTime;
+      auto elapsedS = elapsedMS.count() / 1000;
+      cout << "P1 elapsed time " << commaString(elapsedS) << "s" << endl;
+      startTime = chrono::high_resolution_clock::now();
+    }
     printf("%lu regions\n", num_runs);
     //    for (size_t i = 0; i < num_runs; i++) {
     //      std::cout << runIds[i] << " " << runStarts[i] << "-" << runLengths[i] << endl;
@@ -444,8 +507,22 @@ void new_algo::runGPU() {
     // For reach region:
     //   - find next guess using the region as PS, this is the next guess for all games in this region
     //   - games already won (a win at the end of their region id) get no new guess
-    size_t chunkSize = 512;
+    //    using config32 = SubsettingAlgosKernelConfig<SC, uint32_t>;
+    auto pRunIds = thrust::raw_pointer_cast(runIds.data());
+    auto pRunStarts = thrust::raw_pointer_cast(runStarts.data());
+    auto pRunLengths = thrust::raw_pointer_cast(runLengths.data());
+
     for (size_t offset = 0; offset < num_runs; offset += chunkSize) {
+      auto runsToDo = min(chunkSize, num_runs - offset);
+      int threadsPerBlock = 128;
+
+      newGuessForRegions<config32, LittleStuffNew>
+          <<<(runsToDo + threadsPerBlock - 1) / threadsPerBlock, threadsPerBlock>>>(
+              pAllCodewords, pRegions, pNextmoves, pRunIds, pRunStarts, pRunLengths, offset, runsToDo, pdLittleStuffs,
+              pdPerBlockSolutions);
+      CubDebug(cudaDeviceSynchronize());
+
+#if 0
       thrust::for_each_n(thrust::make_zip_iterator(thrust::make_tuple(
                              runIds.begin() + offset, runStarts.begin() + offset, runLengths.begin() + offset)),
                          min(chunkSize, num_runs - offset),
@@ -461,8 +538,6 @@ void new_algo::runGPU() {
                            } else {
                              LittleStuffNew* pdLS;
                              CubDebug(cudaMalloc((void**)&pdLS, sizeof(*pdLS)));
-
-                             using config32 = SubsettingAlgosKernelConfig<SC, uint32_t>;
 
                              IndexAndScore* pdPBS;
                              CubDebug(cudaMalloc((void**)&pdPBS, sizeof(*pdPBS) * config32::NUM_BLOCKS));
@@ -490,10 +565,19 @@ void new_algo::runGPU() {
                              CubDebug(cudaFree(pdPBS));
                            }
                          }));
+#endif
     }
 
     // mmmfixme: likely rather do an atomic or during the previous step
     anyNewMoves = thrust::any_of(dNextMoves.begin(), dNextMoves.end(), [] __device__(int c) { return c != -1; });
+
+    {
+      auto endTime = chrono::high_resolution_clock::now();
+      chrono::duration<float, milli> elapsedMS = endTime - startTime;
+      auto elapsedS = elapsedMS.count() / 1000;
+      cout << "P2 elapsed time " << commaString(elapsedS) << "s" << endl;
+      startTime = chrono::high_resolution_clock::now();
+    }
 
     if (depth > 7) {
       anyNewMoves = false;  // mmmfixme: tmp
