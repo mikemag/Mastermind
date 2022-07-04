@@ -168,10 +168,15 @@ struct IndexAndScoreReducer {
   __device__ __forceinline__ IndexAndScore operator()(const IndexAndScore &a, const IndexAndScore &b) const {
     // Always take the best score. If it's a tie, take the one that could be a solution. If that's a tie, take lexically
     // first.
+#if 0
     if (b.isFD || a.isFD) {
-      if (b.isFD && a.isFD) return (b.index < a.index) ? b : a;
+      if (b.isFD && a.isFD) {
+        if (b.isPossibleSolution ^ a.isPossibleSolution) return b.isPossibleSolution ? b : a;
+        return (b.index < a.index) ? b : a;
+      }
       return b.isFD ? b : a;
     }
+#endif
 
     if (b.score > a.score) return b;
     if (b.score < a.score) return a;
@@ -286,7 +291,6 @@ __global__ void subsettingAlgosKernel(
     }
   }
 }
-
 
 // cub::DeviceReduce::Reduce is a slight loss to this, not sure why, so keeping the custom kernel for now.
 template <uint32_t blockSize, typename LittleStuffT>

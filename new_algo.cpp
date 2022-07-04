@@ -398,6 +398,22 @@ __global__ void reduceMaxScoreNew(IndexAndScore* __restrict__ perBlockSolutions,
   }
 }
 
+__global__ void simpleRuns(const RegionID* __restrict__ regions, int* __restrict__ nextMoves,
+                           const int* __restrict__ runStarts, const int* __restrict__ runLengths, const int runCount) {
+  uint32_t idx = threadIdx.x;
+
+  for (int runIndex = idx; runIndex < runCount; runIndex += blockDim.x) {
+    auto runStart = runStarts[runIndex];
+    auto runLength = runLengths[runIndex];
+    if (runLength == 1) {
+      nextMoves[regions[runStart].index] = regions[runStart].index;
+    } else if (runLength == 2) {
+      nextMoves[regions[runStart].index] = regions[runStart].index;
+      nextMoves[regions[runStart + 1].index] = regions[runStart].index;
+    }
+  }
+}
+
 template <typename SubsettingAlgosKernelConfig, typename LittleStuffT>
 __global__ void newGuessForRegions(const typename SubsettingAlgosKernelConfig::CodewordT* __restrict__ allCodewords,
                                    const RegionID* __restrict__ regions, int* __restrict__ nextMoves,
@@ -412,9 +428,15 @@ __global__ void newGuessForRegions(const typename SubsettingAlgosKernelConfig::C
     auto runStart = runStarts[offset + tidGrid];
     auto runLength = runLengths[offset + tidGrid];
 
-    if (runLength <= 2) {
+#if 0
+    if (runLength == 1) {
       nextMoves[regions[runStart].index] = regions[runStart].index;
-    } else {
+    } else if (runLength == 2) {
+      nextMoves[regions[runStart].index] = regions[runStart].index;
+      nextMoves[regions[runStart + 1].index] = regions[runStart].index;
+    } else
+#endif
+    {
       auto littleStuff = &littleStuffsPool[tidGrid];
       auto perBlockSolutions = &perBlockSolutionsPool[tidGrid * config32::NUM_BLOCKS];
 
@@ -459,6 +481,8 @@ void new_algo::runGPU() {
   thrust::device_vector<RegionID> runIds(dRegions.size());
   thrust::device_vector<int> runStarts(dRegions.size());
   thrust::device_vector<int> runLengths(dRegions.size());
+  thrust::host_vector<int> hRunStarts(dRegions.size());
+  thrust::host_vector<int> hRunLengths(dRegions.size());
 
   size_t chunkSize = 256;
   thrust::device_vector<LittleStuffNew> dLittleStuffs(chunkSize);
@@ -484,7 +508,7 @@ void new_algo::runGPU() {
 
     thrust::for_each(dRegions.begin(), dRegionsEnd, [=] __device__(RegionID & r) {
       auto cwi = r.index;
-//      if (pNextmoves[cwi] != -1) {
+      //      if (pNextmoves[cwi] != -1) {
       if (!r.isFinalPacked()) {
         unsigned __int128 apc8 = pAllCodewords[cwi].packedColors8();              // Annoying...
         unsigned __int128 npc8 = pAllCodewords[pNextmoves[cwi]].packedColors8();  // Annoying...
@@ -495,9 +519,11 @@ void new_algo::runGPU() {
       }
     });
 
-//    thrust::fill(dNextMoves.begin(), dNextMoves.end(), -1);
+    //    thrust::fill(dNextMoves.begin(), dNextMoves.end(), -1);
     dRegionsEnd = thrust::partition(dRegions.begin(), dRegionsEnd,
                                     [] __device__(const RegionID& r) { return !r.isFinalPacked(); });
+
+    printf("%ld regions left\n", dRegionsEnd - dRegions.begin());
 
     // Sort all games by region id. This re-shuffles within each region only.
     thrust::sort(dRegions.begin(), dRegionsEnd,
@@ -508,6 +534,8 @@ void new_algo::runGPU() {
 
     // Get start and run length for each region by id.
     //   - at the start there are 14, at the end there are 1296
+    // mmmfixme: I don't think I need the keys out, since I compute starts and just index w/ that when I want to.
+    //  - An iterator to drop those, like /dev/null? discard_iterator
     size_t num_runs =
         thrust::reduce_by_key(dRegions.begin(), dRegionsEnd, thrust::constant_iterator<int>(1), runIds.begin(),
                               runLengths.begin(),
@@ -517,6 +545,19 @@ void new_algo::runGPU() {
 
     thrust::exclusive_scan(runLengths.begin(), runLengths.begin() + num_runs, runStarts.begin());
 
+    // mmmfixme: re-sort {runStarts, runLengths} by length.
+    //  - Then treat groups of those differently below.
+    //    - All the 1's and 2's can get a special kernel to blast the simple result into place w/ max overlap.
+    //    - All the rest of size PS or smaller can get a shortcut kernel first.
+
+    static const bool simpleRunsOpt = true;
+
+    if (simpleRunsOpt) {
+      thrust::sort_by_key(runLengths.begin(), runLengths.begin() + num_runs,
+                          thrust::make_zip_iterator(thrust::make_tuple(runStarts.begin(), runIds.begin())));
+      hRunLengths = runLengths;
+    }
+
     {
       auto endTime = chrono::high_resolution_clock::now();
       chrono::duration<float, milli> elapsedMS = endTime - startTime;
@@ -524,7 +565,7 @@ void new_algo::runGPU() {
       cout << "P1 elapsed time " << commaString(elapsedS) << "s" << endl;
       startTime = chrono::high_resolution_clock::now();
     }
-    printf("%lu regions\n", num_runs);
+    printf("%lu runs\n", num_runs);
     //    for (size_t i = 0; i < num_runs; i++) {
     //      std::cout << runIds[i] << " " << runStarts[i] << "-" << runLengths[i] << endl;
     //    }
@@ -539,9 +580,23 @@ void new_algo::runGPU() {
     auto pRunStarts = thrust::raw_pointer_cast(runStarts.data());
     auto pRunLengths = thrust::raw_pointer_cast(runLengths.data());
 
-#if 0
+    int ri = 0;
+    if (simpleRunsOpt) {
+      int regionCnt = 0;
+      while (ri < num_runs && hRunLengths[ri] <= 2) {
+        regionCnt += hRunLengths[ri];
+        ri++;
+      }
+      printf("Simple runs: %d, totalling %d regions\n", ri, regionCnt);
+      if (ri > 0) {
+        simpleRuns<<<1, 128>>>(pRegions, pNextmoves, pRunStarts, pRunLengths, ri);
+      }
+    }
+
+#if 1
+    int bigBoyLaunches = 0;
     int pbsIndex = 0;
-    for (int ri = 0; ri < num_runs; ri++) {
+    for (; ri < num_runs; ri++) {
       auto runStart = runStarts[ri];
       auto runLength = runLengths[ri];
 
@@ -552,6 +607,7 @@ void new_algo::runGPU() {
       auto perBlockSolutions = &pdPerBlockSolutions[pbsIndex++];
       auto littleStuff = &pdLittleStuffs[pbsIndex++];
 
+      bigBoyLaunches++;
       subsettingAlgosKernelNew<config32><<<config32::NUM_BLOCKS, config32::THREADS_PER_BLOCK>>>(
           pAllCodewords, pRegions, runStart, runLength, littleStuff, perBlockSolutions);
       CubDebug(cudaGetLastError());
@@ -561,10 +617,10 @@ void new_algo::runGPU() {
           <<<1, 128>>>(perBlockSolutions, config32::NUM_BLOCKS, pRegions, pNextmoves, runStart, runLength);
       CubDebug(cudaGetLastError());
     }
-
-    CubDebug(cudaDeviceSynchronize());
+    printf("Big Boy Launches: %d\n", bigBoyLaunches);
 #else
-    for (size_t offset = 0; offset < num_runs; offset += chunkSize) {
+
+    for (size_t offset = ri; offset < num_runs; offset += chunkSize) {
       auto runsToDo = min(chunkSize, num_runs - offset);
       int threadsPerBlock = 4;
 
@@ -621,7 +677,8 @@ void new_algo::runGPU() {
     CubDebug(cudaDeviceSynchronize());
 
     // mmmfixme: likely rather do an atomic or during the previous step
-//    anyNewMoves = thrust::any_of(dNextMoves.begin(), dNextMoves.end(), [] __device__(int c) { return c != -1; });
+    //    anyNewMoves = thrust::any_of(dNextMoves.begin(), dNextMoves.end(), [] __device__(int c) { return c != -1;
+    //    });
 
     {
       auto endTime = chrono::high_resolution_clock::now();
