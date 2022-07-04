@@ -18,6 +18,7 @@ struct IndexAndScore {
   uint32_t index;
   uint32_t score;
   bool isPossibleSolution;
+  bool isFD;
 };
 
 // An interface to keep the GPU code separate from the rest of the code, so it can be compiled in conditionally, or

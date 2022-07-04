@@ -2,10 +2,9 @@
 // Created by Michael Magruder on 6/30/22.
 //
 
-#define CUB_STDERR
-
 #include "new_algo.h"
 
+#define CUB_STDERR
 #include <thrust/device_free.h>
 #include <thrust/device_malloc.h>
 #include <thrust/device_vector.h>
@@ -17,6 +16,8 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cub/cub.cuh>
+#include <cuda/barrier>
 #include <new>
 #include <vector>
 
@@ -273,6 +274,8 @@ __device__ void computeSubsetSizesNew(SubsetSizeT* __restrict__ subsetSizes, con
   }
 }
 
+using config32 = SubsettingAlgosKernelConfig<SC, uint32_t>;
+
 template <typename SubsettingAlgosKernelConfig, typename LittleStuffT>
 __global__ void subsettingAlgosKernelNew(
     const typename SubsettingAlgosKernelConfig::CodewordT* __restrict__ allCodewords,
@@ -336,7 +339,10 @@ __global__ void subsettingAlgosKernelNew(
   }
 
   // A score of 0 will prevent used or invalid codewords from being chosen.
-  if (tidGrid >= SubsettingAlgosKernelConfig::CodewordT::TOTAL_CODEWORDS) score = 0;
+  if (tidGrid >= SubsettingAlgosKernelConfig::CodewordT::TOTAL_CODEWORDS) {
+    score = 0;
+    totalUsedSubsets = 0;
+  }
   // mmmfixme:
   //  for (int i = 0; i < littleStuff->usedCodewordsCount; i++) {
   //    if (allCodewords[tidGrid] == littleStuff->usedCodewords[i]) score = 0;
@@ -345,7 +351,7 @@ __global__ void subsettingAlgosKernelNew(
   // Reduce to find the best solution we have in this block. This keeps the codeword index, score, and possible solution
   // indicator together.
   __syncthreads();
-  IndexAndScore ias{tidGrid, score, isPossibleSolution};
+  IndexAndScore ias{tidGrid, score, isPossibleSolution, false && totalUsedSubsets == possibleSolutionsCount};
   IndexAndScore bestSolution = typename SubsettingAlgosKernelConfig::BlockReduce(sharedMem.reducerTmpStorage)
                                    .Reduce(ias, IndexAndScoreReducer());
 
@@ -365,7 +371,32 @@ __global__ void subsettingAlgosKernelNew(
   //  }
 }
 
-using config32 = SubsettingAlgosKernelConfig<SC, uint32_t>;
+template <uint32_t blockSize>
+__global__ void reduceMaxScoreNew(IndexAndScore* __restrict__ perBlockSolutions, const uint32_t solutionsCount,
+                                  const RegionID* __restrict__ regions, int* __restrict__ nextMoves, const int runStart,
+                                  const int runLength) {
+  uint32_t idx = threadIdx.x;
+  IndexAndScoreReducer reduce;
+  IndexAndScore bestScore{0, 0, false, false};
+  for (uint32_t i = idx; i < solutionsCount; i += blockSize) {
+    bestScore = reduce(bestScore, perBlockSolutions[i]);
+  }
+
+  __shared__ IndexAndScore shared[blockSize];
+  shared[idx] = bestScore;
+  __syncthreads();
+
+  for (uint32_t size = blockSize / 2; size > 0; size /= 2) {
+    if (idx < size) {
+      shared[idx] = reduce(shared[idx], shared[idx + size]);
+    }
+    __syncthreads();
+  }
+
+  for (uint32_t i = idx; i < runLength; i += blockSize) {
+    nextMoves[regions[i + runStart].index] = shared[0].index;
+  }
+}
 
 template <typename SubsettingAlgosKernelConfig, typename LittleStuffT>
 __global__ void newGuessForRegions(const typename SubsettingAlgosKernelConfig::CodewordT* __restrict__ allCodewords,
@@ -377,49 +408,42 @@ __global__ void newGuessForRegions(const typename SubsettingAlgosKernelConfig::C
   uint tidGrid = blockDim.x * blockIdx.x + threadIdx.x;
 
   if (tidGrid < runsCount) {
-//    auto& rid = runRegions[offset + tidGrid];
+    //    auto& rid = runRegions[offset + tidGrid];
     auto runStart = runStarts[offset + tidGrid];
     auto runLength = runLengths[offset + tidGrid];
 
-    //    if (rid.isFinalPacked()) {
-    //      //      printf("%016lx-%016lx -- %d:%d -- win\n", *(((uint64_t*)&rid.value) + 1), *((uint64_t*)&rid.value),
-    //      //      runStart,
-    //      //             runLength);
-    //      for (int j = runStart; j < runStart + runLength; j++) {
-    //        nextMoves[regions[j].index] = -1;
-    //      }
-    //    } else {
-    auto littleStuff = &littleStuffsPool[tidGrid];
-    auto perBlockSolutions = &perBlockSolutionsPool[tidGrid * config32::NUM_BLOCKS];
+    if (runLength <= 2) {
+      nextMoves[regions[runStart].index] = regions[runStart].index;
+    } else {
+      auto littleStuff = &littleStuffsPool[tidGrid];
+      auto perBlockSolutions = &perBlockSolutionsPool[tidGrid * config32::NUM_BLOCKS];
 
-    subsettingAlgosKernelNew<config32><<<config32::NUM_BLOCKS, config32::THREADS_PER_BLOCK>>>(
-        allCodewords, regions, runStart, runLength, littleStuff, perBlockSolutions);
-    CubDebug(cudaGetLastError());
+      subsettingAlgosKernelNew<config32><<<config32::NUM_BLOCKS, config32::THREADS_PER_BLOCK>>>(
+          allCodewords, regions, runStart, runLength, littleStuff, perBlockSolutions);
+      CubDebug(cudaGetLastError());
 
-    // nb: block size on this one must be a power of 2
-    reduceMaxScore<128><<<1, 128>>>(perBlockSolutions, config32::NUM_BLOCKS, littleStuff);
-    CubDebug(cudaGetLastError());
-    CubDebug(cudaDeviceSynchronize());
-
-    //      printf("%016lx-%016lx -- %d:%d -- ng = %x (%d)\n", *(((uint64_t*)&rid.value) + 1),
-    //      *((uint64_t*)&rid.value),
-    //             runStart, runLength, allCodewords[pdLS->bestGuess.index].packedCodeword(),
-    //             regions[runStart].index);
-
-    for (int j = runStart; j < runStart + runLength; j++) {
-      nextMoves[regions[j].index] = littleStuff->bestGuess.index;
+      // nb: block size on this one must be a power of 2
+      reduceMaxScoreNew<128>
+          <<<1, 128>>>(perBlockSolutions, config32::NUM_BLOCKS, regions, nextMoves, runStart, runLength);
+      CubDebug(cudaGetLastError());
     }
-    //    }
   }
 }
 
 void new_algo::runGPU() {
   auto gpuInterface = new CUDAGPUInterface<SC>(CodewordT::getAllCodewords());
 
+  printf("config32::NUM_BLOCKS = %d\n", config32::NUM_BLOCKS);
+  printf("config32::THREADS_PER_BLOCK = %d\n", config32::THREADS_PER_BLOCK);
+
   vector<CodewordT>& allCodewords = CodewordT ::getAllCodewords();
 
   thrust::host_vector<CodewordT> hAllCodewords = allCodewords;
   thrust::device_vector<CodewordT> dAllCodewords = hAllCodewords;
+
+  // mmmfixme: how to do this with a thrust vector?
+  //  CubDebugExit(cudaMemAdvise(thrust::raw_pointer_cast(dAllCodewords.data()), sizeof(CodewordT) *
+  //  allCodewords.size(), cudaMemAdviseSetReadMostly, 0));
 
   // Starting case: all games, initial guess.
   //  vector<CodewordT> used{};
@@ -460,7 +484,8 @@ void new_algo::runGPU() {
 
     thrust::for_each(dRegions.begin(), dRegionsEnd, [=] __device__(RegionID & r) {
       auto cwi = r.index;
-      if (pNextmoves[cwi] != -1) {
+//      if (pNextmoves[cwi] != -1) {
+      if (!r.isFinalPacked()) {
         unsigned __int128 apc8 = pAllCodewords[cwi].packedColors8();              // Annoying...
         unsigned __int128 npc8 = pAllCodewords[pNextmoves[cwi]].packedColors8();  // Annoying...
         uint8_t s = scoreCodewords<PIN_COUNT>(pAllCodewords[cwi].packedCodeword(), *(uint4*)&apc8,
@@ -470,7 +495,7 @@ void new_algo::runGPU() {
       }
     });
 
-    thrust::fill(dNextMoves.begin(), dNextMoves.end(), -1);
+//    thrust::fill(dNextMoves.begin(), dNextMoves.end(), -1);
     dRegionsEnd = thrust::partition(dRegions.begin(), dRegionsEnd,
                                     [] __device__(const RegionID& r) { return !r.isFinalPacked(); });
 
@@ -504,6 +529,8 @@ void new_algo::runGPU() {
     //      std::cout << runIds[i] << " " << runStarts[i] << "-" << runLengths[i] << endl;
     //    }
 
+    if (num_runs == 0) break;
+
     // For reach region:
     //   - find next guess using the region as PS, this is the next guess for all games in this region
     //   - games already won (a win at the end of their region id) get no new guess
@@ -512,16 +539,39 @@ void new_algo::runGPU() {
     auto pRunStarts = thrust::raw_pointer_cast(runStarts.data());
     auto pRunLengths = thrust::raw_pointer_cast(runLengths.data());
 
+#if 0
+    int pbsIndex = 0;
+    for (int ri = 0; ri < num_runs; ri++) {
+      auto runStart = runStarts[ri];
+      auto runLength = runLengths[ri];
+
+      if (pbsIndex >= chunkSize) {
+        pbsIndex = 0;
+        //        CubDebug(cudaDeviceSynchronize());
+      }
+      auto perBlockSolutions = &pdPerBlockSolutions[pbsIndex++];
+      auto littleStuff = &pdLittleStuffs[pbsIndex++];
+
+      subsettingAlgosKernelNew<config32><<<config32::NUM_BLOCKS, config32::THREADS_PER_BLOCK>>>(
+          pAllCodewords, pRegions, runStart, runLength, littleStuff, perBlockSolutions);
+      CubDebug(cudaGetLastError());
+
+      // nb: block size on this one must be a power of 2
+      reduceMaxScoreNew<128>
+          <<<1, 128>>>(perBlockSolutions, config32::NUM_BLOCKS, pRegions, pNextmoves, runStart, runLength);
+      CubDebug(cudaGetLastError());
+    }
+
+    CubDebug(cudaDeviceSynchronize());
+#else
     for (size_t offset = 0; offset < num_runs; offset += chunkSize) {
       auto runsToDo = min(chunkSize, num_runs - offset);
-      int threadsPerBlock = 128;
+      int threadsPerBlock = 4;
 
       newGuessForRegions<config32, LittleStuffNew>
           <<<(runsToDo + threadsPerBlock - 1) / threadsPerBlock, threadsPerBlock>>>(
               pAllCodewords, pRegions, pNextmoves, pRunIds, pRunStarts, pRunLengths, offset, runsToDo, pdLittleStuffs,
               pdPerBlockSolutions);
-      CubDebug(cudaDeviceSynchronize());
-
 #if 0
       thrust::for_each_n(thrust::make_zip_iterator(thrust::make_tuple(
                              runIds.begin() + offset, runStarts.begin() + offset, runLengths.begin() + offset)),
@@ -567,9 +617,11 @@ void new_algo::runGPU() {
                          }));
 #endif
     }
+#endif
+    CubDebug(cudaDeviceSynchronize());
 
     // mmmfixme: likely rather do an atomic or during the previous step
-    anyNewMoves = thrust::any_of(dNextMoves.begin(), dNextMoves.end(), [] __device__(int c) { return c != -1; });
+//    anyNewMoves = thrust::any_of(dNextMoves.begin(), dNextMoves.end(), [] __device__(int c) { return c != -1; });
 
     {
       auto endTime = chrono::high_resolution_clock::now();
@@ -579,7 +631,7 @@ void new_algo::runGPU() {
       startTime = chrono::high_resolution_clock::now();
     }
 
-    if (depth > 7) {
+    if (depth > 12) {
       anyNewMoves = false;  // mmmfixme: tmp
     }
   }
