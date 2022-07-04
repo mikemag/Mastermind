@@ -8,12 +8,12 @@
 #include "codeword.hpp"
 #include "compute_kernel_constants.h"
 #include "mastermind_config.h"
+#include "new_algo.h"
 #include "preset_initial_guesses.h"
 #include "score.hpp"
 #include "simple_strategies.hpp"
 #include "strategy.hpp"
 #include "subsetting_strategies.hpp"
-#include "new_algo.h"
 
 using namespace std;
 
@@ -293,8 +293,16 @@ void runWithAllInitialGuesses(Algo a, StatsRecorder& s) {
 }
 
 int main(int argc, const char* argv[]) {
+  auto startTime = chrono::high_resolution_clock::now();
 
-  new_algo::run();
+  //  new_algo::run();
+  new_algo::runGPU();
+
+  auto endTime = chrono::high_resolution_clock::now();
+  chrono::duration<float, milli> elapsedMS = endTime - startTime;
+  auto elapsedS = elapsedMS.count() / 1000;
+  cout << "Elapsed time " << commaString(elapsedS) << "s" << endl;
+
   return 0;
 
   setupHistogramHeaders();
@@ -312,7 +320,8 @@ int main(int argc, const char* argv[]) {
 
   if (playSingleGame) {
     statsRecorder.newRun();
-    auto strategy = makeStrategy<StrategyConfig<singleGamePinCount, singleGameColorCount, false>>(singleGameAlgo, singleGameGPUMode);
+    auto strategy = makeStrategy<StrategyConfig<singleGamePinCount, singleGameColorCount, false>>(singleGameAlgo,
+                                                                                                  singleGameGPUMode);
     playAllGamesForStrategy(strategy, statsRecorder);
   }
 

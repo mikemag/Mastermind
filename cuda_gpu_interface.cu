@@ -282,6 +282,7 @@ __global__ void subsettingAlgosKernel(
   }
 }
 
+
 // cub::DeviceReduce::Reduce is a slight loss to this, not sure why, so keeping the custom kernel for now.
 template <uint32_t blockSize, typename LittleStuffT>
 __global__ void reduceMaxScore(IndexAndScore *__restrict__ perBlockSolutions, const uint32_t solutionsCount,

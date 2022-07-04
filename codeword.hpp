@@ -24,13 +24,13 @@
 template <uint8_t PIN_COUNT, uint8_t COLOR_COUNT>
 class Codeword {
  public:
-  constexpr Codeword() noexcept : codeword(0xFFFFFFFF), colorCounts8(0) {}
+  DEVICE_ANNOTATION constexpr Codeword() noexcept : codeword(0xFFFFFFFF), colorCounts8(0) {}
 
   constexpr Codeword(uint32_t codeword) noexcept : codeword(codeword), colorCounts8(computeColorCounts8(codeword)) {}
 
-  bool isInvalid() const { return codeword == 0xFFFFFFFF; }
+  DEVICE_ANNOTATION bool isInvalid() const { return codeword == 0xFFFFFFFF; }
 
-  bool operator==(const Codeword other) const { return codeword == other.codeword; }
+  DEVICE_ANNOTATION bool operator==(const Codeword other) const { return codeword == other.codeword; }
 
   DEVICE_ANNOTATION uint32_t packedCodeword() const { return codeword; }
   DEVICE_ANNOTATION unsigned __int128 packedColors8() const { return colorCounts8; }

@@ -80,6 +80,8 @@ if (CMAKE_CUDA_COMPILER)
             --relocatable-device-code=true
             --default-stream per-thread
             -fno-omit-frame-pointer
+            --extended-lambda
+            -dc
             --std=c++17
             --forward-unknown-to-host-compiler -march=native
             >)

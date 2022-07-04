@@ -45,7 +45,8 @@ class CUDAGPUInterface : public GPUInterface<typename SubsettingStrategyConfig::
     uint32_t usedCodewords[100];
   };
 
- private:
+  // mmmfixme: tmp
+// private:
   void dumpDeviceInfo();
 
   template <typename SubsettingAlgosKernelConfig>

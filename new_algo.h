@@ -8,6 +8,7 @@
 class new_algo {
  public:
   static void run();
+  static void runGPU();
 };
 
 #endif  // MASTERMIND__NEW_ALGO_H_
