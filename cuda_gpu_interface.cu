@@ -141,10 +141,12 @@ struct SubsettingAlgosKernelConfig {
       numBlocks(threadsPerBlock<uint8_t>()) * threadsPerBlock<uint8_t>();
 
   using BlockReduce = cub::BlockReduce<IndexAndScore, THREADS_PER_BLOCK>;
+  using SmallOptsBlockReduce = cub::BlockReduce<uint, THREADS_PER_BLOCK>;
 
   union SharedMemLayout {
     SubsetSizeT subsetSizes[TOTAL_PACKED_SCORES * THREADS_PER_BLOCK];
     typename BlockReduce::TempStorage reducerTmpStorage;
+    typename SmallOptsBlockReduce::TempStorage smallOptsReducerTmpStorage;
     IndexAndScore aggregate;  // Ensure alignment for these
   };
 
