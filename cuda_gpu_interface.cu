@@ -9,6 +9,7 @@
 #define CUB_STDERR
 #include <cub/cub.cuh>
 #include <cuda/std/cstdint>
+#include <cuda/std/limits>
 #include <limits>
 #include <string>
 #include <type_traits>
@@ -99,10 +100,9 @@ struct SubsettingAlgosKernelConfig {
                                 SubsetSizeOverrideT, typename SubsettingStrategyConfig::SubsetSizeT>::type;
 
   // This subset size is good given the PS size, or this is the default type provided by the Strategy.
-  // This is quite coarse: sure, no subset can be larger that PS size, but it's also unlikely that any PS has a single
-  // subset. Provable? If so, with a better bound?
-  static bool shouldUseType(uint32_t possibleSolutionsCount) {
-    return possibleSolutionsCount < numeric_limits<SubsetSizeT>::max() ||
+  // No subset can be larger than PS, but a single subset may equal PS in the worst case.
+  __host__ __device__ static bool shouldUseType(uint32_t possibleSolutionsCount) {
+    return possibleSolutionsCount < cuda::std::numeric_limits<SubsetSizeT>::max() ||
            sizeof(SubsetSizeOverrideT) == sizeof(typename SubsettingStrategyConfig::SubsetSizeT);
   }
 

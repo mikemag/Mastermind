@@ -10,6 +10,7 @@
 #include <thrust/device_vector.h>
 #include <thrust/for_each.h>
 #include <thrust/host_vector.h>
+#include <thrust/iterator/discard_iterator.h>
 #include <thrust/iterator/zip_iterator.h>
 #include <thrust/logical.h>
 #include <thrust/zip_function.h>
@@ -236,9 +237,9 @@ struct RegionRun {
 template <uint32_t PIN_COUNT, Algo ALGO, typename SubsetSizeT, typename CodewordT>
 __device__ void computeSubsetSizesNew(SubsetSizeT* __restrict__ subsetSizes, const uint32_t secret,
                                       const uint4 secretColors, const CodewordT* __restrict__ allCodewords,
-                                      const RegionID* __restrict__ regions, uint32_t runStart, uint32_t runLength) {
+                                      const CodewordT* __restrict__ regions, uint32_t runStart, uint32_t runLength) {
   for (uint32_t i = runStart; i < runStart + runLength; i++) {
-    auto &ps = allCodewords[regions[i].index];
+    auto& ps = regions[i];
     unsigned __int128 pc8 = ps.packedColors8();  // Annoying...
     uint score = scoreCodewords<PIN_COUNT>(secret, secretColors, ps.packedCodeword(), *(uint4*)&pc8);
     if (ALGO == Algo::MostParts) {
@@ -252,8 +253,8 @@ __device__ void computeSubsetSizesNew(SubsetSizeT* __restrict__ subsetSizes, con
 template <typename SubsettingAlgosKernelConfig, typename LittleStuffT>
 __global__ void subsettingAlgosKernelNew(
     const typename SubsettingAlgosKernelConfig::CodewordT* __restrict__ allCodewords,
-    const RegionID* __restrict__ regions, uint32_t runStart, uint32_t runLength, LittleStuffT* __restrict__ littleStuff,
-    IndexAndScore* __restrict__ perBlockSolutions) {
+    const typename SubsettingAlgosKernelConfig::CodewordT* __restrict__ regions, uint32_t runStart, uint32_t runLength,
+    LittleStuffT* __restrict__ littleStuff, IndexAndScore* __restrict__ perBlockSolutions) {
   __shared__ typename SubsettingAlgosKernelConfig::SharedMemLayout sharedMem;
 
   const uint tidGrid = blockDim.x * blockIdx.x + threadIdx.x;
@@ -346,7 +347,7 @@ __global__ void subsettingAlgosKernelNew(
 
 template <uint32_t blockSize>
 __global__ void reduceMaxScoreNew(IndexAndScore* __restrict__ perBlockSolutions, const uint32_t solutionsCount,
-                                  const RegionID* __restrict__ regions, int* __restrict__ nextMoves, const int runStart,
+                                  const uint32_t* __restrict__ regions, int* __restrict__ nextMoves, const int runStart,
                                   const int runLength) {
   uint32_t idx = threadIdx.x;
   IndexAndScoreReducer reduce;
@@ -367,11 +368,11 @@ __global__ void reduceMaxScoreNew(IndexAndScore* __restrict__ perBlockSolutions,
   }
 
   for (uint32_t i = idx; i < runLength; i += blockSize) {
-    nextMoves[regions[i + runStart].index] = shared[0].index;
+    nextMoves[regions[i + runStart]] = shared[0].index;
   }
 }
 
-__global__ void simpleRuns(const RegionID* __restrict__ regions, int* __restrict__ nextMoves,
+__global__ void simpleRuns(const uint32_t* __restrict__ regions, int* __restrict__ nextMoves,
                            const int* __restrict__ runStarts, const int* __restrict__ runLengths, const int runCount) {
   uint32_t idx = threadIdx.x;
 
@@ -379,48 +380,58 @@ __global__ void simpleRuns(const RegionID* __restrict__ regions, int* __restrict
     auto runStart = runStarts[runIndex];
     auto runLength = runLengths[runIndex];
     if (runLength == 1) {
-      nextMoves[regions[runStart].index] = regions[runStart].index;
+      nextMoves[regions[runStart]] = regions[runStart];
     } else if (runLength == 2) {
-      nextMoves[regions[runStart].index] = regions[runStart].index;
-      nextMoves[regions[runStart + 1].index] = regions[runStart].index;
+      nextMoves[regions[runStart]] = regions[runStart];
+      nextMoves[regions[runStart + 1]] = regions[runStart];
     }
   }
 }
 
-template <typename SubsettingAlgosKernelConfig, typename LittleStuffT>
-__global__ void newGuessForRegions(const typename SubsettingAlgosKernelConfig::CodewordT* __restrict__ allCodewords,
-                                   const RegionID* __restrict__ regions, int* __restrict__ nextMoves,
-                                   const RegionID* __restrict__ runRegions, const int* __restrict__ runStarts,
-                                   const int* __restrict__ runLengths, const int offset, const int runsCount,
-                                   LittleStuffT* __restrict__ littleStuffsPool,
+__global__ void newGuessForRegions(const CodewordT* __restrict__ allCodewords,
+                                   const CodewordT* __restrict__ regionsAsCodeword,
+                                   const uint32_t* __restrict__ regionsAdIndex, int* __restrict__ nextMoves,
+                                   const int* __restrict__ runStarts, const int* __restrict__ runLengths,
+                                   const int offset, const int runsCount,
                                    IndexAndScore* __restrict__ perBlockSolutionsPool) {
   uint tidGrid = blockDim.x * blockIdx.x + threadIdx.x;
 
   if (tidGrid < runsCount) {
-    //    auto& rid = runRegions[offset + tidGrid];
     auto runStart = runStarts[offset + tidGrid];
     auto runLength = runLengths[offset + tidGrid];
+    auto perBlockSolutions =
+        &perBlockSolutionsPool[SubsettingAlgosKernelConfig<SC, uint32_t>::LARGEST_NUM_BLOCKS * tidGrid];
 
-#if 0
-    if (runLength == 1) {
-      nextMoves[regions[runStart].index] = regions[runStart].index;
-    } else if (runLength == 2) {
-      nextMoves[regions[runStart].index] = regions[runStart].index;
-      nextMoves[regions[runStart + 1].index] = regions[runStart].index;
-    } else
-#endif
-    {
-      auto littleStuff = &littleStuffsPool[tidGrid];
-      auto perBlockSolutions = &perBlockSolutionsPool[tidGrid * SubsettingAlgosKernelConfig::NUM_BLOCKS];
+    using config8 = SubsettingAlgosKernelConfig<SC, uint8_t>;
+    using config16 = SubsettingAlgosKernelConfig<SC, uint16_t>;
+    using config32 = SubsettingAlgosKernelConfig<SC, uint32_t>;
 
-      subsettingAlgosKernelNew<SubsettingAlgosKernelConfig>
-          <<<SubsettingAlgosKernelConfig::NUM_BLOCKS, SubsettingAlgosKernelConfig::THREADS_PER_BLOCK>>>(
-              allCodewords, regions, runStart, runLength, littleStuff, perBlockSolutions);
+    if (config8::shouldUseType(runLength)) {
+      subsettingAlgosKernelNew<config8, LittleStuffNew><<<config8::NUM_BLOCKS, config8::THREADS_PER_BLOCK>>>(
+          allCodewords, regionsAsCodeword, runStart, runLength, nullptr, perBlockSolutions);
       CubDebug(cudaGetLastError());
 
       // nb: block size on this one must be a power of 2
-      reduceMaxScoreNew<128><<<1, 128>>>(perBlockSolutions, SubsettingAlgosKernelConfig::NUM_BLOCKS, regions, nextMoves,
-                                         runStart, runLength);
+      reduceMaxScoreNew<128>
+          <<<1, 128>>>(perBlockSolutions, config8::NUM_BLOCKS, regionsAdIndex, nextMoves, runStart, runLength);
+      CubDebug(cudaGetLastError());
+    } else if (config16::shouldUseType(runLength)) {
+      subsettingAlgosKernelNew<config16, LittleStuffNew><<<config16::NUM_BLOCKS, config16::THREADS_PER_BLOCK>>>(
+          allCodewords, regionsAsCodeword, runStart, runLength, nullptr, perBlockSolutions);
+      CubDebug(cudaGetLastError());
+
+      // nb: block size on this one must be a power of 2
+      reduceMaxScoreNew<128>
+          <<<1, 128>>>(perBlockSolutions, config8::NUM_BLOCKS, regionsAdIndex, nextMoves, runStart, runLength);
+      CubDebug(cudaGetLastError());
+    } else {
+      subsettingAlgosKernelNew<config32, LittleStuffNew><<<config32::NUM_BLOCKS, config32::THREADS_PER_BLOCK>>>(
+          allCodewords, regionsAsCodeword, runStart, runLength, nullptr, perBlockSolutions);
+      CubDebug(cudaGetLastError());
+
+      // nb: block size on this one must be a power of 2
+      reduceMaxScoreNew<128>
+          <<<1, 128>>>(perBlockSolutions, config8::NUM_BLOCKS, regionsAdIndex, nextMoves, runStart, runLength);
       CubDebug(cudaGetLastError());
     }
   }
@@ -440,27 +451,30 @@ void new_algo::runGPU() {
 
   // Starting case: all games, initial guess.
   //  vector<CodewordT> used{};
-  int i = 0;
-  for (; i < allCodewords.size(); i++) {
-    if (allCodewords[i] == INITIAL_GUESS) break;
+  int igIndex = 0;
+  for (; igIndex < allCodewords.size(); igIndex++) {
+    if (allCodewords[igIndex] == INITIAL_GUESS) break;
   }
-  thrust::device_vector<int> dNextMoves(allCodewords.size(), i);
+  thrust::device_vector<int> dNextMoves(allCodewords.size(), igIndex);
   thrust::host_vector<RegionID> hRegions(allCodewords.size());
   for (int i = 0; i < hRegions.size(); i++) hRegions[i].index = i;
   thrust::device_vector<RegionID> dRegions = hRegions;
 
-  thrust::device_vector<RegionID> runIds(dRegions.size());
+  //  thrust::device_vector<RegionID> runIds(dRegions.size());
   thrust::device_vector<int> runStarts(dRegions.size());
   thrust::device_vector<int> runLengths(dRegions.size());
-  thrust::host_vector<int> hRunStarts(dRegions.size());
+  //  thrust::host_vector<int> hRunStarts(dRegions.size());
   thrust::host_vector<int> hRunLengths(dRegions.size());
 
   size_t chunkSize = 256;
-  thrust::device_vector<LittleStuffNew> dLittleStuffs(chunkSize);
+  //  thrust::device_vector<LittleStuffNew> dLittleStuffs(chunkSize);
   thrust::device_vector<IndexAndScore> dPerBlockSolutions(
       SubsettingAlgosKernelConfig<SC, uint32_t>::LARGEST_NUM_BLOCKS * chunkSize);
-  auto pdLittleStuffs = thrust::raw_pointer_cast(dLittleStuffs.data());
+  //  auto pdLittleStuffs = thrust::raw_pointer_cast(dLittleStuffs.data());
   auto pdPerBlockSolutions = thrust::raw_pointer_cast(dPerBlockSolutions.data());
+
+  thrust::device_vector<uint32_t> dRegionsAsIndex(dRegions.size());
+  thrust::device_vector<CodewordT> dRegionsAsCodeword(dRegions.size());
 
   auto dRegionsEnd = dRegions.end();
 
@@ -476,7 +490,7 @@ void new_algo::runGPU() {
 
     auto pAllCodewords = thrust::raw_pointer_cast(dAllCodewords.data());
     auto pNextmoves = thrust::raw_pointer_cast(dNextMoves.data());
-    auto pRegions = thrust::raw_pointer_cast(dRegions.data());
+    //    auto pRegions = thrust::raw_pointer_cast(dRegions.data());
 
     thrust::for_each(dRegions.begin(), dRegionsEnd, [=] __device__(RegionID & r) {
       auto cwi = r.index;
@@ -508,25 +522,23 @@ void new_algo::runGPU() {
 
     // Get start and run length for each region by id.
     //   - at the start there are 14, at the end there are 1296
-    // mmmfixme: I don't think I need the keys out, since I compute starts and just index w/ that when I want to.
-    //  - An iterator to drop those, like /dev/null? discard_iterator
     size_t num_runs =
-        thrust::reduce_by_key(dRegions.begin(), dRegionsEnd, thrust::constant_iterator<int>(1), runIds.begin(),
-                              runLengths.begin(),
+        thrust::reduce_by_key(dRegions.begin(), dRegionsEnd, thrust::constant_iterator<int>(1),
+                              thrust::make_discard_iterator(), runLengths.begin(),
                               [] __device__(const RegionID& a, const RegionID& b) { return a.value == b.value; })
-            .first -
-        runIds.begin();
+            .second -
+        runLengths.begin();
 
     thrust::exclusive_scan(runLengths.begin(), runLengths.begin() + num_runs, runStarts.begin());
 
-    // mmmfixme: re-sort {runStarts, runLengths} by length.
-    //  - Then treat groups of those differently below.
-    //    - All the 1's and 2's can get a special kernel to blast the simple result into place w/ max overlap.
-    //    - All the rest of size PS or smaller can get a shortcut kernel first.
-
-    thrust::sort_by_key(runLengths.begin(), runLengths.begin() + num_runs,
-                        thrust::make_zip_iterator(thrust::make_tuple(runStarts.begin(), runIds.begin())));
+    thrust::sort_by_key(runLengths.begin(), runLengths.begin() + num_runs, runStarts.begin());
     hRunLengths = runLengths;
+
+    // mmmfixme: these could probably be one zipped transform
+    thrust::transform(dRegions.begin(), dRegionsEnd, dRegionsAsIndex.begin(),
+                      [] __device__(const RegionID& r) { return r.index; });
+    thrust::transform(dRegions.begin(), dRegionsEnd, dRegionsAsCodeword.begin(),
+                      [pAllCodewords] __device__(const RegionID& r) { return pAllCodewords[r.index]; });
 
     {
       auto endTime = chrono::high_resolution_clock::now();
@@ -546,9 +558,11 @@ void new_algo::runGPU() {
     // For reach region:
     //   - find next guess using the region as PS, this is the next guess for all games in this region
     //   - games already won (a win at the end of their region id) get no new guess
-    auto pRunIds = thrust::raw_pointer_cast(runIds.data());
+    //    auto pRunIds = thrust::raw_pointer_cast(runIds.data());
     auto pRunStarts = thrust::raw_pointer_cast(runStarts.data());
     auto pRunLengths = thrust::raw_pointer_cast(runLengths.data());
+    auto pRegionsAsIndex = thrust::raw_pointer_cast(dRegionsAsIndex.data());
+    auto pRegionsAsCodeword = thrust::raw_pointer_cast(dRegionsAsCodeword.data());
 
     int ri = 0;
     int regionCnt = 0;
@@ -558,11 +572,11 @@ void new_algo::runGPU() {
     }
     printf("Simple runs: %d, totalling %d regions\n", ri, regionCnt);
     if (ri > 0) {
-      simpleRuns<<<1, 128>>>(pRegions, pNextmoves, pRunStarts, pRunLengths, ri);
+      simpleRuns<<<1, 128>>>(pRegionsAsIndex, pNextmoves, pRunStarts, pRunLengths, ri);
     }
 
-#if 1
     int bigBoyLaunches = 0;
+#if 0
     int pbsIndex = 0;
     for (; ri < num_runs; ri++) {
       auto runStart = runStarts[ri];
@@ -572,7 +586,7 @@ void new_algo::runGPU() {
         pbsIndex = 0;
         //        CubDebug(cudaDeviceSynchronize());
       }
-      auto perBlockSolutions = &pdPerBlockSolutions[pbsIndex++];
+      auto perBlockSolutions = &pdPerBlockSolutions[SubsettingAlgosKernelConfig<SC, uint32_t>::LARGEST_NUM_BLOCKS * pbsIndex++];
       auto littleStuff = &pdLittleStuffs[pbsIndex++];
 
       bigBoyLaunches++;
@@ -582,45 +596,45 @@ void new_algo::runGPU() {
 
       if (config8::shouldUseType(hRunLengths[ri])) {
         subsettingAlgosKernelNew<config8><<<config8::NUM_BLOCKS, config8::THREADS_PER_BLOCK>>>(
-            pAllCodewords, pRegions, runStart, runLength, littleStuff, perBlockSolutions);
+            pAllCodewords, pRegionsAsCodeword, runStart, runLength, littleStuff, perBlockSolutions);
         CubDebug(cudaGetLastError());
 
         // nb: block size on this one must be a power of 2
         reduceMaxScoreNew<128>
-            <<<1, 128>>>(perBlockSolutions, config8::NUM_BLOCKS, pRegions, pNextmoves, runStart, runLength);
+            <<<1, 128>>>(perBlockSolutions, config8::NUM_BLOCKS, pRegionsAsIndex, pNextmoves, runStart, runLength);
         CubDebug(cudaGetLastError());
       } else if (config16::shouldUseType(hRunLengths[ri])) {
         subsettingAlgosKernelNew<config16><<<config16::NUM_BLOCKS, config16::THREADS_PER_BLOCK>>>(
-            pAllCodewords, pRegions, runStart, runLength, littleStuff, perBlockSolutions);
+            pAllCodewords, pRegionsAsCodeword, runStart, runLength, littleStuff, perBlockSolutions);
         CubDebug(cudaGetLastError());
 
         // nb: block size on this one must be a power of 2
         reduceMaxScoreNew<128>
-            <<<1, 128>>>(perBlockSolutions, config16::NUM_BLOCKS, pRegions, pNextmoves, runStart, runLength);
+            <<<1, 128>>>(perBlockSolutions, config16::NUM_BLOCKS, pRegionsAsIndex, pNextmoves, runStart, runLength);
         CubDebug(cudaGetLastError());
       } else {
         subsettingAlgosKernelNew<config32><<<config32::NUM_BLOCKS, config32::THREADS_PER_BLOCK>>>(
-            pAllCodewords, pRegions, runStart, runLength, littleStuff, perBlockSolutions);
+            pAllCodewords, pRegionsAsCodeword, runStart, runLength, littleStuff, perBlockSolutions);
         CubDebug(cudaGetLastError());
 
         // nb: block size on this one must be a power of 2
         reduceMaxScoreNew<128>
-            <<<1, 128>>>(perBlockSolutions, config32::NUM_BLOCKS, pRegions, pNextmoves, runStart, runLength);
+            <<<1, 128>>>(perBlockSolutions, config32::NUM_BLOCKS, pRegionsAsIndex, pNextmoves, runStart, runLength);
         CubDebug(cudaGetLastError());
       }
     }
-    printf("Big Boy Launches: %d\n", bigBoyLaunches);
 #else
     for (size_t offset = ri; offset < num_runs; offset += chunkSize) {
       auto runsToDo = min(chunkSize, num_runs - offset);
-      int threadsPerBlock = 4;
+      int threadsPerBlock = 4;  // mmmfixme: odd...
 
-      newGuessForRegions<config32, LittleStuffNew>
-          <<<(runsToDo + threadsPerBlock - 1) / threadsPerBlock, threadsPerBlock>>>(
-              pAllCodewords, pRegions, pNextmoves, pRunIds, pRunStarts, pRunLengths, offset, runsToDo, pdLittleStuffs,
-              pdPerBlockSolutions);
+      bigBoyLaunches++;
+      newGuessForRegions<<<(runsToDo + threadsPerBlock - 1) / threadsPerBlock, threadsPerBlock>>>(
+          pAllCodewords, pRegionsAsCodeword, pRegionsAsIndex, pNextmoves, pRunStarts, pRunLengths, offset, runsToDo,
+          pdPerBlockSolutions);
     }
 #endif
+    printf("Big Boy Launches: %d\n", bigBoyLaunches);
     CubDebug(cudaDeviceSynchronize());
 
     {
