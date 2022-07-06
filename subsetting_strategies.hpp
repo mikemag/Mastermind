@@ -7,9 +7,9 @@
 
 #include <unordered_map>
 
-#ifdef __CUDACC__
-#include "cuda_gpu_interface.cuh"
-#endif
+//#ifdef __CUDACC__
+//#include "cuda_gpu_interface.cuh"
+//#endif
 
 #ifdef __MM_GPU_METAL__
 #include "metal_gpu_interface_wrapper.hpp"
@@ -160,7 +160,7 @@ class StrategySubsettingGPU : public StrategySubsetting<StrategyConfig, Derived>
 #ifdef __MM_GPU_METAL__
       gpuRootData->gpuInterface = new MetalGPUInterfaceWrapper(SubsettingStrategyConfig::PIN_COUNT,
                                                                (uint)CodewordT::TOTAL_CODEWORDS, kernelName);
-#elif __CUDACC__
+//#elif __CUDACC__
       gpuRootData->gpuInterface = new CUDAGPUInterface<SubsettingStrategyConfig>(CodewordT::getAllCodewords());
 #else
       gpuRootData->gpuInterface = new NoGPUInterface<CodewordT>();

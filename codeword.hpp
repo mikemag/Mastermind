@@ -45,6 +45,17 @@ class Codeword {
 
   std::ostream &dump(std::ostream &stream) const;
 
+  constexpr static uint32_t computeOrdinal(uint32_t word) {
+    uint32_t o = 0;
+    uint32_t mult = 1;
+    for (int i = 0; i < PIN_COUNT; i++) {
+      o += ((word & 0xFu) - 1) * mult;
+      word >>= 4u;
+      mult *= COLOR_COUNT;
+    }
+    return o;
+  }
+
  private:
   unsigned __int128 colorCounts8;  // Room for 16 8-bit counters
   uint32_t codeword;
@@ -76,18 +87,6 @@ class Codeword {
       word >>= 4u;
     }
     return cc4;
-  }
-
-  // Legacy, but here for reference.
-  constexpr static uint32_t computeOrdinal(uint32_t word) {
-    uint32_t o = 0;
-    uint32_t mult = 1;
-    for (int i = 0; i < PIN_COUNT; i++) {
-      o += ((word & 0xFu) - 1) * mult;
-      word >>= 4u;
-      mult *= COLOR_COUNT;
-    }
-    return o;
   }
 };
 

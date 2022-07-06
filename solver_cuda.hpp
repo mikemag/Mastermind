@@ -20,6 +20,8 @@ class SolverCUDA : public Solver<SolverConfig> {
  public:
   void playAllGames() override;
 
+
+
 };
 
 #include "solver_cuda.inl"
