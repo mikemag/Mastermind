@@ -5,22 +5,22 @@
 
 #pragma once
 
+#include "algos.hpp"
 #include "codeword.hpp"
-#include "compute_kernel_constants.h"  // mmmfixme: for Algo
-#include "preset_initial_guesses.h"
 
-template <uint8_t PIN_COUNT_, uint8_t COLOR_COUNT_, bool LOG_, Algo ALGO_>
+template <uint8_t PIN_COUNT_, uint8_t COLOR_COUNT_, bool LOG_, typename ALGO_>
 struct SolverConfig {
   constexpr static uint8_t PIN_COUNT = PIN_COUNT_;
   constexpr static uint8_t COLOR_COUNT = COLOR_COUNT_;
   constexpr static bool LOG = LOG_;
-  constexpr static Algo ALGO = ALGO_;
+  using ALGO = ALGO_;
 
   using CodewordT = Codeword<PIN_COUNT, COLOR_COUNT>;
+  using SubsetSizeT = typename ALGO::MaxSubsetSizeT;
 
   constexpr static int TOTAL_SCORES = (PIN_COUNT * (PIN_COUNT + 3)) / 2;
   constexpr static uint32_t MAX_SCORE_SLOTS = (PIN_COUNT << 4u) + 1;
-  constexpr static CodewordT INITIAL_GUESS = presetInitialGuess<PIN_COUNT, COLOR_COUNT, ALGO>();
+  constexpr static CodewordT INITIAL_GUESS = ALGO::template presetInitialGuess<PIN_COUNT, COLOR_COUNT>();
 
   // Packed scores have room for the extra impossible score, so +1 for imperfect packing
   constexpr static int TOTAL_PACKED_SCORES = TOTAL_SCORES + 1;

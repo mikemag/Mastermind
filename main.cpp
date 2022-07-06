@@ -13,9 +13,12 @@
 #include "simple_strategies.hpp"
 #include "solver.hpp"
 #include "solver_cpu_reference.hpp"
-#include "solver_cuda.hpp"
 #include "strategy.hpp"
 #include "subsetting_strategies.hpp"
+
+#if __CUDACC__
+#include "solver_cuda.hpp"
+#endif
 
 using namespace std;
 
@@ -348,8 +351,8 @@ void playAllGames(Solver<SolverConfig>& solver, StatsRecorder& statsRecorder) {
 
 int main(int argc, const char* argv[]) {
   if (true) {  // TODO: temp placement
-    //      SolverReferenceImpl<SolverConfig<4, 6, false, Algo::Knuth>> solver{};
-    SolverCUDA<SolverConfig<8, 5, true, Algo::Knuth>> solver{};
+//    SolverReferenceImpl<SolverConfig<4, 6, false, Algos::Knuth>> solver{};
+    SolverCUDA<SolverConfig<8, 5, true, Algos::Knuth>> solver{};
     StatsRecorder statsRecorder;
     statsRecorder.newRun();
     playAllGames(solver, statsRecorder);

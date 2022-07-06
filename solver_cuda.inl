@@ -21,9 +21,8 @@
 #include <new>
 #include <vector>
 
+#include "algos.hpp"
 #include "codeword.hpp"
-#include "gpu_interface.hpp"
-#include "strategy_config.hpp"
 
 // CUDA implementation for playing all games at once
 //
@@ -51,17 +50,8 @@
 //       games with a win at the end of their region id get no new guess
 //       otherwise, find next guess using the region itself as the possible solutions set PS
 
-// mmmfixme: nuke these and properly template the kernels below. This was for some quick hacking but it's a mess now.
-constexpr static int PIN_COUNT = 8;
-constexpr static int COLOR_COUNT = 5;
-static constexpr uint32_t INITIAL_GUESS = presetInitialGuessKnuth<PIN_COUNT, COLOR_COUNT>();
-using CodewordT = Codeword<PIN_COUNT, COLOR_COUNT>;
-static constexpr int TOTAL_PACKED_SCORES = ((PIN_COUNT * (PIN_COUNT + 3)) / 2) + 1;
-
-using SC = SubsettingStrategyConfig<PIN_COUNT, COLOR_COUNT, false, Algo::Knuth, uint32_t>;
-
 // mmmfixme: name and placement of both of these
-template <typename T>
+template <typename T, uint8_t WINNING_SCORE>
 struct RegionIDLR {
   T value = 0;
   uint32_t index;
@@ -82,7 +72,7 @@ struct RegionIDLR {
   __host__ __device__ bool isGameOver() const {
     auto v = value;
     while (v != 0) {
-      if ((v & 0xFF) == TOTAL_PACKED_SCORES - 1) return true;
+      if ((v & 0xFF) == WINNING_SCORE) return true;
       v >>= 8;
     }
     return false;
@@ -94,7 +84,7 @@ struct RegionIDLR {
     while (v != 0) {
       c++;
       static constexpr auto highByteShift = cuda::std::numeric_limits<T>::digits - CHAR_BIT;
-      if (((v & (static_cast<T>(0xFF) << highByteShift)) >> highByteShift) == TOTAL_PACKED_SCORES - 1) break;
+      if (((v & (static_cast<T>(0xFF) << highByteShift)) >> highByteShift) == WINNING_SCORE) break;
       v <<= 8;
     }
     return c;
@@ -112,6 +102,7 @@ struct RegionIDLR {
   }
 };
 
+#if 0
 struct RegionIDRL {
   unsigned __int128 value = 0;
   uint32_t index;
@@ -143,11 +134,14 @@ struct RegionIDRL {
     return stream;
   }
 };
+#endif
 
-using RegionID = RegionIDLR<unsigned __int128>;
 // using RegionID = RegionIDLR<uint64_t>;
 
-std::ostream& operator<<(std::ostream& stream, const RegionID& r) { return r.dump(stream); }
+template <typename T, uint8_t WINNING_SCORE>
+std::ostream& operator<<(std::ostream& stream, const RegionIDLR<T, WINNING_SCORE>& r) {
+  return r.dump(stream);
+}
 
 // scoring all games in a region subdivides it, one new region per score.
 // - sorting the region by score gets us runs of games we can apply the same guess to
@@ -243,30 +237,90 @@ __device__ uint scoreCodewords(const uint32_t secret, const uint4 secretColors, 
   return b * PIN_COUNT - ((b - 1) * b) / 2 + allHits;
 }
 
-// mmmfixme: do I still need the override for subset size w/ the removal of the old Strategy stuff?
-// Holds all the constants we need to kick off a CUDA kernel for all the subsetting strategies given a strategy config.
+// mmmfixme: which of these, if any, are screwed up due to the Thrust device vectors being properly sized, and not
+//  rounded up to the next block size?
+
+// Score all possible solutions against a given secret and compute subset sizes, which are the number of codewords per
+// score.
+template <typename SolverConfig, typename SubsetSizeT, typename CodewordT>
+__device__ void computeSubsetSizes(SubsetSizeT* __restrict__ subsetSizes, const uint32_t secret,
+                                   const uint4 secretColors, const CodewordT* __restrict__ regionIDsAsCodeword,
+                                   uint32_t regionStart, uint32_t regionLength) {
+  for (uint32_t i = regionStart; i < regionStart + regionLength; i++) {
+    auto& ps = regionIDsAsCodeword[i];
+    unsigned __int128 pc8 = ps.packedColors8();  // Annoying...
+    uint score = scoreCodewords<SolverConfig::PIN_COUNT>(secret, secretColors, ps.packedCodeword(), *(uint4*)&pc8);
+    SolverConfig::ALGO::accumulateSubsetSize(subsetSizes[score]);
+  }
+}
+
+// Score all possible solutions against a given secret and compute subset sizes, which are the number of codewords per
+// score. Specialized for small regions with a fixed length.
+// TODO: more detailed specializations for specific small sizes, like 3.
+template <typename SolverConfig, uint32_t REGION_LENGTH = 0, typename SubsetSizeT, typename CodewordT>
+__device__ void computeSubsetSizesFixedLength(SubsetSizeT* __restrict__ subsetSizes, const uint32_t secret,
+                                              const uint4 secretColors,
+                                              const CodewordT* __restrict__ regionIDsAsCodeword, uint32_t regionStart,
+                                              uint32_t secretIndex) {
+  for (uint32_t i = regionStart; i < regionStart + REGION_LENGTH; i++) {
+    if (i == secretIndex) {  // don't score w/ self, we know it's a win
+      subsetSizes[SolverConfig::TOTAL_PACKED_SCORES - 1] = 1;
+    } else {
+      auto& ps = regionIDsAsCodeword[i];
+      unsigned __int128 pc8 = ps.packedColors8();  // Annoying...
+      uint score = scoreCodewords<SolverConfig::PIN_COUNT>(secret, secretColors, ps.packedCodeword(), *(uint4*)&pc8);
+      subsetSizes[score] = 1;
+    }
+  }
+}
+
+// Reducer for per-thread scores, used for CUB per-block and device reductions.
+struct IndexAndScoreReducer {
+  __device__ __forceinline__ IndexAndScore operator()(const IndexAndScore& a, const IndexAndScore& b) const {
+    // Always take the best score. If it's a tie, take the one that could be a solution. If that's a tie, take lexically
+    // first.
+#if 0
+    // mmmfixme: worth it?
+    if (b.isFD || a.isFD) {
+      if (b.isFD && a.isFD) {
+        if (b.isPossibleSolution ^ a.isPossibleSolution) return b.isPossibleSolution ? b : a;
+        return (b.index < a.index) ? b : a;
+      }
+      return b.isFD ? b : a;
+    }
+#endif
+
+    if (b.score > a.score) return b;
+    if (b.score < a.score) return a;
+    if (b.isPossibleSolution ^ a.isPossibleSolution) return b.isPossibleSolution ? b : a;
+    return (b.index < a.index) ? b : a;
+  }
+};
+
+// Holds all the constants we need to kick off the CUDA kernel for all the subsetting algos given a solver config.
 // Computes how many threads per block, blocks needed, and importantly shared memory size. Can override the subset
 // counter type to be smaller than the one given by the Strategy when we know the max subset size is small enough.
-template <typename SubsettingStrategyConfig, typename SubsetSizeOverrideT = uint32_t>
+template <typename SolverConfig_, typename SubsetSizeOverrideT = uint32_t>
 struct SubsettingAlgosKernelConfig {
-  static constexpr uint8_t PIN_COUNT = SubsettingStrategyConfig::PIN_COUNT;
-  static constexpr uint8_t COLOR_COUNT = SubsettingStrategyConfig::COLOR_COUNT;
-  static constexpr bool LOG = SubsettingStrategyConfig::LOG;
-  static constexpr Algo ALGO = SubsettingStrategyConfig::ALGO;
+  using SolverConfig = SolverConfig_;
+  static constexpr uint8_t PIN_COUNT = SolverConfig::PIN_COUNT;
+  static constexpr uint8_t COLOR_COUNT = SolverConfig::COLOR_COUNT;
+  static constexpr bool LOG = SolverConfig::LOG;
+  using ALGO = typename SolverConfig::ALGO;
   using CodewordT = Codeword<PIN_COUNT, COLOR_COUNT>;
 
   // Total scores = (PIN_COUNT * (PIN_COUNT + 3)) / 2, but +1 for imperfect packing.
   static constexpr int TOTAL_PACKED_SCORES = ((PIN_COUNT * (PIN_COUNT + 3)) / 2) + 1;
 
   using SubsetSizeT =
-      typename std::conditional<sizeof(SubsetSizeOverrideT) < sizeof(typename SubsettingStrategyConfig::SubsetSizeT),
-                                SubsetSizeOverrideT, typename SubsettingStrategyConfig::SubsetSizeT>::type;
+      typename std::conditional<sizeof(SubsetSizeOverrideT) < sizeof(typename SolverConfig::SubsetSizeT),
+                                SubsetSizeOverrideT, typename SolverConfig::SubsetSizeT>::type;
 
   // This subset size is good given the PS size, or this is the default type provided by the Strategy.
   // No subset can be larger than PS, but a single subset may equal PS in the worst case.
   __host__ __device__ static bool shouldUseType(uint32_t possibleSolutionsCount) {
     return possibleSolutionsCount < cuda::std::numeric_limits<SubsetSizeT>::max() ||
-           sizeof(SubsetSizeOverrideT) == sizeof(typename SubsettingStrategyConfig::SubsetSizeT);
+           sizeof(SubsetSizeOverrideT) == sizeof(typename SolverConfig::SubsetSizeT);
   }
 
   // Max threads we could put in a group given how much shared memory space we need for packed subset counters.
@@ -323,82 +377,28 @@ struct SubsettingAlgosKernelConfig {
 };
 
 // Little tests
-using testConfig = SubsettingAlgosKernelConfig<SubsettingStrategyConfig<8, 5, false, Algo::Knuth, uint32_t>>;
+using testConfig = SubsettingAlgosKernelConfig<SolverConfig<8, 5, false, Algos::Knuth>>;
 static_assert(nextPowerOfTwo(uint32_t(136)) == 256);
 static_assert(testConfig::maxThreadsFromSubsetType<uint32_t>() == 256);
 static_assert(testConfig::numBlocks(testConfig::threadsPerBlock<uint32_t>()) == 1526);
 
-// Reducer for per-thread scores, used for CUB per-block and device reductions.
-struct IndexAndScoreReducer {
-  __device__ __forceinline__ IndexAndScore operator()(const IndexAndScore& a, const IndexAndScore& b) const {
-    // Always take the best score. If it's a tie, take the one that could be a solution. If that's a tie, take lexically
-    // first.
-#if 0
-    // mmmfixme: worth it?
-    if (b.isFD || a.isFD) {
-      if (b.isFD && a.isFD) {
-        if (b.isPossibleSolution ^ a.isPossibleSolution) return b.isPossibleSolution ? b : a;
-        return (b.index < a.index) ? b : a;
-      }
-      return b.isFD ? b : a;
-    }
-#endif
-
-    if (b.score > a.score) return b;
-    if (b.score < a.score) return a;
-    if (b.isPossibleSolution ^ a.isPossibleSolution) return b.isPossibleSolution ? b : a;
-    return (b.index < a.index) ? b : a;
-  }
-};
-
-// mmmfixme: which of these, if any, are screwed up due to the Thrust device vectors being properly sized, and not
-//  rounded up to the next block size?
-
-// mmmfixme: fix names to possibleSolutions instead of regionIDsAsCodeword/runs.
-// mmmfixme: name, docs
-// The common portion of the kernels which scores all possible solutions against a given secret and computes subset
-// sizes, i.e., for each score the number of codewords with that score.
-template <uint32_t PIN_COUNT, Algo ALGO, typename SubsetSizeT, typename CodewordT>
-__device__ void computeSubsetSizesNew(SubsetSizeT* __restrict__ subsetSizes, const uint32_t secret,
-                                      const uint4 secretColors, const CodewordT* __restrict__ regionIDsAsCodeword,
-                                      uint32_t regionStart, uint32_t regionLength) {
-  for (uint32_t i = regionStart; i < regionStart + regionLength; i++) {
-    auto& ps = regionIDsAsCodeword[i];
-    unsigned __int128 pc8 = ps.packedColors8();  // Annoying...
-    uint score = scoreCodewords<PIN_COUNT>(secret, secretColors, ps.packedCodeword(), *(uint4*)&pc8);
-    if (ALGO == Algo::MostParts) {
-      subsetSizes[score] = 1;
-    } else {
-      subsetSizes[score]++;
-    }
-  }
-}
-
-// mmmfixme: docs, specialize for small regions in the FD-high opt
-// mmmfixme: name
-template <uint32_t PIN_COUNT, Algo ALGO, uint32_t regionLength, typename SubsetSizeT, typename CodewordT>
-__device__ void computeSubsetSizesNew2(SubsetSizeT* __restrict__ subsetSizes, const uint32_t secret,
-                                       const uint4 secretColors, const CodewordT* __restrict__ regionIDsAsCodeword,
-                                       uint32_t regionStart, uint32_t secretIndex) {
-  for (uint32_t i = regionStart; i < regionStart + regionLength; i++) {
-    if (i == secretIndex) {  // don't score w/ self, we know it's a win
-      subsetSizes[TOTAL_PACKED_SCORES - 1] = 1;
-    } else {
-      auto& ps = regionIDsAsCodeword[i];
-      unsigned __int128 pc8 = ps.packedColors8();  // Annoying...
-      uint score = scoreCodewords<PIN_COUNT>(secret, secretColors, ps.packedCodeword(), *(uint4*)&pc8);
-      subsetSizes[score] = 1;
-    }
-  }
-}
-
-// mmmfixme: docs, names
-// mmmfixme: broken used codewords, broken FD-low
-template <typename SubsettingAlgosKernelConfig>
-__global__ void subsettingAlgosKernelNew(
-    const typename SubsettingAlgosKernelConfig::CodewordT* __restrict__ allCodewords,
-    const typename SubsettingAlgosKernelConfig::CodewordT* __restrict__ regionIDsAsCodeword, uint32_t regionStart,
-    uint32_t regionLength, IndexAndScore* __restrict__ perBlockSolutions) {
+// This takes two sets of codewords: the "all codewords" set, which is every possible codeword, and the "possible
+// solutions" set. The all codewords set is placed into GPU memory once at program start and remains constant. The
+// possible solutions set changes each time, both content and length, and is a sub-set of allCodewords.
+//
+// All codeword pairs are scored and subset sizes computed, then each codeword is ranked for the algorithm we're
+// running. Finally, each block computes the best ranked codeword in the group, and we look for fully discriminating
+// codewords.
+//
+// Output is an array of IndexAndScores for the best selections from each block, and a single fully discriminating
+// guess.
+//
+// Finally, there's shared block memory for each thread with enough room for all the intermediate subset sizes,
+// reduction space, etc.
+template <typename SubsettingAlgosKernelConfig, typename CodewordT>
+__global__ void subsettingAlgosKernel(const CodewordT* __restrict__ allCodewords,
+                                      const CodewordT* __restrict__ regionIDsAsCodeword, uint32_t regionStart,
+                                      uint32_t regionLength, IndexAndScore* __restrict__ perBlockSolutions) {
   __shared__ typename SubsettingAlgosKernelConfig::SharedMemLayout sharedMem;
 
   const uint tidGrid = blockDim.x * blockIdx.x + threadIdx.x;
@@ -406,60 +406,28 @@ __global__ void subsettingAlgosKernelNew(
   for (int i = 0; i < SubsettingAlgosKernelConfig::TOTAL_PACKED_SCORES; i++) subsetSizes[i] = 0;
 
   unsigned __int128 apc8 = allCodewords[tidGrid].packedColors8();  // Annoying...
-  computeSubsetSizesNew<SubsettingAlgosKernelConfig::PIN_COUNT, SubsettingAlgosKernelConfig::ALGO>(
-      subsetSizes, allCodewords[tidGrid].packedCodeword(), *(uint4*)&apc8, regionIDsAsCodeword, regionStart,
-      regionLength);
+  computeSubsetSizes<SubsettingAlgosKernelConfig::SolverConfig>(subsetSizes, allCodewords[tidGrid].packedCodeword(),
+                                                                *(uint4*)&apc8, regionIDsAsCodeword, regionStart,
+                                                                regionLength);
 
   auto possibleSolutionsCount = regionLength;
   bool isPossibleSolution = subsetSizes[SubsettingAlgosKernelConfig::TOTAL_PACKED_SCORES - 1] > 0;
 
-  uint32_t largestSubsetSize = 0;
+  using ALGO = typename SubsettingAlgosKernelConfig::SolverConfig::ALGO;
+  typename ALGO::RankingAccumulatorType rankingAccumulator{};
   uint32_t totalUsedSubsets = 0;
-  float entropySum = 0.0;
-  float expectedSize = 0.0;
   for (int i = 0; i < SubsettingAlgosKernelConfig::TOTAL_PACKED_SCORES; i++) {
     if (subsetSizes[i] > 0) {
+      ALGO::accumulateRanking(rankingAccumulator, subsetSizes[i], possibleSolutionsCount);
       totalUsedSubsets++;
-      switch (SubsettingAlgosKernelConfig::ALGO) {
-        case Knuth:
-          largestSubsetSize = max(largestSubsetSize, subsetSizes[i]);
-          break;
-        case MostParts:
-          // Already done
-          break;
-        case ExpectedSize:
-          expectedSize += ((float)subsetSizes[i] * (float)subsetSizes[i]) / possibleSolutionsCount;
-          break;
-        case Entropy:
-          float pi = (float)subsetSizes[i] / possibleSolutionsCount;
-          entropySum -= pi * log(pi);
-          break;
-      }
     }
   }
-  uint32_t score;
-  switch (SubsettingAlgosKernelConfig::ALGO) {
-    case Knuth:
-      score = possibleSolutionsCount - largestSubsetSize;
-      break;
-    case MostParts:
-      score = totalUsedSubsets;
-      break;
-    case ExpectedSize:
-#pragma nv_diagnostic push
-#pragma nv_diag_suppress 68
-      // This is a bit broken, and needs to be to match the semantics in the paper.
-      score = (uint32_t)round(expectedSize * 1'000'000.0) * -1;  // 9 digits of precision
-#pragma nv_diagnostic pop
-      break;
-    case Entropy:
-      score = round(entropySum * 1'000'000'000.0);  // 9 digits of precision
-      break;
-  }
 
-  // A score of 0 will prevent used or invalid codewords from being chosen.
+  uint32_t rank = ALGO::computeRank(rankingAccumulator, possibleSolutionsCount);
+
+  // A rank of 0 will prevent used or invalid codewords from being chosen.
   if (tidGrid >= SubsettingAlgosKernelConfig::CodewordT::TOTAL_CODEWORDS) {
-    score = 0;
+    rank = 0;
     totalUsedSubsets = 0;
   }
   // mmmfixme:
@@ -467,10 +435,11 @@ __global__ void subsettingAlgosKernelNew(
   //    if (allCodewords[tidGrid] == littleStuff->usedCodewords[i]) score = 0;
   //  }
 
-  // Reduce to find the best solution we have in this block. This keeps the codeword index, score, and possible solution
+  // Reduce to find the best solution we have in this block. This keeps the codeword index, rank, and possible solution
   // indicator together.
   __syncthreads();
-  IndexAndScore ias{tidGrid, score, isPossibleSolution, false && totalUsedSubsets == possibleSolutionsCount};
+  // mmmfixme: IndexAndRank, not Score
+  IndexAndScore ias{tidGrid, rank, isPossibleSolution, false && totalUsedSubsets == possibleSolutionsCount};
   IndexAndScore bestSolution = typename SubsettingAlgosKernelConfig::BlockReduce(sharedMem.reducerTmpStorage)
                                    .Reduce(ias, IndexAndScoreReducer());
 
@@ -478,6 +447,7 @@ __global__ void subsettingAlgosKernelNew(
     perBlockSolutions[blockIdx.x] = bestSolution;
   }
 
+  // mmmfixme
   // If we find some guesses which are fully discriminating, we want to pick the first one lexically to play. tidGrid is
   // the same as the ordinal for each member of allCodewords, so we can simply take the min tidGrid.
   //  if (possibleSolutionsCount <= SubsettingAlgosKernelConfig::TOTAL_PACKED_SCORES) {
@@ -490,12 +460,12 @@ __global__ void subsettingAlgosKernelNew(
   //  }
 }
 
-// mmmfixme: docs, pushing directly to nextmoves
-// mmmfixme: name
+// Reduce the per-block best guesses from subsettingAlgosKernel to generate a single, best guess. This is then set
+// as the next move for the region.
 template <uint32_t blockSize>
-__global__ void reduceMaxScoreNew(IndexAndScore* __restrict__ perBlockSolutions, const uint32_t solutionsCount,
-                                  const uint32_t* __restrict__ regionIDsAsIndex, uint32_t* __restrict__ nextMoves,
-                                  const int regionStart, const int regionLength) {
+__global__ void reduceBestGuess(IndexAndScore* __restrict__ perBlockSolutions, const uint32_t solutionsCount,
+                                const uint32_t* __restrict__ regionIDsAsIndex, uint32_t* __restrict__ nextMoves,
+                                const int regionStart, const int regionLength) {
   uint32_t idx = threadIdx.x;
   IndexAndScoreReducer reduce;
   IndexAndScore bestScore{0, 0, false, false};
@@ -521,20 +491,20 @@ __global__ void reduceMaxScoreNew(IndexAndScore* __restrict__ perBlockSolutions,
 
 // Runs the full kernel for all the subsetting algorithms, plus the reducer afterwards. Results in nextMoves populated
 // with the best guess for the entire region.
-template <typename SubsettingAlgosKernelConfig>
+template <typename SubsettingAlgosKernelConfig, typename CodewordT>
 __device__ void launchSubsettingKernel(const CodewordT* __restrict__ allCodewords,
                                        const CodewordT* __restrict__ regionIDsAsCodeword,
                                        const uint32_t* __restrict__ regionIDsAsIndex, uint32_t* __restrict__ nextMoves,
                                        const uint32_t regionStart, const uint32_t regionLength,
                                        IndexAndScore* __restrict__ perBlockSolutions) {
-  subsettingAlgosKernelNew<SubsettingAlgosKernelConfig>
+  subsettingAlgosKernel<SubsettingAlgosKernelConfig>
       <<<SubsettingAlgosKernelConfig::NUM_BLOCKS, SubsettingAlgosKernelConfig::THREADS_PER_BLOCK>>>(
           allCodewords, regionIDsAsCodeword, regionStart, regionLength, perBlockSolutions);
   CubDebug(cudaGetLastError());
 
   // nb: block size on this one must be a power of 2
-  reduceMaxScoreNew<128><<<1, 128>>>(perBlockSolutions, SubsettingAlgosKernelConfig::NUM_BLOCKS, regionIDsAsIndex,
-                                     nextMoves, regionStart, regionLength);
+  reduceBestGuess<128><<<1, 128>>>(perBlockSolutions, SubsettingAlgosKernelConfig::NUM_BLOCKS, regionIDsAsIndex,
+                                   nextMoves, regionStart, regionLength);
   CubDebug(cudaGetLastError());
 }
 
@@ -549,16 +519,17 @@ __device__ void launchSubsettingKernel(const CodewordT* __restrict__ allCodeword
 // turns, max turns, max secret, and the full histograms all remain precisely the same. What does change is the number
 // of scores computed, and the runtime.
 
-// mmmfixme: need to template this properly and give it it's own config separate from the full kernel, but still have
-//  a config to pass thru to the full kernel.
+// mmmfixme: need to give this it's own config separate from the full kernel, but still have a config to pass thru to
+//  the full kernel.
 //  - worth it to go down o a single warp? Switch the block reduce to a warp reduce? Would need some threads to pickup
 //    the extras.
-template <typename SubsettingAlgosKernelConfig>
-__global__ void fullyDiscriminatingOpt(
-    const typename SubsettingAlgosKernelConfig::CodewordT* __restrict__ allCodewords,
-    const typename SubsettingAlgosKernelConfig::CodewordT* __restrict__ regionIDsAsCodeword,
-    const uint32_t* __restrict__ regionIDsAsIndex, uint32_t regionStart, uint32_t regionLength,
-    uint32_t* __restrict__ nextMoves, IndexAndScore* __restrict__ perBlockSolutions) {
+
+template <typename SolverConfig, typename SubsettingAlgosKernelConfig, typename CodewordT>
+__global__ void fullyDiscriminatingOpt(const CodewordT* __restrict__ allCodewords,
+                                       const CodewordT* __restrict__ regionIDsAsCodeword,
+                                       const uint32_t* __restrict__ regionIDsAsIndex, uint32_t regionStart,
+                                       uint32_t regionLength, uint32_t* __restrict__ nextMoves,
+                                       IndexAndScore* __restrict__ perBlockSolutions) {
   // mmmfixme: need separate shared mem layout from the full kernel
   __shared__ typename SubsettingAlgosKernelConfig::SharedMemLayout sharedMem;
 
@@ -567,32 +538,31 @@ __global__ void fullyDiscriminatingOpt(
 
   if (tidGrid < regionLength) {
     auto subsetSizes = &sharedMem.subsetSizes[threadIdx.x * SubsettingAlgosKernelConfig::TOTAL_PACKED_SCORES];
-    for (int i = 0; i < SubsettingAlgosKernelConfig::TOTAL_PACKED_SCORES; i++) subsetSizes[i] = 0;
+    for (int i = 0; i < SolverConfig::TOTAL_PACKED_SCORES; i++) subsetSizes[i] = 0;
 
     unsigned __int128 apc8 = regionIDsAsCodeword[tidGrid + regionStart].packedColors8();  // Annoying...
 
     // mmmfixme: need to tune these small specializations and see which ones are really necessary, which ones should be
     // specialized by hand, etc.
     if (regionLength == 3) {
-      computeSubsetSizesNew2<SubsettingAlgosKernelConfig::PIN_COUNT, Algo::MostParts, 3>(
+      computeSubsetSizesFixedLength<SolverConfig, 3>(
           subsetSizes, regionIDsAsCodeword[tidGrid + regionStart].packedCodeword(), *(uint4*)&apc8, regionIDsAsCodeword,
           regionStart, tidGrid + regionStart);
     } else if (regionLength == 4) {
-      computeSubsetSizesNew2<SubsettingAlgosKernelConfig::PIN_COUNT, Algo::MostParts, 4>(
+      computeSubsetSizesFixedLength<SolverConfig, 4>(
           subsetSizes, regionIDsAsCodeword[tidGrid + regionStart].packedCodeword(), *(uint4*)&apc8, regionIDsAsCodeword,
           regionStart, tidGrid + regionStart);
     } else if (regionLength == 5) {
-      computeSubsetSizesNew2<SubsettingAlgosKernelConfig::PIN_COUNT, Algo::MostParts, 5>(
+      computeSubsetSizesFixedLength<SolverConfig, 5>(
           subsetSizes, regionIDsAsCodeword[tidGrid + regionStart].packedCodeword(), *(uint4*)&apc8, regionIDsAsCodeword,
           regionStart, tidGrid + regionStart);
     } else {
-      computeSubsetSizesNew<SubsettingAlgosKernelConfig::PIN_COUNT, Algo::MostParts>(
-          subsetSizes, regionIDsAsCodeword[tidGrid + regionStart].packedCodeword(), *(uint4*)&apc8, regionIDsAsCodeword,
-          regionStart, regionLength);
+      computeSubsetSizes<SolverConfig>(subsetSizes, regionIDsAsCodeword[tidGrid + regionStart].packedCodeword(),
+                                       *(uint4*)&apc8, regionIDsAsCodeword, regionStart, regionLength);
     }
 
     uint32_t totalUsedSubsets = 0;
-    for (int i = 0; i < SubsettingAlgosKernelConfig::TOTAL_PACKED_SCORES; i++) {
+    for (int i = 0; i < SolverConfig::TOTAL_PACKED_SCORES; i++) {
       if (subsetSizes[i] > 0) {
         totalUsedSubsets++;
       }
@@ -620,10 +590,9 @@ __global__ void fullyDiscriminatingOpt(
   }
 }
 
-// mmmfixme: need to fixup the configs and re-template each of these!
-
 // Find the next guess for a group of regions. Each thread figures out the best kernel to launch for a region.
 // The optimization for small regions which could have a fully discriminating guess is handled here for now as well.
+template <typename SolverConfig, typename CodewordT>
 __global__ void nextGuessForRegions(const CodewordT* __restrict__ allCodewords,
                                     const CodewordT* __restrict__ regionIDsAsCodeword,
                                     const uint32_t* __restrict__ regionIDsAsIndex, uint32_t* __restrict__ nextMoves,
@@ -636,18 +605,18 @@ __global__ void nextGuessForRegions(const CodewordT* __restrict__ allCodewords,
     auto regionStart = regionStarts[offset + tidGrid];
     auto regionLength = regionLengths[offset + tidGrid];
     auto perBlockSolutions =
-        &perBlockSolutionsPool[SubsettingAlgosKernelConfig<SC, uint32_t>::LARGEST_NUM_BLOCKS * tidGrid];
+        &perBlockSolutionsPool[SubsettingAlgosKernelConfig<SolverConfig, uint32_t>::LARGEST_NUM_BLOCKS * tidGrid];
 
-    using config8 = SubsettingAlgosKernelConfig<SC, uint8_t>;
-    using config16 = SubsettingAlgosKernelConfig<SC, uint16_t>;
-    using config32 = SubsettingAlgosKernelConfig<SC, uint32_t>;
+    using config8 = SubsettingAlgosKernelConfig<SolverConfig, uint8_t>;
+    using config16 = SubsettingAlgosKernelConfig<SolverConfig, uint16_t>;
+    using config32 = SubsettingAlgosKernelConfig<SolverConfig, uint32_t>;
 
     if (config8::shouldUseType(regionLength)) {
-      if (regionLength < TOTAL_PACKED_SCORES) {
+      if (regionLength < SolverConfig::TOTAL_PACKED_SCORES) {
         // mmmfixme: need a different config for this. The max region length is 45 for the biggest games afterall...
-        fullyDiscriminatingOpt<config8><<<1, config8::THREADS_PER_BLOCK>>>(allCodewords, regionIDsAsCodeword,
-                                                                           regionIDsAsIndex, regionStart, regionLength,
-                                                                           nextMoves, perBlockSolutions);
+        fullyDiscriminatingOpt<SolverConfig, config8>
+            <<<1, config8::THREADS_PER_BLOCK>>>(allCodewords, regionIDsAsCodeword, regionIDsAsIndex, regionStart,
+                                                regionLength, nextMoves, perBlockSolutions);
       } else {
         launchSubsettingKernel<config8>(allCodewords, regionIDsAsCodeword, regionIDsAsIndex, nextMoves, regionStart,
                                         regionLength, perBlockSolutions);
@@ -691,6 +660,7 @@ __global__ void nextGuessTiny(const uint32_t* __restrict__ regionIDsAsIndex, uin
 template <typename SolverConfig>
 void SolverCUDA<SolverConfig>::playAllGames() {
   constexpr static bool LOG = SolverConfig::LOG;
+  using RegionID = RegionIDLR<unsigned __int128, SolverConfig::TOTAL_PACKED_SCORES - 1>;
 
   thrust::device_vector<CodewordT> dAllCodewords = CodewordT::getAllCodewords();
 
@@ -699,7 +669,10 @@ void SolverCUDA<SolverConfig>::playAllGames() {
   //  allCodewords.size(), cudaMemAdviseSetReadMostly, 0));
 
   // Starting case: all games, initial guess.
-  thrust::device_vector<uint32_t> dNextMoves(dAllCodewords.size(), CodewordT::computeOrdinal(INITIAL_GUESS));
+  thrust::device_vector<uint32_t> dNextMoves(
+      dAllCodewords.size(),
+      CodewordT::computeOrdinal(
+          SolverConfig::ALGO::template presetInitialGuess<SolverConfig::PIN_COUNT, SolverConfig::COLOR_COUNT>()));
 
   // All region ids start empty, with their index set to the sequence of all codewords
   thrust::host_vector<RegionID> hRegionIDs(dAllCodewords.size());
@@ -715,11 +688,10 @@ void SolverCUDA<SolverConfig>::playAllGames() {
   // mmmfixme: we need a set per concurrent kernel
   size_t chunkSize = 256;  // mmmfixme: placement
   thrust::device_vector<IndexAndScore> dPerBlockSolutions(
-      SubsettingAlgosKernelConfig<SC, uint32_t>::LARGEST_NUM_BLOCKS * chunkSize);
+      SubsettingAlgosKernelConfig<SolverConfig, uint32_t>::LARGEST_NUM_BLOCKS * chunkSize);
 
-  // mmmfixme: names?
-  thrust::device_vector<uint32_t> dRegionsAsIndex(dRegionIDs.size());
-  thrust::device_vector<CodewordT> dRegionsAsCodeword(dRegionIDs.size());
+  thrust::device_vector<uint32_t> dRegionIDsAsIndex(dRegionIDs.size());
+  thrust::device_vector<CodewordT> dRegionIDsAsCodeword(dRegionIDs.size());
 
   int depth = 0;
   auto dRegionIDsEnd = dRegionIDs.end();  // The set of active games contracts as we go
@@ -743,8 +715,9 @@ void SolverCUDA<SolverConfig>::playAllGames() {
             auto cwi = regionID.index;
             unsigned __int128 apc8 = pdAllCodewords[cwi].packedColors8();               // Annoying...
             unsigned __int128 npc8 = pdAllCodewords[pdNextMoves[cwi]].packedColors8();  // Annoying...
-            uint8_t s = scoreCodewords<PIN_COUNT>(pdAllCodewords[cwi].packedCodeword(), *(uint4*)&apc8,
-                                                  pdAllCodewords[pdNextMoves[cwi]].packedCodeword(), *(uint4*)&npc8);
+            uint8_t s = scoreCodewords<SolverConfig::PIN_COUNT>(pdAllCodewords[cwi].packedCodeword(), *(uint4*)&apc8,
+                                                                pdAllCodewords[pdNextMoves[cwi]].packedCodeword(),
+                                                                *(uint4*)&npc8);
             regionID.append(s, depth);
           }
         });
@@ -784,9 +757,9 @@ void SolverCUDA<SolverConfig>::playAllGames() {
 
     // mmmfixme: these could probably be one zipped transform
     //  - Re-test these. Trades a lot of device space for a small time gain, worth it?
-    thrust::transform(dRegionIDs.begin(), dRegionIDsEnd, dRegionsAsIndex.begin(),
+    thrust::transform(dRegionIDs.begin(), dRegionIDsEnd, dRegionIDsAsIndex.begin(),
                       [] __device__(const RegionID& r) { return r.index; });
-    thrust::transform(dRegionIDs.begin(), dRegionIDsEnd, dRegionsAsCodeword.begin(),
+    thrust::transform(dRegionIDs.begin(), dRegionIDsEnd, dRegionIDsAsCodeword.begin(),
                       [pdAllCodewords] __device__(const RegionID& r) { return pdAllCodewords[r.index]; });
 
     if (LOG) {  // mmmfixme: tmp, factor if I decide to keep it
@@ -805,8 +778,8 @@ void SolverCUDA<SolverConfig>::playAllGames() {
     // and a nice early shortcut for regions which can potentially be fully discriminated.
     auto pdRegionStarts = thrust::raw_pointer_cast(dRegionStarts.data());
     auto pdRegionLengths = thrust::raw_pointer_cast(dRegionLengths.data());
-    auto pdRegionsAsIndex = thrust::raw_pointer_cast(dRegionsAsIndex.data());
-    auto pdRegionsAsCodeword = thrust::raw_pointer_cast(dRegionsAsCodeword.data());
+    auto pdRegionsAsIndex = thrust::raw_pointer_cast(dRegionIDsAsIndex.data());
+    auto pdRegionsAsCodeword = thrust::raw_pointer_cast(dRegionIDsAsCodeword.data());
 
     uint32_t tinyRegionCount = 0;
     uint32_t tinyGameCount = 0;
@@ -823,7 +796,8 @@ void SolverCUDA<SolverConfig>::playAllGames() {
 
       uint32_t fdRegionCount = 0;
       uint32_t fdGameCount = 0;
-      for (uint32_t k = tinyRegionCount; k < regionCount && hRegionLengths[k] < TOTAL_PACKED_SCORES; k++) {
+      for (uint32_t k = tinyRegionCount; k < regionCount && hRegionLengths[k] < SolverConfig::TOTAL_PACKED_SCORES;
+           k++) {
         fdGameCount += hRegionLengths[k];
         fdRegionCount++;
       }
@@ -837,7 +811,7 @@ void SolverCUDA<SolverConfig>::playAllGames() {
 
       bigBoyLaunches++;
       auto pdPerBlockSolutions = thrust::raw_pointer_cast(dPerBlockSolutions.data());
-      nextGuessForRegions<<<(regionsToDo + threadsPerBlock - 1) / threadsPerBlock, threadsPerBlock>>>(
+      nextGuessForRegions<SolverConfig><<<(regionsToDo + threadsPerBlock - 1) / threadsPerBlock, threadsPerBlock>>>(
           pdAllCodewords, pdRegionsAsCodeword, pdRegionsAsIndex, pdNextMoves, pdRegionStarts, pdRegionLengths, offset,
           regionsToDo, pdPerBlockSolutions);
     }

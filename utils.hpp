@@ -15,6 +15,12 @@
 #include <unordered_map>
 #include <vector>
 
+#if defined(__CUDA_ARCH__)
+#define CUDA_HOST_AND_DEVICE __device__ __host__
+#else
+#define CUDA_HOST_AND_DEVICE
+#endif
+
 // This embodies my love/hate relationship with C++. Simple shit just isn't simple :(
 class comma_numpunct : public std::numpunct<char> {
  protected:

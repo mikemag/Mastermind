@@ -181,6 +181,8 @@ void SolverReferenceImpl<SolverConfig>::playAllGames() {
 template <typename SolverConfig>
 typename SolverConfig::CodewordT SolverReferenceImpl<SolverConfig>::nextGuess(
     const vector<CodewordT>& possibleSolutions, const vector<CodewordT>& usedCodewords) {
+  using ALGO = typename SolverConfig::ALGO;
+
   CodewordT bestGuess;
   size_t bestRank = 0;
   bool bestIsPossibleSolution = false;
@@ -192,61 +194,21 @@ typename SolverConfig::CodewordT SolverReferenceImpl<SolverConfig>::nextGuess(
     bool isPossibleSolution = false;
     for (const auto& ps : possibleSolutions) {
       Score r = g.score(ps);
-      if (SolverConfig::ALGO == Algo::MostParts) {
-        subsetSizes[r.result] = 1;
-      } else {
-        subsetSizes[r.result]++;
-      }
+      ALGO::accumulateSubsetSize(subsetSizes[r.result]);
       if (r == CodewordT::WINNING_SCORE) {
         isPossibleSolution = true;  // Remember if this guess is in the set of possible solutions
       }
     }
 
-    int largestSubsetSize = 0;
-    int totalUsedSubsets = 0;
-    float entropySum = 0.0;
-    float expectedSize = 0.0;
+    typename ALGO::RankingAccumulatorType rankingAccumulator{};
     for (auto& s : subsetSizes) {
       if (s > 0) {
-        totalUsedSubsets++;
-        switch (SolverConfig::ALGO) {
-          case Knuth:
-            largestSubsetSize = max(largestSubsetSize, s);
-            break;
-          case MostParts:
-            // Already done
-            break;
-          case ExpectedSize:
-            expectedSize += ((float)s * (float)s) / possibleSolutions.size();
-            break;
-          case Entropy:
-            float pi = (float)s / possibleSolutions.size();
-            entropySum -= pi * log(pi);
-            break;
-        }
+        ALGO::accumulateRanking(rankingAccumulator, s, possibleSolutions.size());
       }
       s = 0;
     }
 
-    uint32_t rank;
-    switch (SolverConfig::ALGO) {
-      case Knuth:
-        rank = possibleSolutions.size() - largestSubsetSize;
-        break;
-      case MostParts:
-        rank = totalUsedSubsets;
-        break;
-      case ExpectedSize:
-#pragma nv_diagnostic push
-#pragma nv_diag_suppress 68
-        // This is a bit broken, and needs to be to match the semantics in the paper.
-        rank = (uint32_t)round(expectedSize * 1'000'000.0) * -1;  // 9 digits of precision
-#pragma nv_diagnostic pop
-        break;
-      case Entropy:
-        rank = round(entropySum * 1'000'000'000.0);  // 9 digits of precision
-        break;
-    }
+    uint32_t rank = ALGO::computeRank(rankingAccumulator, possibleSolutions.size());
 
     if (rank > bestRank || (!bestIsPossibleSolution && isPossibleSolution && rank == bestRank)) {
       if (find(usedCodewords.cbegin(), usedCodewords.cend(), g) != usedCodewords.end()) {
