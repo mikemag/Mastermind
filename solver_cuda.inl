@@ -3,7 +3,32 @@
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree.
 
-#include "new_algo.h"
+// CUDA implementation for playing all games at once
+//
+// TODO: this needs a lot of notes and docs consolidated
+//
+//
+// This plays all games at once, playing a turn on each game and forming a set of next guesses for the next turn.
+// Scoring all games subdivides those games with the same score into disjoint regions. We form an id for each region
+// made up of a growing list of scores, and sorting the list of games by region id groups the regions together. Then we
+// can find a single best guess for each region and play that for all games in the region.
+//
+// Region ids are chosen to ensure that a stable sort keeps games within each region in their original lexical order.
+// Many algorithms pick the first lexical game on ties.
+//
+// Pseudocode for the algorithm:
+//   start: all games get the same initial guess
+//
+//   while any games have guesses to play:
+//     score all games against their next guess, if any, which was given per-region
+//       append their score to their region id
+//       if no games have guesses, then we're done
+//     stable sort all games by region id
+//     get start and run length for each region by id
+//     for reach region:
+//       games with a win at the end of their region id get no new guess
+//       otherwise, find next guess using the region itself as the possible solutions set PS
+
 
 #define CUB_STDERR
 #include <thrust/device_free.h>
@@ -485,8 +510,9 @@ __global__ void newGuessForRegions(const CodewordT* __restrict__ allCodewords,
   }
 }
 
-void new_algo::runGPU() {
-  auto gpuInterface = new CUDAGPUInterface<SC>(CodewordT::getAllCodewords());
+template <typename SolverConfig>
+void SolverCUDA<SolverConfig>::playAllGames() {
+//  auto gpuInterface = new CUDAGPUInterface<SC>(CodewordT::getAllCodewords());
 
   vector<CodewordT>& allCodewords = CodewordT ::getAllCodewords();
 

@@ -8,12 +8,12 @@
 #include "codeword.hpp"
 #include "compute_kernel_constants.h"
 #include "mastermind_config.h"
-#include "new_algo.h"
 #include "preset_initial_guesses.h"
 #include "score.hpp"
 #include "simple_strategies.hpp"
 #include "solver.hpp"
 #include "solver_cpu_reference.hpp"
+#include "solver_cuda.hpp"
 #include "strategy.hpp"
 #include "subsetting_strategies.hpp"
 
@@ -348,21 +348,11 @@ void playAllGames(Solver<SolverConfig>& solver, StatsRecorder& statsRecorder) {
 
 int main(int argc, const char* argv[]) {
   if (true) {  // TODO: temp placement
-    auto startTime = chrono::high_resolution_clock::now();
-
-    if (true) {  // TODO: tmp testing
-      SolverReferenceImpl<SolverConfig<4, 6, false, Algo::Knuth>> solver{};
-      StatsRecorder statsRecorder;
-      statsRecorder.newRun();
-      playAllGames(solver, statsRecorder);
-    } else {
-      new_algo::runGPU();
-    }
-
-    auto endTime = chrono::high_resolution_clock::now();
-    chrono::duration<float, milli> elapsedMS = endTime - startTime;
-    auto elapsedS = elapsedMS.count() / 1000;
-    cout << "Elapsed time " << commaString(elapsedS) << "s" << endl;
+    //      SolverReferenceImpl<SolverConfig<4, 6, false, Algo::Knuth>> solver{};
+    SolverCUDA<SolverConfig<8, 5, true, Algo::Knuth>> solver{};
+    StatsRecorder statsRecorder;
+    statsRecorder.newRun();
+    playAllGames(solver, statsRecorder);
 
     return 0;
   }
