@@ -12,6 +12,8 @@
 #include "preset_initial_guesses.h"
 #include "score.hpp"
 #include "simple_strategies.hpp"
+#include "solver.hpp"
+#include "solver_cpu_reference.hpp"
 #include "strategy.hpp"
 #include "subsetting_strategies.hpp"
 
@@ -292,18 +294,78 @@ void runWithAllInitialGuesses(Algo a, StatsRecorder& s) {
   }
 }
 
-int main(int argc, const char* argv[]) {
+template <typename SolverConfig>
+void playAllGames(Solver<SolverConfig>& solver, StatsRecorder& statsRecorder) {
+  printf("Playing all %d pin %d color games using algorithm '%s' for every possible secret...\n",
+         SolverConfig::PIN_COUNT, SolverConfig::COLOR_COUNT, solver.getName().c_str());
+  statsRecorder.add("Pin Count", (int)SolverConfig::PIN_COUNT);
+  statsRecorder.add("Color Count", (int)SolverConfig::COLOR_COUNT);
+  statsRecorder.add("Strategy", solver.getName());
+
+  cout << "Total codewords: " << commaString(solver.getTotalGames()) << endl;
+  statsRecorder.add("Total Codewords", solver.getTotalGames());
+
+  cout << "Initial guess: " << SolverConfig::INITIAL_GUESS << endl;
+  statsRecorder.add("Initial Guess", SolverConfig::INITIAL_GUESS);
+
   auto startTime = chrono::high_resolution_clock::now();
 
-  //  new_algo::run();
-  new_algo::runGPU();
+  solver.playAllGames();
 
   auto endTime = chrono::high_resolution_clock::now();
+  double averageTurns = (double)solver.getTotalTurns() / solver.getTotalGames();
+  printf("Average number of turns was %.4f\n", averageTurns);
+  statsRecorder.add("Average Turns", averageTurns);
+  cout << "Maximum number of turns over all possible secrets was " << solver.getMaxDepth() << endl;
+  statsRecorder.add("Max Turns", solver.getMaxDepth());
+  //  statsRecorder.add("Max Secret", maxSecret);
   chrono::duration<float, milli> elapsedMS = endTime - startTime;
   auto elapsedS = elapsedMS.count() / 1000;
   cout << "Elapsed time " << commaString(elapsedS) << "s" << endl;
+  statsRecorder.add("Elapsed (s)", elapsedS);
+  //  statsRecorder.add("Average Game Time (ms)", avgGameTimeMS);
 
-  return 0;
+  // mmmfixme: need these two back!
+  //  strategy->printStats(elapsedMS);
+  //  strategy->recordStats(statsRecorder, elapsedMS);
+
+  printf("\n");
+  //  for (int i = 0; i < histogramSize; i++) {
+  //    if (histogram[i] > 0) {
+  //      printf("%2d: %s ", i, commaString(histogram[i]).c_str());
+  //    }
+  //    statsRecorder.add(histogramHeaders[i], histogram[i]);
+  //  }
+  //  printf("\n");
+
+  if (writeStratFiles) {
+    // mmmfixme: need this to dump the strat graph
+    //    strategy->dump();
+  }
+
+  cout << "Done" << endl;
+}
+
+int main(int argc, const char* argv[]) {
+  if (true) {  // TODO: temp placement
+    auto startTime = chrono::high_resolution_clock::now();
+
+    if (true) {  // TODO: tmp testing
+      SolverReferenceImpl<SolverConfig<4, 6, false, Algo::Knuth>> solver{};
+      StatsRecorder statsRecorder;
+      statsRecorder.newRun();
+      playAllGames(solver, statsRecorder);
+    } else {
+      new_algo::runGPU();
+    }
+
+    auto endTime = chrono::high_resolution_clock::now();
+    chrono::duration<float, milli> elapsedMS = endTime - startTime;
+    auto elapsedS = elapsedMS.count() / 1000;
+    cout << "Elapsed time " << commaString(elapsedS) << "s" << endl;
+
+    return 0;
+  }
 
   setupHistogramHeaders();
 

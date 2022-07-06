@@ -87,7 +87,7 @@ class StrategySubsetting : public Strategy<StrategyConfig> {
 };
 
 // --------------------------------------------------------------------------------------------------------------------
-// Base for all subsetting strategies, CPU-based
+// Base for all subsetting strategies, GPU-based
 //
 // This is a base for all subsetting algorithms that want to take advantage of the GPU. The core GPU setup and access
 // logic is the same, as is the fallback to CPU-only when necessary. The only real variable here is the compute kernel
