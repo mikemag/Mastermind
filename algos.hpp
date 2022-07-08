@@ -25,8 +25,11 @@
 
 namespace Algos {
 
-struct Knuth {
+struct Algo {};
+
+struct Knuth : public Algo {
   using MaxSubsetSizeT = int32_t;
+  constexpr static const char* name = "Knuth";
 
   template <typename SubsetSizeT>
   CUDA_HOST_AND_DEVICE static void accumulateSubsetSize(SubsetSizeT& s) {
@@ -52,8 +55,9 @@ struct Knuth {
   }
 };
 
-struct MostParts {
+struct MostParts : public Algo {
   using MaxSubsetSizeT = int8_t;
+  constexpr static const char* name = "Most Parts";
 
   template <typename SubsetSizeT>
   CUDA_HOST_AND_DEVICE static void accumulateSubsetSize(SubsetSizeT& s) {
@@ -81,6 +85,7 @@ struct MostParts {
 
 struct ExpectedSize {
   using MaxSubsetSizeT = int32_t;
+  constexpr static const char* name = "Expected Size";
 
   template <typename SubsetSizeT>
   CUDA_HOST_AND_DEVICE static void accumulateSubsetSize(SubsetSizeT& s) {
@@ -112,6 +117,7 @@ struct ExpectedSize {
 
 struct Entropy {
   using MaxSubsetSizeT = int32_t;
+  constexpr static const char* name = "Entropy";
 
   template <typename SubsetSizeT>
   CUDA_HOST_AND_DEVICE static void accumulateSubsetSize(SubsetSizeT& s) {

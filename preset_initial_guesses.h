@@ -566,20 +566,3 @@ constexpr uint32_t presetInitialGuessExpectedSize() {
       return (Codeword<p, c>::ONE_PINS >> p / 2 * 4) + Codeword<p, c>::ONE_PINS;
   }
 }
-
-template <uint8_t p, uint8_t c, Algo a>
-constexpr uint32_t presetInitialGuess() {
-  switch (a) {
-    case Algo::FirstOne:
-      return presetInitialGuessFirstOne<p, c>();
-    case Algo::Knuth:
-      return presetInitialGuessKnuth<p, c>();
-    case Algo::MostParts:
-      return presetInitialGuessMostParts<p, c>();
-    case Algo::Entropy:
-      return presetInitialGuessEntropy<p, c>();
-    case Algo::ExpectedSize:
-      return presetInitialGuessExpectedSize<p, c>();
-  }
-}
-

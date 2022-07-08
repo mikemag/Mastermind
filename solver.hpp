@@ -8,8 +8,10 @@
 #include "algos.hpp"
 #include "codeword.hpp"
 
+struct SolverConfigBase {};
+
 template <uint8_t PIN_COUNT_, uint8_t COLOR_COUNT_, bool LOG_, typename ALGO_>
-struct SolverConfig {
+struct SolverConfig : public SolverConfigBase {
   constexpr static uint8_t PIN_COUNT = PIN_COUNT_;
   constexpr static uint8_t COLOR_COUNT = COLOR_COUNT_;
   constexpr static bool LOG = LOG_;
@@ -26,18 +28,12 @@ struct SolverConfig {
   constexpr static int TOTAL_PACKED_SCORES = TOTAL_SCORES + 1;
 };
 
-template <typename SolverConfig>
 class Solver {
-  using CodewordT = typename SolverConfig::CodewordT;
-
  public:
-  virtual void playAllGames() = 0;
+  virtual void playAllGames(uint32_t packedInitialGuess) = 0;
 
   size_t getMaxDepth() const { return maxDepth; }
   size_t getTotalTurns() const { return totalTurns; };
-  size_t getTotalGames() const { return SolverConfig::CodewordT::TOTAL_CODEWORDS; }
-
-  virtual std::string getName() const { return "tmp name"; }
 
  protected:
   size_t maxDepth = 0;

@@ -58,13 +58,13 @@ struct SimpleRegionID {
 };
 
 template <typename SolverConfig>
-void SolverReferenceImpl<SolverConfig>::playAllGames() {
+void SolverReferenceImpl<SolverConfig>::playAllGames(uint32_t packedInitialGuess) {
   using RegionID = SimpleRegionID<SolverConfig::CodewordT::WINNING_SCORE.result>;
 
   vector<CodewordT>& allCodewords = CodewordT::getAllCodewords();
 
   // Starting case: all games get the same initial guess, region ids are empty
-  vector<CodewordT> nextMoves(allCodewords.size(), SolverConfig::INITIAL_GUESS);
+  vector<CodewordT> nextMoves(allCodewords.size(), packedInitialGuess);
   vector<vector<CodewordT>> nextMovesList;
 
   vector<RegionID> regionIDs(allCodewords.size());
@@ -156,16 +156,6 @@ void SolverReferenceImpl<SolverConfig>::playAllGames() {
 // These algorithms all rely on splitting the remaining possible guesses into groups or subsets based on their scores
 // vs each other.
 //
-// References:
-// [1] D.E. Knuth. The computer as Master Mind. Journal of Recreational Mathematics, 9(1):1–6, 1976.
-// https://www.cs.uni.edu/~wallingf/teaching/cs3530/resources/knuth-mastermind.pdf
-//
-// [2] Geoffroy Ville, An Optimal Mastermind (4,7) Strategy and More Results in the Expected Case, March
-// 2013, arXiv:1305.1010 [cs.GT].
-//
-// [3] Barteld Kooi, Yet another mastermind Strategy. International Computer Games Association Journal,
-// 28(1):13–20, 2005. https://www.researchgate.net/publication/30485793_Yet_another_Mastermind_strategy
-//
 // The core of these comes from the method described by Knuth in [1], which subsets the possibilities by score,
 // comparing all remaining codewords (i.e., not yet guessed) to all current possible guesses. This is O(n^2) in the
 // number of total codewords, though the size of the possible solutions set does decrease drastically with each play. Of
@@ -177,6 +167,16 @@ void SolverReferenceImpl<SolverConfig>::playAllGames() {
 //
 // There's a decent summary of Knuth's overall algorithm on Wikipedia, too:
 // https://en.wikipedia.org/wiki/Mastermind_(board_game)
+//
+// References:
+// [1] D.E. Knuth. The computer as Master Mind. Journal of Recreational Mathematics, 9(1):1–6, 1976.
+// https://www.cs.uni.edu/~wallingf/teaching/cs3530/resources/knuth-mastermind.pdf
+//
+// [2] Geoffroy Ville, An Optimal Mastermind (4,7) Strategy and More Results in the Expected Case, March
+// 2013, arXiv:1305.1010 [cs.GT].
+//
+// [3] Barteld Kooi, Yet another mastermind Strategy. International Computer Games Association Journal,
+// 28(1):13–20, 2005. https://www.researchgate.net/publication/30485793_Yet_another_Mastermind_strategy
 
 template <typename SolverConfig>
 typename SolverConfig::CodewordT SolverReferenceImpl<SolverConfig>::nextGuess(

@@ -3,6 +3,7 @@
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree.
 
+#include <new>
 #define CUB_STDERR
 #include <thrust/device_free.h>
 #include <thrust/device_malloc.h>
@@ -18,7 +19,6 @@
 #include <cassert>
 #include <cub/cub.cuh>
 #include <cuda/barrier>
-#include <new>
 #include <vector>
 
 #include "algos.hpp"
@@ -274,6 +274,15 @@ __device__ void computeSubsetSizesFixedLength(SubsetSizeT* __restrict__ subsetSi
   }
 }
 
+// Keeps an index into the all codewords vector together with a rank on the GPU, and whether this codeword is a
+// possible solution.
+struct IndexAndScore {
+  uint32_t index;
+  uint32_t score;
+  bool isPossibleSolution;
+  bool isFD;
+};
+
 // Reducer for per-thread scores, used for CUB per-block and device reductions.
 struct IndexAndScoreReducer {
   __device__ __forceinline__ IndexAndScore operator()(const IndexAndScore& a, const IndexAndScore& b) const {
@@ -366,14 +375,6 @@ struct SubsettingAlgosKernelConfig {
     typename SmallOptsBlockReduce::TempStorage smallOptsReducerTmpStorage;
     IndexAndScore aggregate;  // Ensure alignment for these
   };
-
-  // Confirm the shared mem size is as expected
-  static_assert(sizeof(SharedMemLayout) ==
-                std::max({
-                    sizeof(SubsetSizeT) * TOTAL_PACKED_SCORES * THREADS_PER_BLOCK,
-                    sizeof(typename cub::BlockReduce<IndexAndScore, THREADS_PER_BLOCK>::TempStorage),
-                    1 * sizeof(IndexAndScore),
-                }));
 };
 
 // Little tests
@@ -658,7 +659,7 @@ __global__ void nextGuessTiny(const uint32_t* __restrict__ regionIDsAsIndex, uin
 //    of the main subsetting kernel is a tiny fraction of the overall work right now, so keeping it simple.
 
 template <typename SolverConfig>
-void SolverCUDA<SolverConfig>::playAllGames() {
+void SolverCUDA<SolverConfig>::playAllGames(uint32_t packedInitialGuess) {
   constexpr static bool LOG = SolverConfig::LOG;
   using RegionID = RegionIDLR<unsigned __int128, SolverConfig::TOTAL_PACKED_SCORES - 1>;
 
@@ -669,10 +670,7 @@ void SolverCUDA<SolverConfig>::playAllGames() {
   //  allCodewords.size(), cudaMemAdviseSetReadMostly, 0));
 
   // Starting case: all games, initial guess.
-  thrust::device_vector<uint32_t> dNextMoves(
-      dAllCodewords.size(),
-      CodewordT::computeOrdinal(
-          SolverConfig::ALGO::template presetInitialGuess<SolverConfig::PIN_COUNT, SolverConfig::COLOR_COUNT>()));
+  thrust::device_vector<uint32_t> dNextMoves(dAllCodewords.size(), CodewordT::computeOrdinal(packedInitialGuess));
 
   // All region ids start empty, with their index set to the sequence of all codewords
   thrust::host_vector<RegionID> hRegionIDs(dAllCodewords.size());

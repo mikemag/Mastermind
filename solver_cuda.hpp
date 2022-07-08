@@ -13,12 +13,14 @@
 //
 // TODO: this needs a lot of notes and docs consolidated
 
-template <typename SolverConfig>
-class SolverCUDA : public Solver<SolverConfig> {
-  using CodewordT = typename SolverConfig::CodewordT;
+template <typename SolverConfig_>
+class SolverCUDA : public Solver {
+  using CodewordT = typename SolverConfig_::CodewordT;
 
  public:
-  void playAllGames() override;
+  using SolverConfig = SolverConfig_;
+
+  void playAllGames(uint32_t packedInitialGuess) override;
 };
 
 #include "solver_cuda.inl"

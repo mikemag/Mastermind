@@ -14,12 +14,14 @@
 // This is a simple impl to serve as a reference for all the others. It's not optimized for speed. Hopefully it's clear.
 // More details w/ the impl.
 
-template <typename SolverConfig>
-class SolverReferenceImpl : public Solver<SolverConfig> {
-  using CodewordT = typename SolverConfig::CodewordT;
+template <typename SolverConfig_>
+class SolverReferenceImpl : public Solver {
+  using CodewordT = typename SolverConfig_::CodewordT;
 
  public:
-  void playAllGames() override;
+  using SolverConfig = SolverConfig_;
+
+  void playAllGames(uint32_t packedInitialGuess) override;
 
  private:
   CodewordT nextGuess(const vector<CodewordT>& possibleSolutions, const vector<CodewordT>& usedCodewords);
