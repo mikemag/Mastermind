@@ -398,8 +398,10 @@ static_assert(testConfig::numBlocks(testConfig::threadsPerBlock<uint32_t>()) == 
 // reduction space, etc.
 template <typename SubsettingAlgosKernelConfig, typename CodewordT>
 __global__ void subsettingAlgosKernel(const CodewordT* __restrict__ allCodewords,
-                                      const CodewordT* __restrict__ regionIDsAsCodeword, uint32_t regionStart,
-                                      uint32_t regionLength, IndexAndRank* __restrict__ perBlockSolutions) {
+                                      const CodewordT* __restrict__ regionIDsAsCodeword,
+                                      const uint32_t* __restrict__ regionIDsAsIndex, uint32_t regionStart,
+                                      uint32_t regionLength, uint32_t** __restrict__ nextMovesVecs,
+                                      uint32_t nextMovesVecsSize, IndexAndRank* __restrict__ perBlockSolutions) {
   __shared__ typename SubsettingAlgosKernelConfig::SharedMemLayout sharedMem;
 
   const uint tidGrid = blockDim.x * blockIdx.x + threadIdx.x;
@@ -430,11 +432,17 @@ __global__ void subsettingAlgosKernel(const CodewordT* __restrict__ allCodewords
   if (tidGrid >= SubsettingAlgosKernelConfig::CodewordT::TOTAL_CODEWORDS) {
     rank = 0;
     totalUsedSubsets = 0;
+  } else {
+    // Use the list of next moves sets to discard used codewords. nb: -1 to skip the new set.
+    // TODO: I'd like to improve this. Ideally we wouldn't do this for low ranked guesses that won't be picked anyway.
+    for (int i = 0; i < nextMovesVecsSize - 1; i++) {
+      if (tidGrid == nextMovesVecs[i][regionIDsAsIndex[regionStart]]) {
+        rank = 0;
+        totalUsedSubsets = 0;
+        break;
+      }
+    }
   }
-  // mmmfixme:
-  //  for (int i = 0; i < littleStuff->usedCodewordsCount; i++) {
-  //    if (allCodewords[tidGrid] == littleStuff->usedCodewords[i]) score = 0;
-  //  }
 
   // Reduce to find the best solution we have in this block. This keeps the codeword index, rank, and possible solution
   // indicator together.
@@ -496,10 +504,12 @@ __device__ void launchSubsettingKernel(const CodewordT* __restrict__ allCodeword
                                        const CodewordT* __restrict__ regionIDsAsCodeword,
                                        const uint32_t* __restrict__ regionIDsAsIndex, uint32_t* __restrict__ nextMoves,
                                        const uint32_t regionStart, const uint32_t regionLength,
+                                       uint32_t** __restrict__ nextMovesVecs, uint32_t nextMovesVecsSize,
                                        IndexAndRank* __restrict__ perBlockSolutions) {
   subsettingAlgosKernel<SubsettingAlgosKernelConfig>
       <<<SubsettingAlgosKernelConfig::NUM_BLOCKS, SubsettingAlgosKernelConfig::THREADS_PER_BLOCK>>>(
-          allCodewords, regionIDsAsCodeword, regionStart, regionLength, perBlockSolutions);
+          allCodewords, regionIDsAsCodeword, regionIDsAsIndex, regionStart, regionLength, nextMovesVecs,
+          nextMovesVecsSize, perBlockSolutions);
   CubDebug(cudaGetLastError());
 
   // nb: block size on this one must be a power of 2
@@ -529,6 +539,7 @@ __global__ void fullyDiscriminatingOpt(const CodewordT* __restrict__ allCodeword
                                        const CodewordT* __restrict__ regionIDsAsCodeword,
                                        const uint32_t* __restrict__ regionIDsAsIndex, uint32_t regionStart,
                                        uint32_t regionLength, uint32_t* __restrict__ nextMoves,
+                                       uint32_t** __restrict__ nextMovesVecs, uint32_t nextMovesVecsSize,
                                        IndexAndRank* __restrict__ perBlockSolutions) {
   // mmmfixme: need separate shared mem layout from the full kernel
   __shared__ typename SubsettingAlgosKernelConfig::SharedMemLayout sharedMem;
@@ -585,7 +596,8 @@ __global__ void fullyDiscriminatingOpt(const CodewordT* __restrict__ allCodeword
     } else {
       // Fallback on the big kernel
       launchSubsettingKernel<SubsettingAlgosKernelConfig>(allCodewords, regionIDsAsCodeword, regionIDsAsIndex,
-                                                          nextMoves, regionStart, regionLength, perBlockSolutions);
+                                                          nextMoves, regionStart, regionLength, nextMovesVecs,
+                                                          nextMovesVecsSize, perBlockSolutions);
     }
   }
 }
@@ -598,7 +610,8 @@ __global__ void nextGuessForRegions(const CodewordT* __restrict__ allCodewords,
                                     const uint32_t* __restrict__ regionIDsAsIndex, uint32_t* __restrict__ nextMoves,
                                     const uint32_t* __restrict__ regionStarts,
                                     const uint32_t* __restrict__ regionLengths, const uint32_t offset,
-                                    const uint32_t regionCount, IndexAndRank* __restrict__ perBlockSolutionsPool) {
+                                    const uint32_t regionCount, uint32_t** __restrict__ nextMovesVecs,
+                                    uint32_t nextMovesVecsSize, IndexAndRank* __restrict__ perBlockSolutionsPool) {
   uint tidGrid = blockDim.x * blockIdx.x + threadIdx.x;
 
   if (tidGrid < regionCount) {
@@ -614,19 +627,19 @@ __global__ void nextGuessForRegions(const CodewordT* __restrict__ allCodewords,
     if (config8::shouldUseType(regionLength)) {
       if (regionLength < SolverConfig::TOTAL_PACKED_SCORES) {
         // mmmfixme: need a different config for this. The max region length is 45 for the biggest games afterall...
-        fullyDiscriminatingOpt<SolverConfig, config8>
-            <<<1, config8::THREADS_PER_BLOCK>>>(allCodewords, regionIDsAsCodeword, regionIDsAsIndex, regionStart,
-                                                regionLength, nextMoves, perBlockSolutions);
+        fullyDiscriminatingOpt<SolverConfig, config8><<<1, config8::THREADS_PER_BLOCK>>>(
+            allCodewords, regionIDsAsCodeword, regionIDsAsIndex, regionStart, regionLength, nextMoves, nextMovesVecs,
+            nextMovesVecsSize, perBlockSolutions);
       } else {
         launchSubsettingKernel<config8>(allCodewords, regionIDsAsCodeword, regionIDsAsIndex, nextMoves, regionStart,
-                                        regionLength, perBlockSolutions);
+                                        regionLength, nextMovesVecs, nextMovesVecsSize, perBlockSolutions);
       }
     } else if (config16::shouldUseType(regionLength)) {
       launchSubsettingKernel<config16>(allCodewords, regionIDsAsCodeword, regionIDsAsIndex, nextMoves, regionStart,
-                                       regionLength, perBlockSolutions);
+                                       regionLength, nextMovesVecs, nextMovesVecsSize, perBlockSolutions);
     } else {
       launchSubsettingKernel<config32>(allCodewords, regionIDsAsCodeword, regionIDsAsIndex, nextMoves, regionStart,
-                                       regionLength, perBlockSolutions);
+                                       regionLength, nextMovesVecs, nextMovesVecsSize, perBlockSolutions);
     }
   }
 }
@@ -668,8 +681,26 @@ void SolverCUDA<SolverConfig>::playAllGames(uint32_t packedInitialGuess) {
   //  CubDebugExit(cudaMemAdvise(thrust::raw_pointer_cast(dAllCodewords.data()), sizeof(CodewordT) *
   //  allCodewords.size(), cudaMemAdviseSetReadMostly, 0));
 
+  // mmmfixme: before - 5.2085s
+
+  // Hold the next moves in a parallel vector to the all codewords vector. We need one such vector per turn played,
+  // so we can have a "used codewords" list, and so we can form the full output graphs of moves when done.
+  // TODO: This is a lot of memory. Could stream these out to the host while doing other work to have just one or two
+  //  on-device at a time, but that doesn't support the used codewords set. Feel like there's an alternative here.
+  constexpr static int MAX_SUPPORTED_TURNS = 16;
+  thrust::host_vector<uint32_t*> hNextMovesDeviceVecs(MAX_SUPPORTED_TURNS);
+  for (auto& n : hNextMovesDeviceVecs) {
+    n = thrust::raw_pointer_cast(thrust::device_malloc<uint32_t>(dAllCodewords.size()));
+  }
+  thrust::device_vector<uint32_t*> dNextMovesVecs(hNextMovesDeviceVecs.size());
+  thrust::copy(hNextMovesDeviceVecs.begin(), hNextMovesDeviceVecs.end(), dNextMovesVecs.begin());
+  uint32_t** pdNextMovesVecs = thrust::raw_pointer_cast(dNextMovesVecs.data());
+
   // Starting case: all games, initial guess.
-  thrust::device_vector<uint32_t> dNextMoves(dAllCodewords.size(), CodewordT::computeOrdinal(packedInitialGuess));
+  int nextMovesVecsSize = 0;
+  auto dNextMoves = thrust::device_pointer_cast(hNextMovesDeviceVecs[nextMovesVecsSize++]);
+  thrust::fill(dNextMoves, dNextMoves + dAllCodewords.size(), CodewordT::computeOrdinal(packedInitialGuess));
+  auto pdNextMoves = thrust::raw_pointer_cast(dNextMoves);
 
   // All region ids start empty, with their index set to the sequence of all codewords
   thrust::host_vector<RegionID> hRegionIDs(dAllCodewords.size());
@@ -700,12 +731,9 @@ void SolverCUDA<SolverConfig>::playAllGames(uint32_t packedInitialGuess) {
 
     if (LOG) printf("\nDepth = %d\n", depth);
 
-    // mmmfixme: port nextMovesList from reference impl, keep it device-side
-
     // Score all games against their next guess, if any, which was given per-region. Append the score to the game's
     // region id.
     auto pdAllCodewords = thrust::raw_pointer_cast(dAllCodewords.data());
-    auto pdNextMoves = thrust::raw_pointer_cast(dNextMoves.data());
     thrust::for_each(
         dRegionIDs.begin(), dRegionIDsEnd, [depth, pdAllCodewords, pdNextMoves] __device__(RegionID & regionID) {
           if (!regionID.isGameOver()) {
@@ -778,6 +806,9 @@ void SolverCUDA<SolverConfig>::playAllGames(uint32_t packedInitialGuess) {
     auto pdRegionsAsIndex = thrust::raw_pointer_cast(dRegionIDsAsIndex.data());
     auto pdRegionsAsCodeword = thrust::raw_pointer_cast(dRegionIDsAsCodeword.data());
 
+    // Advance to a fresh next moves vector
+    pdNextMoves = thrust::raw_pointer_cast(hNextMovesDeviceVecs[nextMovesVecsSize++]);
+
     uint32_t tinyRegionCount = 0;
     uint32_t tinyGameCount = 0;
     while (tinyRegionCount < regionCount && hRegionLengths[tinyRegionCount] <= 2) {
@@ -810,7 +841,7 @@ void SolverCUDA<SolverConfig>::playAllGames(uint32_t packedInitialGuess) {
       auto pdPerBlockSolutions = thrust::raw_pointer_cast(dPerBlockSolutions.data());
       nextGuessForRegions<SolverConfig><<<(regionsToDo + threadsPerBlock - 1) / threadsPerBlock, threadsPerBlock>>>(
           pdAllCodewords, pdRegionsAsCodeword, pdRegionsAsIndex, pdNextMoves, pdRegionStarts, pdRegionLengths, offset,
-          regionsToDo, pdPerBlockSolutions);
+          regionsToDo, pdNextMovesVecs, nextMovesVecsSize, pdPerBlockSolutions);
     }
 
     if (LOG) printf("Big Boy Launches: %d\n", bigBoyLaunches);
@@ -824,7 +855,7 @@ void SolverCUDA<SolverConfig>::playAllGames(uint32_t packedInitialGuess) {
       startTime = chrono::high_resolution_clock::now();
     }
 
-    if (depth == 16) {
+    if (depth == MAX_SUPPORTED_TURNS) {
       printf("\nMax depth reached, impl is broken!\n");
       break;
     }
