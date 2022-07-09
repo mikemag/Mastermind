@@ -19,6 +19,7 @@ class SolverCUDA : public Solver {
 
  public:
   using SolverConfig = SolverConfig_;
+  constexpr static const char* name = "CUDA";
 
   void playAllGames(uint32_t packedInitialGuess) override;
 };

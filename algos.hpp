@@ -6,6 +6,7 @@
 #pragma once
 
 #include "preset_initial_guesses.h"
+#include <cmath>
 
 // Multiple algorithms for solving Mastermind
 //
@@ -41,7 +42,7 @@ struct Knuth : public Algo {
   template <typename SubsetSizeT>
   CUDA_HOST_AND_DEVICE static void accumulateRanking(RankingAccumulatorType& rankingAccumulator, SubsetSizeT& s,
                                                      uint32_t possibleSolutionsCount) {
-    rankingAccumulator = max(rankingAccumulator, s);
+    if (s > rankingAccumulator) rankingAccumulator = s;
   }
 
   CUDA_HOST_AND_DEVICE static uint32_t computeRank(const RankingAccumulatorType rankingAccumulator,

@@ -3,6 +3,9 @@
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree.
 
+#include <chrono>
+#include <set>
+
 #include "codeword.hpp"
 #include "mastermind_config.h"
 #include "score.hpp"
@@ -45,16 +48,16 @@ static constexpr uint8_t singleGameColorCount = 5;  // 1-15, 6 is classic
 static constexpr bool singleGameLog = true;
 
 // Config for playing a set of games
-static constexpr bool shouldPlayMultipleGames = true;
+static constexpr bool shouldPlayMultipleGames = false;
 template <typename T>
-using MultiGameSolver = SolverCUDA<T>;
+using MultiGameSolver = DefaultSolver<T>;
 using MultiGameAlgos = ss::algo_list<Algos::Knuth, Algos::MostParts>;
 using MultiGamePins = ss::pin_counts<4, 5>;
 using MultiGameColors = ss::color_counts<6>;
 static constexpr bool multiGameLog = true;
 
 // Initial guess exploration, plays the same games as the multi game config above
-static constexpr bool shouldFindBestFirstGuesses = true;
+static constexpr bool shouldFindBestFirstGuesses = false;
 
 // Misc config
 static constexpr bool shouldRunTests = true;  // Run unit tests and play Knuth's game
@@ -123,14 +126,18 @@ void runSingleSolver(StatsRecorder& statsRecorder, uint32_t packedInitialGuess) 
 
   Solver solver;
 
-  printf("Playing all %d pin %d color games using algorithm '%s' for every possible secret...\n",
-         SolverConfig::PIN_COUNT, SolverConfig::COLOR_COUNT, SolverConfig::ALGO::name);
   statsRecorder.newRun();
+  printf("Playing all %d pin %d color games using algorithm '%s' and solver '%s' for every possible secret...\n",
+         SolverConfig::PIN_COUNT, SolverConfig::COLOR_COUNT, SolverConfig::ALGO::name, Solver::name);
+
+  if (statsRecorder.gpuInfo.hasGPU()) {
+    printf("Using GPU '%s'\n", statsRecorder.gpuInfo.info["GPU Name"].c_str());
+  }
+
   statsRecorder.add("Pin Count", (int)SolverConfig::PIN_COUNT);
   statsRecorder.add("Color Count", (int)SolverConfig::COLOR_COUNT);
   statsRecorder.add("Strategy", SolverConfig::ALGO::name);
-  // mmmfixme: get solver name working. Would be nice to let the
-  //  Solver add whatever it wants to the sr.
+  statsRecorder.add("Solver", Solver::name);
 
   cout << "Total codewords: " << commaString(CodewordT::TOTAL_CODEWORDS) << endl;
   statsRecorder.add("Total Codewords", CodewordT::TOTAL_CODEWORDS);
@@ -156,10 +163,12 @@ void runSingleSolver(StatsRecorder& statsRecorder, uint32_t packedInitialGuess) 
   //  statsRecorder.add("Average Game Time (ms)", avgGameTimeMS);
 
   // mmmfixme: need these two back!
+  //  - these printed and saved CPU & GPU score counts, kernels executed
   //  strategy->printStats(elapsedMS);
   //  strategy->recordStats(statsRecorder, elapsedMS);
 
   printf("\n");
+  // mmmfixme: this was number of games bucketed by turns taken. Kinda fun to see.
   //  for (int i = 0; i < histogramSize; i++) {
   //    if (histogram[i] > 0) {
   //      printf("%2d: %s ", i, commaString(histogram[i]).c_str());
@@ -300,7 +309,6 @@ int main(int argc, const char* argv[]) {
   statsRecorder.addAll("Git Branch", MASTERMIND_GIT_BRANCH);
   statsRecorder.addAll("Git Commit Hash", MASTERMIND_GIT_COMMIT_HASH);
   statsRecorder.addAll("Git Commit Date", MASTERMIND_GIT_COMMIT_DATE);
-  string csvTag;  // mmmfixme
 
   playSingleGame<shouldPlaySingleGame>(statsRecorder);
 
@@ -308,12 +316,13 @@ int main(int argc, const char* argv[]) {
 
   playMultipleGamesWithInitialGuesses<shouldFindBestFirstGuesses>(statsRecorder);
 
+  // mmmfixme: move the file setup into the constructor, and write runs as the complete & flush so we don't lose work on crash
+  //  - Honestly, switch to JSON (so all rows don't have to be the same) and use https://github.com/nlohmann/json
   tm t = {};
   istringstream ss(MASTERMIND_GIT_COMMIT_DATE);
   ss >> get_time(&t, "%Y-%m-%d %H:%M:%S");
   stringstream fs;
-  fs << "mastermind_run_stats_" << csvTag << put_time(&t, "%Y%m%d_%H%M%S") << "_" << MASTERMIND_GIT_COMMIT_HASH
-     << ".csv";
+  fs << "mastermind_run_stats_" << put_time(&t, "%Y%m%d_%H%M%S") << "_" << MASTERMIND_GIT_COMMIT_HASH << ".csv";
   statsRecorder.writeStats(fs.str());
 
   return 0;

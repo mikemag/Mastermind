@@ -7,6 +7,7 @@
 #include <iostream>
 #include <iterator>
 #include <limits>
+#include <algorithm>
 
 // CPU Reference Implementation
 //

@@ -276,17 +276,17 @@ __device__ void computeSubsetSizesFixedLength(SubsetSizeT* __restrict__ subsetSi
 
 // Keeps an index into the all codewords vector together with a rank on the GPU, and whether this codeword is a
 // possible solution.
-struct IndexAndScore {
+struct IndexAndRank {
   uint32_t index;
-  uint32_t score;
+  uint32_t rank;
   bool isPossibleSolution;
   bool isFD;
 };
 
-// Reducer for per-thread scores, used for CUB per-block and device reductions.
-struct IndexAndScoreReducer {
-  __device__ __forceinline__ IndexAndScore operator()(const IndexAndScore& a, const IndexAndScore& b) const {
-    // Always take the best score. If it's a tie, take the one that could be a solution. If that's a tie, take lexically
+// Reducer for per-thread guesses, used for CUB per-block and device reductions.
+struct IndexAndRankReducer {
+  __device__ __forceinline__ IndexAndRank operator()(const IndexAndRank& a, const IndexAndRank& b) const {
+    // Always take the best rank. If it's a tie, take the one that could be a solution. If that's a tie, take lexically
     // first.
 #if 0
     // mmmfixme: worth it?
@@ -299,8 +299,8 @@ struct IndexAndScoreReducer {
     }
 #endif
 
-    if (b.score > a.score) return b;
-    if (b.score < a.score) return a;
+    if (b.rank > a.rank) return b;
+    if (b.rank < a.rank) return a;
     if (b.isPossibleSolution ^ a.isPossibleSolution) return b.isPossibleSolution ? b : a;
     return (b.index < a.index) ? b : a;
   }
@@ -366,14 +366,14 @@ struct SubsettingAlgosKernelConfig {
   static constexpr uint32_t LARGEST_ROUNDED_TOTAL_CODEWORDS =
       numBlocks(threadsPerBlock<uint8_t>()) * threadsPerBlock<uint8_t>();
 
-  using BlockReduce = cub::BlockReduce<IndexAndScore, THREADS_PER_BLOCK>;
+  using BlockReduce = cub::BlockReduce<IndexAndRank, THREADS_PER_BLOCK>;
   using SmallOptsBlockReduce = cub::BlockReduce<uint, THREADS_PER_BLOCK>;
 
   union SharedMemLayout {
     SubsetSizeT subsetSizes[TOTAL_PACKED_SCORES * THREADS_PER_BLOCK];
     typename BlockReduce::TempStorage reducerTmpStorage;
     typename SmallOptsBlockReduce::TempStorage smallOptsReducerTmpStorage;
-    IndexAndScore aggregate;  // Ensure alignment for these
+    IndexAndRank aggregate;  // Ensure alignment for these
   };
 };
 
@@ -391,7 +391,7 @@ static_assert(testConfig::numBlocks(testConfig::threadsPerBlock<uint32_t>()) == 
 // running. Finally, each block computes the best ranked codeword in the group, and we look for fully discriminating
 // codewords.
 //
-// Output is an array of IndexAndScores for the best selections from each block, and a single fully discriminating
+// Output is an array of IndexAndRanks for the best selections from each block, and a single fully discriminating
 // guess.
 //
 // Finally, there's shared block memory for each thread with enough room for all the intermediate subset sizes,
@@ -399,7 +399,7 @@ static_assert(testConfig::numBlocks(testConfig::threadsPerBlock<uint32_t>()) == 
 template <typename SubsettingAlgosKernelConfig, typename CodewordT>
 __global__ void subsettingAlgosKernel(const CodewordT* __restrict__ allCodewords,
                                       const CodewordT* __restrict__ regionIDsAsCodeword, uint32_t regionStart,
-                                      uint32_t regionLength, IndexAndScore* __restrict__ perBlockSolutions) {
+                                      uint32_t regionLength, IndexAndRank* __restrict__ perBlockSolutions) {
   __shared__ typename SubsettingAlgosKernelConfig::SharedMemLayout sharedMem;
 
   const uint tidGrid = blockDim.x * blockIdx.x + threadIdx.x;
@@ -439,10 +439,9 @@ __global__ void subsettingAlgosKernel(const CodewordT* __restrict__ allCodewords
   // Reduce to find the best solution we have in this block. This keeps the codeword index, rank, and possible solution
   // indicator together.
   __syncthreads();
-  // mmmfixme: IndexAndRank, not Score
-  IndexAndScore ias{tidGrid, rank, isPossibleSolution, false && totalUsedSubsets == possibleSolutionsCount};
-  IndexAndScore bestSolution = typename SubsettingAlgosKernelConfig::BlockReduce(sharedMem.reducerTmpStorage)
-                                   .Reduce(ias, IndexAndScoreReducer());
+  IndexAndRank iar{tidGrid, rank, isPossibleSolution, false && totalUsedSubsets == possibleSolutionsCount};
+  IndexAndRank bestSolution =
+      typename SubsettingAlgosKernelConfig::BlockReduce(sharedMem.reducerTmpStorage).Reduce(iar, IndexAndRankReducer());
 
   if (threadIdx.x == 0) {
     perBlockSolutions[blockIdx.x] = bestSolution;
@@ -464,18 +463,18 @@ __global__ void subsettingAlgosKernel(const CodewordT* __restrict__ allCodewords
 // Reduce the per-block best guesses from subsettingAlgosKernel to generate a single, best guess. This is then set
 // as the next move for the region.
 template <uint32_t blockSize>
-__global__ void reduceBestGuess(IndexAndScore* __restrict__ perBlockSolutions, const uint32_t solutionsCount,
+__global__ void reduceBestGuess(IndexAndRank* __restrict__ perBlockSolutions, const uint32_t solutionsCount,
                                 const uint32_t* __restrict__ regionIDsAsIndex, uint32_t* __restrict__ nextMoves,
                                 const int regionStart, const int regionLength) {
   uint32_t idx = threadIdx.x;
-  IndexAndScoreReducer reduce;
-  IndexAndScore bestScore{0, 0, false, false};
+  IndexAndRankReducer reduce;
+  IndexAndRank bestGuess{0, 0, false, false};
   for (uint32_t i = idx; i < solutionsCount; i += blockSize) {
-    bestScore = reduce(bestScore, perBlockSolutions[i]);
+    bestGuess = reduce(bestGuess, perBlockSolutions[i]);
   }
 
-  __shared__ IndexAndScore shared[blockSize];
-  shared[idx] = bestScore;
+  __shared__ IndexAndRank shared[blockSize];
+  shared[idx] = bestGuess;
   __syncthreads();
 
   for (uint32_t size = blockSize / 2; size > 0; size /= 2) {
@@ -497,7 +496,7 @@ __device__ void launchSubsettingKernel(const CodewordT* __restrict__ allCodeword
                                        const CodewordT* __restrict__ regionIDsAsCodeword,
                                        const uint32_t* __restrict__ regionIDsAsIndex, uint32_t* __restrict__ nextMoves,
                                        const uint32_t regionStart, const uint32_t regionLength,
-                                       IndexAndScore* __restrict__ perBlockSolutions) {
+                                       IndexAndRank* __restrict__ perBlockSolutions) {
   subsettingAlgosKernel<SubsettingAlgosKernelConfig>
       <<<SubsettingAlgosKernelConfig::NUM_BLOCKS, SubsettingAlgosKernelConfig::THREADS_PER_BLOCK>>>(
           allCodewords, regionIDsAsCodeword, regionStart, regionLength, perBlockSolutions);
@@ -530,7 +529,7 @@ __global__ void fullyDiscriminatingOpt(const CodewordT* __restrict__ allCodeword
                                        const CodewordT* __restrict__ regionIDsAsCodeword,
                                        const uint32_t* __restrict__ regionIDsAsIndex, uint32_t regionStart,
                                        uint32_t regionLength, uint32_t* __restrict__ nextMoves,
-                                       IndexAndScore* __restrict__ perBlockSolutions) {
+                                       IndexAndRank* __restrict__ perBlockSolutions) {
   // mmmfixme: need separate shared mem layout from the full kernel
   __shared__ typename SubsettingAlgosKernelConfig::SharedMemLayout sharedMem;
 
@@ -599,7 +598,7 @@ __global__ void nextGuessForRegions(const CodewordT* __restrict__ allCodewords,
                                     const uint32_t* __restrict__ regionIDsAsIndex, uint32_t* __restrict__ nextMoves,
                                     const uint32_t* __restrict__ regionStarts,
                                     const uint32_t* __restrict__ regionLengths, const uint32_t offset,
-                                    const uint32_t regionCount, IndexAndScore* __restrict__ perBlockSolutionsPool) {
+                                    const uint32_t regionCount, IndexAndRank* __restrict__ perBlockSolutionsPool) {
   uint tidGrid = blockDim.x * blockIdx.x + threadIdx.x;
 
   if (tidGrid < regionCount) {
@@ -685,7 +684,7 @@ void SolverCUDA<SolverConfig>::playAllGames(uint32_t packedInitialGuess) {
   // Space for the intermediate reduction results out of the subsetting algos kernel.
   // mmmfixme: we need a set per concurrent kernel
   size_t chunkSize = 256;  // mmmfixme: placement
-  thrust::device_vector<IndexAndScore> dPerBlockSolutions(
+  thrust::device_vector<IndexAndRank> dPerBlockSolutions(
       SubsettingAlgosKernelConfig<SolverConfig, uint32_t>::LARGEST_NUM_BLOCKS * chunkSize);
 
   thrust::device_vector<uint32_t> dRegionIDsAsIndex(dRegionIDs.size());

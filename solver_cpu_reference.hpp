@@ -20,6 +20,7 @@ class SolverReferenceImpl : public Solver {
 
  public:
   using SolverConfig = SolverConfig_;
+  constexpr static const char* name = "CPU Reference Impl";
 
   void playAllGames(uint32_t packedInitialGuess) override;
 

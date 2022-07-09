@@ -75,6 +75,35 @@ std::ostream &operator<<(std::ostream &stream, const OSInfo &r) {
   return r.dump(stream);
 }
 
+// Get basic info about the GPU, if present
+class GPUInfo {
+ public:
+  std::map<std::string, std::string> info;
+
+  GPUInfo();
+
+  bool hasGPU() const { return hasGPU_; }
+
+  std::ostream &dump(std::ostream &stream) const {
+    for (const auto &a : info) {
+      stream << a.first << ": " << a.second << std::endl;
+    }
+    return stream;
+  }
+
+ private:
+  int _ConvertSMVer2Cores(int major, int minor);
+  void dumpDeviceInfo();
+  void loadDeviceInfo();
+
+  bool hasGPU_ = false;
+};
+
+template <bool enabled>
+std::ostream &operator<<(std::ostream &stream, const GPUInfo &r) {
+  return r.dump(stream);
+}
+
 // A way to record various stats about a game so we can write a nice csv of results.
 class StatsRecorder {
  public:
@@ -82,9 +111,14 @@ class StatsRecorder {
   size_t currentRun = 0;
   std::map<std::string, std::string> all;
   OSInfo osInfo;
+  GPUInfo gpuInfo;
 
   StatsRecorder() {
     for (const auto &a : osInfo.info) {
+      all[a.first] = a.second;
+    }
+
+    for (const auto &a : gpuInfo.info) {
       all[a.first] = a.second;
     }
   }
