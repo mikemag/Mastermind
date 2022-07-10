@@ -254,26 +254,6 @@ __device__ void computeSubsetSizes(SubsetSizeT* __restrict__ subsetSizes, const 
   }
 }
 
-// Score all possible solutions against a given secret and compute subset sizes, which are the number of codewords per
-// score. Specialized for small regions with a fixed length.
-// TODO: more detailed specializations for specific small sizes, like 3.
-template <typename SolverConfig, uint32_t REGION_LENGTH = 0, typename SubsetSizeT, typename CodewordT>
-__device__ void computeSubsetSizesFixedLength(SubsetSizeT* __restrict__ subsetSizes, const uint32_t secret,
-                                              const uint4 secretColors,
-                                              const CodewordT* __restrict__ regionIDsAsCodeword, uint32_t regionStart,
-                                              uint32_t secretIndex) {
-  for (uint32_t i = regionStart; i < regionStart + REGION_LENGTH; i++) {
-    if (i == secretIndex) {  // don't score w/ self, we know it's a win
-      subsetSizes[SolverConfig::TOTAL_PACKED_SCORES - 1] = 1;
-    } else {
-      auto& ps = regionIDsAsCodeword[i];
-      unsigned __int128 pc8 = ps.packedColors8();  // Annoying...
-      uint score = scoreCodewords<SolverConfig::PIN_COUNT>(secret, secretColors, ps.packedCodeword(), *(uint4*)&pc8);
-      subsetSizes[score] = 1;
-    }
-  }
-}
-
 // Keeps an index into the all codewords vector together with a rank on the GPU, and whether this codeword is a
 // possible solution.
 struct IndexAndRank {
@@ -574,25 +554,8 @@ __global__ void fullyDiscriminatingOpt(const CodewordT* __restrict__ allCodeword
     for (int i = 0; i < SolverConfig::TOTAL_PACKED_SCORES; i++) subsetSizes[i] = 0;
 
     unsigned __int128 apc8 = regionIDsAsCodeword[idx + regionStart].packedColors8();  // Annoying...
-
-    // mmmfixme: need to tune these small specializations and see which ones are really necessary, which ones should be
-    //  specialized by hand, etc.
-    if (regionLength == 3) {
-      computeSubsetSizesFixedLength<SolverConfig, 3>(
-          subsetSizes, regionIDsAsCodeword[idx + regionStart].packedCodeword(), *(uint4*)&apc8, regionIDsAsCodeword,
-          regionStart, idx + regionStart);
-    } else if (regionLength == 4) {
-      computeSubsetSizesFixedLength<SolverConfig, 4>(
-          subsetSizes, regionIDsAsCodeword[idx + regionStart].packedCodeword(), *(uint4*)&apc8, regionIDsAsCodeword,
-          regionStart, idx + regionStart);
-    } else if (regionLength == 5) {
-      computeSubsetSizesFixedLength<SolverConfig, 5>(
-          subsetSizes, regionIDsAsCodeword[idx + regionStart].packedCodeword(), *(uint4*)&apc8, regionIDsAsCodeword,
-          regionStart, idx + regionStart);
-    } else {
-      computeSubsetSizes<SolverConfig>(subsetSizes, regionIDsAsCodeword[idx + regionStart].packedCodeword(),
-                                       *(uint4*)&apc8, regionIDsAsCodeword, regionStart, regionLength);
-    }
+    computeSubsetSizes<SolverConfig>(subsetSizes, regionIDsAsCodeword[idx + regionStart].packedCodeword(),
+                                     *(uint4*)&apc8, regionIDsAsCodeword, regionStart, regionLength);
 
     uint32_t totalUsedSubsets = 0;
     for (int i = 0; i < SolverConfig::TOTAL_PACKED_SCORES; i++) {
@@ -602,7 +565,7 @@ __global__ void fullyDiscriminatingOpt(const CodewordT* __restrict__ allCodeword
     }
 
     if (totalUsedSubsets == regionLength) {
-      result = min(result, idx + regionStart);
+      result = min(result, regionIDsAsIndex[idx + regionStart]);
     }
   }
 
@@ -613,7 +576,7 @@ __global__ void fullyDiscriminatingOpt(const CodewordT* __restrict__ allCodeword
   if (threadIdx.x == 0) {
     if (bestSolution < cuda::std::numeric_limits<uint>::max()) {
       for (int i = 0; i < regionLength; i++) {
-        nextMoves[regionIDsAsIndex[i + regionStart]] = regionIDsAsIndex[bestSolution];
+        nextMoves[regionIDsAsIndex[i + regionStart]] = bestSolution;
       }
     } else {
       // Fallback on the big kernel
