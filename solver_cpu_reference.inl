@@ -7,7 +7,6 @@
 #include <iostream>
 #include <iterator>
 #include <limits>
-#include <algorithm>
 
 // CPU Reference Implementation
 //
@@ -34,41 +33,16 @@
 //       games with a win at the end of their region id get no new guess
 //       otherwise, find next guess using the region itself as the possible solutions set PS
 
-// A simple region id which packs scores into a single 128-bit value, starting w/ the high order bits.
-// The region id carries the index of the game, so we can reorder regions at will.
-template <uint8_t WINNING_SCORE>
-struct SimpleRegionID {
-  using T = unsigned __int128;
-
-  T value = 0;
-  int index = -1;
-
-  void append(const Score& s, int depth) {
-    assert(depth < 16);
-    value |= static_cast<T>(s.result) << (numeric_limits<T>::digits - (depth * CHAR_BIT));
-  }
-
-  bool isGameOver() const {
-    auto v = value;
-    while (v != 0) {
-      if ((v & 0xFF) == WINNING_SCORE) return true;
-      v >>= 8;
-    }
-    return false;
-  }
-};
-
 template <typename SolverConfig>
-void SolverReferenceImpl<SolverConfig>::playAllGames(uint32_t packedInitialGuess) {
-  using RegionID = SimpleRegionID<SolverConfig::CodewordT::WINNING_SCORE.result>;
+std::chrono::nanoseconds SolverReferenceImpl<SolverConfig>::playAllGames(uint32_t packedInitialGuess) {
+  auto startTime = chrono::high_resolution_clock::now();
 
   vector<CodewordT>& allCodewords = CodewordT::getAllCodewords();
 
   // Starting case: all games get the same initial guess, region ids are empty
   vector<CodewordT> nextMoves(allCodewords.size(), packedInitialGuess);
-  vector<vector<CodewordT>> nextMovesList;
 
-  vector<RegionID> regionIDs(allCodewords.size());
+  regionIDs = vector<RegionID>(allCodewords.size());
   for (int i = 0; i < regionIDs.size(); i++) regionIDs[i].index = i;
 
   int depth = 0;
@@ -86,7 +60,7 @@ void SolverReferenceImpl<SolverConfig>::playAllGames(uint32_t packedInitialGuess
     for (auto& regionID : regionIDs) {
       if (!regionID.isGameOver()) {
         auto s = allCodewords[regionID.index].score(nextMoves[regionID.index]);
-        regionID.append(s, depth);
+        regionID.append(s.result, depth);
         if (s == CodewordT::WINNING_SCORE) {
           this->maxDepth = max(this->maxDepth, (size_t)depth);
           this->totalTurns += depth;
@@ -152,6 +126,8 @@ void SolverReferenceImpl<SolverConfig>::playAllGames(uint32_t packedInitialGuess
       break;
     }
   }
+  auto endTime = chrono::high_resolution_clock::now();
+  return endTime - startTime;
 }
 
 // These algorithms all rely on splitting the remaining possible guesses into groups or subsets based on their scores
@@ -222,4 +198,9 @@ typename SolverConfig::CodewordT SolverReferenceImpl<SolverConfig>::nextGuess(
     }
   }
   return bestGuess;
+}
+
+template <typename SolverConfig>
+void SolverReferenceImpl<SolverConfig>::dump() {
+  Solver::dump<SolverConfig, CodewordT>(regionIDs);
 }

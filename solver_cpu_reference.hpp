@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <cassert>
 #include <vector>
 
 #include "solver.hpp"
@@ -17,15 +18,26 @@
 template <typename SolverConfig_>
 class SolverReferenceImpl : public Solver {
   using CodewordT = typename SolverConfig_::CodewordT;
+  using RegionID = RegionID<unsigned __int128, SolverConfig_::CodewordT::WINNING_SCORE.result>;
 
  public:
   using SolverConfig = SolverConfig_;
   constexpr static const char* name = "CPU Reference Impl";
 
-  void playAllGames(uint32_t packedInitialGuess) override;
+  std::chrono::nanoseconds playAllGames(uint32_t packedInitialGuess) override;
+
+  void dump() override;
 
  private:
   CodewordT nextGuess(const vector<CodewordT>& possibleSolutions, const vector<CodewordT>& usedCodewords);
+
+  uint32_t getPackedCodewordForRegion(int level, uint32_t regionIndex) const override {
+    return nextMovesList[level][regionIndex].packedCodeword();
+  }
+  uint8_t getStandardScore(uint8_t score) override { return score; }
+
+  vector<vector<CodewordT>> nextMovesList;
+  vector<RegionID> regionIDs;
 };
 
 #include "solver_cpu_reference.inl"

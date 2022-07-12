@@ -130,6 +130,7 @@ void runSingleSolver(StatsRecorder& statsRecorder, uint32_t packedInitialGuess) 
   printf("Playing all %d pin %d color games using algorithm '%s' and solver '%s' for every possible secret...\n",
          SolverConfig::PIN_COUNT, SolverConfig::COLOR_COUNT, SolverConfig::ALGO::name, Solver::name);
 
+  // mmmfixme: needs to ask the solver for this, confusing otherwise
   if (statsRecorder.gpuInfo.hasGPU()) {
     printf("Using GPU '%s'\n", statsRecorder.gpuInfo.info["GPU Name"].c_str());
   }
@@ -145,22 +146,16 @@ void runSingleSolver(StatsRecorder& statsRecorder, uint32_t packedInitialGuess) 
   cout << "Initial guess: " << CodewordT{packedInitialGuess} << endl;
   statsRecorder.add("Initial Guess", CodewordT{packedInitialGuess});
 
-  auto startTime = chrono::high_resolution_clock::now();
+  auto elapsed = solver.playAllGames(packedInitialGuess);
 
-  solver.playAllGames(packedInitialGuess);
-
-  auto endTime = chrono::high_resolution_clock::now();
   double averageTurns = (double)solver.getTotalTurns() / CodewordT::TOTAL_CODEWORDS;
   printf("Average number of turns was %.4f\n", averageTurns);
   statsRecorder.add("Average Turns", averageTurns);
   cout << "Maximum number of turns over all possible secrets was " << solver.getMaxDepth() << endl;
   statsRecorder.add("Max Turns", solver.getMaxDepth());
-  //  statsRecorder.add("Max Secret", maxSecret);
-  chrono::duration<float, milli> elapsedMS = endTime - startTime;
-  auto elapsedS = elapsedMS.count() / 1000;
-  cout << "Elapsed time " << commaString(elapsedS) << "s" << endl;
-  statsRecorder.add("Elapsed (s)", elapsedS);
-  //  statsRecorder.add("Average Game Time (ms)", avgGameTimeMS);
+  chrono::duration<float> elapsedS = elapsed;
+  cout << "Elapsed time " << commaString(elapsedS.count()) << "s" << endl;
+  statsRecorder.add("Elapsed (s)", elapsedS.count());
 
   // mmmfixme: need these two back!
   //  - these printed and saved CPU & GPU score counts, kernels executed
@@ -178,8 +173,7 @@ void runSingleSolver(StatsRecorder& statsRecorder, uint32_t packedInitialGuess) 
   //  printf("\n");
 
   if (shouldWriteStratFiles) {
-    // mmmfixme: need this to dump the strat graph
-    //    strategy->dump();
+    solver.dump();
   }
 
   cout << "Done" << endl;
@@ -316,7 +310,8 @@ int main(int argc, const char* argv[]) {
 
   playMultipleGamesWithInitialGuesses<shouldFindBestFirstGuesses>(statsRecorder);
 
-  // mmmfixme: move the file setup into the constructor, and write runs as the complete & flush so we don't lose work on crash
+  // mmmfixme: move the file setup into the constructor, and write runs as the complete & flush so we don't lose work on
+  //  crash
   //  - Honestly, switch to JSON (so all rows don't have to be the same) and use https://github.com/nlohmann/json
   tm t = {};
   istringstream ss(MASTERMIND_GIT_COMMIT_DATE);

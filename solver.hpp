@@ -5,8 +5,11 @@
 
 #pragma once
 
+#include <chrono>
+
 #include "algos.hpp"
 #include "codeword.hpp"
+#include "region.hpp"
 
 struct SolverConfigBase {};
 
@@ -30,10 +33,20 @@ struct SolverConfig : public SolverConfigBase {
 
 class Solver {
  public:
-  virtual void playAllGames(uint32_t packedInitialGuess) = 0;
+  virtual std::chrono::nanoseconds playAllGames(uint32_t packedInitialGuess) = 0;
 
   size_t getMaxDepth() const { return maxDepth; }
-  size_t getTotalTurns() const { return totalTurns; };
+  size_t getTotalTurns() const { return totalTurns; }
+
+  // Output the strategy for visualization with GraphViz. Copy-and-paste the output file to sites
+  // like https://dreampuf.github.io/GraphvizOnline or http://www.webgraphviz.com/. Or install
+  // GraphViz locally and run with the following command:
+  //
+  //   twopi -Tjpg mastermind_strategy_4p6c.gv > mastermind_strategy_4p6c.jpg
+  //
+  // Parameters for the graph are currently set to convey the point while being reasonably readable
+  // in a large JPG.
+  virtual void dump() = 0;
 
  protected:
   size_t maxDepth = 0;
@@ -41,6 +54,12 @@ class Solver {
 
   // - printstats, recordstats, dump
   // - flags and opt config
+
+  template <typename SolverConfig, typename CodewordT, typename RegionID>
+  void dump(vector<RegionID> &regionIDs);
+
+  virtual uint32_t getPackedCodewordForRegion(int level, uint32_t regionIndex) const = 0;
+  virtual uint8_t getStandardScore(uint8_t score) = 0;
 };
 
 #include "solver.inl"

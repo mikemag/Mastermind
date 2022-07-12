@@ -50,99 +50,6 @@
 //       games with a win at the end of their region id get no new guess
 //       otherwise, find next guess using the region itself as the possible solutions set PS
 
-// mmmfixme: name and placement of both of these
-template <typename T, uint8_t WINNING_SCORE>
-struct RegionIDLR {
-  T value = 0;
-  uint32_t index;
-
-  __host__ __device__ RegionIDLR() : value(0), index(0) {}
-  __host__ __device__ RegionIDLR(const RegionIDLR& r) : value(r.value), index(r.index) {}
-
-  __host__ __device__ void append(const Score& s, int depth) {
-    assert(depth < 16);
-    value |= static_cast<T>(s.result) << (cuda::std::numeric_limits<T>::digits - (depth * CHAR_BIT));
-  }
-
-  __host__ __device__ void append(uint8_t s, int depth) {
-    assert(depth < 16);
-    value |= static_cast<T>(s) << (cuda::std::numeric_limits<T>::digits - (depth * CHAR_BIT));
-  }
-
-  __host__ __device__ bool isGameOver() const {
-    auto v = value;
-    while (v != 0) {
-      if ((v & 0xFF) == WINNING_SCORE) return true;
-      v >>= 8;
-    }
-    return false;
-  }
-
-  __host__ __device__ int countMovesPacked() const {
-    auto v = value;
-    int c = 0;
-    while (v != 0) {
-      c++;
-      static constexpr auto highByteShift = cuda::std::numeric_limits<T>::digits - CHAR_BIT;
-      if (((v & (static_cast<T>(0xFF) << highByteShift)) >> highByteShift) == WINNING_SCORE) break;
-      v <<= 8;
-    }
-    return c;
-  }
-
-  __host__ __device__ void dump() const { printf("%016lx-%016lx\n", *(((uint64_t*)&value) + 1), *((uint64_t*)&value)); }
-
-  std::ostream& dump(std::ostream& stream) const {
-    std::ios state(nullptr);
-    state.copyfmt(stream);
-    stream << std::hex << std::setfill('0') << std::setw(16) << *(((uint64_t*)&value) + 1) << "-" << std::setw(16)
-           << *((uint64_t*)&value);
-    stream.copyfmt(state);
-    return stream;
-  }
-};
-
-#if 0
-struct RegionIDRL {
-  unsigned __int128 value = 0;
-  uint32_t index;
-
-  __host__ __device__ RegionIDRL() : value(0), index(0) {}
-  __host__ __device__ RegionIDRL(const RegionIDRL& r) : value(r.value), index(r.index) {}
-
-  __host__ __device__ void append(const Score& s, int depth) {
-    assert(depth < 16);
-    value = (value << 8) | s.result;
-  }
-
-  __host__ __device__ void append(uint8_t s, int depth) {
-    assert(depth < 16);
-    value = (value << 8) | s;
-  }
-
-  __host__ bool isFinal() const { return (value & 0xFF) == CodewordT::WINNING_SCORE.result; }
-  __host__ __device__ bool isFinalPacked() const { return (value & 0xFF) == TOTAL_PACKED_SCORES - 1; }
-
-  __host__ __device__ void dump() const { printf("%016lx-%016lx\n", *(((uint64_t*)&value) + 1), *((uint64_t*)&value)); }
-
-  std::ostream& dump(std::ostream& stream) const {
-    std::ios state(nullptr);
-    state.copyfmt(stream);
-    stream << std::hex << std::setfill('0') << std::setw(16) << *(((uint64_t*)&value) + 1) << "-" << std::setw(16)
-           << *((uint64_t*)&value);
-    stream.copyfmt(state);
-    return stream;
-  }
-};
-#endif
-
-// using RegionID = RegionIDLR<uint64_t>;
-
-template <typename T, uint8_t WINNING_SCORE>
-std::ostream& operator<<(std::ostream& stream, const RegionIDLR<T, WINNING_SCORE>& r) {
-  return r.dump(stream);
-}
-
 // scoring all games in a region subdivides it, one new region per score.
 // - sorting the region by score gets us runs of games we can apply the same guess to
 
@@ -656,9 +563,10 @@ __global__ void nextGuessTiny(const uint32_t* __restrict__ regionIDsAsIndex, uin
 //    of the main subsetting kernel is a tiny fraction of the overall work right now, so keeping it simple.
 
 template <typename SolverConfig>
-void SolverCUDA<SolverConfig>::playAllGames(uint32_t packedInitialGuess) {
+std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedInitialGuess) {
   constexpr static bool LOG = SolverConfig::LOG;
-  using RegionID = RegionIDLR<unsigned __int128, SolverConfig::TOTAL_PACKED_SCORES - 1>;
+
+  auto startTime = chrono::high_resolution_clock::now();
 
   thrust::device_vector<CodewordT> dAllCodewords = CodewordT::getAllCodewords();
 
@@ -853,6 +761,8 @@ void SolverCUDA<SolverConfig>::playAllGames(uint32_t packedInitialGuess) {
     }
   }
 
+  auto endTime = chrono::high_resolution_clock::now();
+
   if (LOG) cout << "Last actual depth: " << depth << endl;
 
   // Post-process for stats
@@ -862,4 +772,21 @@ void SolverCUDA<SolverConfig>::playAllGames(uint32_t packedInitialGuess) {
     this->maxDepth = max<size_t>(this->maxDepth, c);
     this->totalTurns += c;
   }
+
+  // Copy solution data off the GPU, so we can use it to dump strategy graphs and other stats
+  regionIDs = std::vector<RegionID>(hRegionIDs.begin(), hRegionIDs.end());
+
+  for (int i = 0; i < hNextMovesStorage.size(); i++) {
+    auto dNM = hNextMovesStorage[i];
+    auto nm = vector<uint32_t>(dNM.size());
+    thrust::copy(dNM.begin(), dNM.end(), nm.begin());
+    nextMovesList.push_back(nm);
+  }
+
+  return endTime - startTime;
+}
+
+template <typename SolverConfig>
+void SolverCUDA<SolverConfig>::dump() {
+  Solver::dump<SolverConfig, CodewordT>(regionIDs);
 }
