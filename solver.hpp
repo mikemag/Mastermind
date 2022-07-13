@@ -35,8 +35,9 @@ class Solver {
  public:
   virtual std::chrono::nanoseconds playAllGames(uint32_t packedInitialGuess) = 0;
 
-  size_t getMaxDepth() const { return maxDepth; }
-  size_t getTotalTurns() const { return totalTurns; }
+  uint64_t getMaxDepth() const { return maxDepth; }
+  uint64_t getTotalTurns() const { return totalTurns; }
+  virtual bool usesGPU() const { return false; }
 
   // Output the strategy for visualization with GraphViz. Copy-and-paste the output file to sites
   // like https://dreampuf.github.io/GraphvizOnline or http://www.webgraphviz.com/. Or install
@@ -47,16 +48,20 @@ class Solver {
   // Parameters for the graph are currently set to convey the point while being reasonably readable
   // in a large JPG.
   virtual void dump() = 0;
+  virtual vector<uint32_t> getGuessesForGame(uint32_t packedCodeword) = 0;
 
  protected:
-  size_t maxDepth = 0;
-  size_t totalTurns = 0;
+  uint64_t maxDepth = 0;
+  uint64_t totalTurns = 0;
+  uint64_t scoreCount = 0;
 
   // - printstats, recordstats, dump
   // - flags and opt config
 
   template <typename SolverConfig, typename CodewordT, typename RegionID>
   void dump(vector<RegionID> &regionIDs);
+  template <typename Solver, typename SolverConfig, typename CodewordT, typename RegionID>
+  vector<uint32_t> getGuessesForGame(uint32_t packedCodeword,  vector<RegionID> &regionIDs);
 
   virtual uint32_t getPackedCodewordForRegion(int level, uint32_t regionIndex) const = 0;
   virtual uint8_t getStandardScore(uint8_t score) = 0;

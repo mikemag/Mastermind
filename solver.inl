@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <fstream>
+#include <iterator>
 #include <sstream>
 
 // Dump the tree of moves over all games as a GraphViz graph. These are fun to render.
@@ -23,7 +24,7 @@ void Solver::dump(vector<RegionID>& regionIDs) {
 
   cout << "\nWriting strategy to " << filename << endl;
   ofstream graphStream(filename);
-  graphStream << "digraph Mastermind_Strategy_" << SolverConfig::ALGO::name << "_" << (int)SolverConfig::PIN_COUNT
+  graphStream << "digraph Mastermind_Strategy_" << algName << "_" << (int)SolverConfig::PIN_COUNT
               << "p" << (int)SolverConfig::COLOR_COUNT << "c";
   graphStream << " {" << endl;
   graphStream << "size=\"40,40\"" << endl;  // Good size for jpgs
@@ -54,7 +55,14 @@ void Solver::dump(vector<RegionID>& regionIDs) {
 
           auto fmtRP = [](int level, unsigned __int128 v) {
             stringstream ss;
-            ss << "\"" << std::hex << std::setw(level * 2) << std::setfill('0') << (unsigned long long)v << "\"";
+            uint64_t vl = *((uint64_t*)&v);
+            uint64_t vh = *(((uint64_t*)&v) + 1);
+            ss << "\"";
+            if (vh > 0) {
+              ss << std::hex << std::setw((level - 8) * 2) << std::setfill('0') << vh;
+              level = 8;
+            }
+            ss << std::hex << std::setw(level * 2) << std::setfill('0') << vl << "\"";
             return ss.str();
           };
 
@@ -78,4 +86,29 @@ void Solver::dump(vector<RegionID>& regionIDs) {
 
   graphStream << "}" << endl;
   graphStream.close();
+}
+
+template <typename Solver_, typename SolverConfig, typename CodewordT, typename RegionID>
+vector<uint32_t> Solver::getGuessesForGame(uint32_t packedCodeword, vector<RegionID>& regionIDs) {
+  uint32_t gameIndex = CodewordT::computeOrdinal(packedCodeword);
+
+  auto rItr =
+      std::find_if(regionIDs.cbegin(), regionIDs.cend(), [=](const RegionID& r) { return r.index == gameIndex; });
+  RegionID gameRegion = *rItr;
+
+  vector<uint32_t> guesses;
+  guesses.push_back(getPackedCodewordForRegion(0, gameIndex));
+
+  for (int level = 1; level < maxDepth; level++) {
+    auto rp = gameRegion.regionPrefix(level);
+    if (rp == numeric_limits<unsigned __int128>::max()) break;
+    uint8_t score = rp & 0xFF;
+
+    if (score != RegionID::WINNING_SCORE) {
+      auto to = getPackedCodewordForRegion(level, gameIndex);
+      guesses.push_back(to);
+    }
+  }
+
+  return guesses;
 }

@@ -630,7 +630,6 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
     auto pdAllCodewords = thrust::raw_pointer_cast(dAllCodewords.data());
     thrust::for_each(
         dRegionIDs.begin(), dRegionIDsEnd, [depth, pdAllCodewords, pdNextMoves] __device__(RegionID & regionID) {
-          if (!regionID.isGameOver()) {
             auto cwi = regionID.index;
             unsigned __int128 apc8 = pdAllCodewords[cwi].packedColors8();               // Annoying...
             unsigned __int128 npc8 = pdAllCodewords[pdNextMoves[cwi]].packedColors8();  // Annoying...
@@ -638,7 +637,6 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
                                                                 pdAllCodewords[pdNextMoves[cwi]].packedCodeword(),
                                                                 *(uint4*)&npc8);
             regionID.append(s, depth);
-          }
         });
 
     // Push won games to the end and focus on the remaining games
@@ -789,4 +787,9 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
 template <typename SolverConfig>
 void SolverCUDA<SolverConfig>::dump() {
   Solver::dump<SolverConfig, CodewordT>(regionIDs);
+}
+
+template <typename SolverConfig>
+vector<uint32_t> SolverCUDA<SolverConfig>::getGuessesForGame(uint32_t packedCodeword) {
+  return Solver::getGuessesForGame<SolverCUDA, SolverConfig, CodewordT>(packedCodeword, regionIDs);
 }

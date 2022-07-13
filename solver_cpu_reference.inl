@@ -60,6 +60,7 @@ std::chrono::nanoseconds SolverReferenceImpl<SolverConfig>::playAllGames(uint32_
     for (auto& regionID : regionIDs) {
       if (!regionID.isGameOver()) {
         auto s = allCodewords[regionID.index].score(nextMoves[regionID.index]);
+        scoreCount++;
         regionID.append(s.result, depth);
         if (s == CodewordT::WINNING_SCORE) {
           this->maxDepth = max(this->maxDepth, (size_t)depth);
@@ -176,6 +177,7 @@ typename SolverConfig::CodewordT SolverReferenceImpl<SolverConfig>::nextGuess(
         isPossibleSolution = true;  // Remember if this guess is in the set of possible solutions
       }
     }
+    scoreCount += possibleSolutions.size();
 
     typename ALGO::RankingAccumulatorType rankingAccumulator{};
     for (auto& s : subsetSizes) {
@@ -203,4 +205,9 @@ typename SolverConfig::CodewordT SolverReferenceImpl<SolverConfig>::nextGuess(
 template <typename SolverConfig>
 void SolverReferenceImpl<SolverConfig>::dump() {
   Solver::dump<SolverConfig, CodewordT>(regionIDs);
+}
+
+template <typename SolverConfig>
+vector<uint32_t> SolverReferenceImpl<SolverConfig>::getGuessesForGame(uint32_t packedCodeword) {
+  return Solver::getGuessesForGame<SolverReferenceImpl, SolverConfig, CodewordT>(packedCodeword, regionIDs);
 }

@@ -24,7 +24,10 @@ class SolverCUDA : public Solver {
 
   std::chrono::nanoseconds playAllGames(uint32_t packedInitialGuess) override;
 
+  bool usesGPU() const override { return true; }
+
   void dump() override;
+  vector<uint32_t> getGuessesForGame(uint32_t packedCodeword) override;
 
  private:
   uint32_t getPackedCodewordForRegion(int level, uint32_t regionIndex) const override {

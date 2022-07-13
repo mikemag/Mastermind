@@ -5,6 +5,7 @@
 
 #include <chrono>
 #include <set>
+#include <typeindex>
 
 #include "codeword.hpp"
 #include "mastermind_config.h"
@@ -54,7 +55,7 @@ using MultiGameSolver = DefaultSolver<T>;
 using MultiGameAlgos = ss::algo_list<Algos::Knuth, Algos::MostParts>;
 using MultiGamePins = ss::pin_counts<4, 5>;
 using MultiGameColors = ss::color_counts<6>;
-static constexpr bool multiGameLog = true;
+static constexpr bool multiGameLog = false;
 
 // Initial guess exploration, plays the same games as the multi game config above
 static constexpr bool shouldFindBestFirstGuesses = false;
@@ -87,7 +88,7 @@ void runUnitTests() {
     success &= (testSecret.score(Codeword<4, 6>(0x8466)) == Score(0, 4));
 
     if (success) {
-      printf("Tests pass\n");
+      printf("Tests pass\n\n");
     } else {
       printf("Some tests failed!\n");
       exit(-1);
@@ -95,27 +96,82 @@ void runUnitTests() {
   }
 }
 
-// mmmfixme: bring this back and post-process the results to print the data we need to match the paper, or add an option
-// to dump a single game as it runs.
-#if 0
-void runKnuthTest() {
-  printf("\nRun the example from Knuth's paper to compare with his results.\n");
-  StrategyKnuth<StrategyConfig<4, 6, true>> s(Codeword<4, 6>(0x1122));
-  Codeword<4, 6> secret(0x3632);
-  s.findSecret(secret);
-  printf("\n");
-}
-#endif
+// A little struct to hold info about a valid result from a solver.
+struct ValidSolution {
+  uint maxTurns;
+  uint64_t totalTurns;
 
-static constexpr uint histogramSize = 32;
-static vector<int> histogram(histogramSize, 0);
-static vector<string> histogramHeaders;
+  struct SingleGame {
+    uint32_t secret;
+    vector<uint32_t> correctGuesses;
+  };
 
-static void setupHistogramHeaders() {
-  for (int i = 0; i < histogramSize; i++) {
-    std::stringstream ss;
-    ss << "Hist_" << setw(2) << setfill('0') << i;
-    histogramHeaders.emplace_back(ss.str());
+  vector<SingleGame> games;
+};
+
+// List of known solutions to verify our runs
+template <uint8_t PIN_COUNT, uint8_t COLOR_COUNT, typename ALGO>
+struct ValidSolutionsKey {};
+
+static std::map<std::type_index, ValidSolution> validSolutions = {
+    {typeid(ValidSolutionsKey<4, 6, Algos::Knuth>),
+     {5,
+      5801,
+      {
+          {0x3632, {0x1122, 0x1344, 0x3526, 0x1462, 0x3632}},
+          {0x1111, {0x1122, 0x1234, 0x1315, 0x1111}},
+      }}},
+    {typeid(ValidSolutionsKey<4, 6, Algos::MostParts>),
+     {6,
+      5668,
+      {
+          {0x3632, {0x1123, 0x2344, 0x3255, 0x3632}},
+          {0x1111, {0x1123, 0x1425, 0x2326, 0x1111}},
+      }}},
+    {typeid(ValidSolutionsKey<8, 5, Algos::Knuth>),
+     {8,
+      2315454,
+      {
+          {0x11223344, {0x11112222, 0x11331134, 0x44331222, 0x23142134, 0x11223344}},
+      }}},
+};
+
+template <typename Solver>
+void validateSolutions(Solver& solver) {
+  using SolverConfig = typename Solver::SolverConfig;
+  using CodewordT = typename SolverConfig::CodewordT;
+  using vsKey = ValidSolutionsKey<SolverConfig::PIN_COUNT, SolverConfig::COLOR_COUNT, typename SolverConfig::ALGO>;
+  auto vsIter = validSolutions.find(typeid(vsKey));
+  if (vsIter != validSolutions.end()) {
+    const ValidSolution& vs = vsIter->second;
+
+    if (solver.getTotalTurns() != vs.totalTurns) {
+      printf("ERROR: Total turns doesn't match, expect %lu (%.4f), actual %lu (%.4f)\n", vs.totalTurns,
+             (double)vs.totalTurns / CodewordT::TOTAL_CODEWORDS, solver.getTotalTurns(),
+             (double)solver.getTotalTurns() / CodewordT::TOTAL_CODEWORDS);
+    }
+
+    if (solver.getMaxDepth() != vs.maxTurns) {
+      printf("ERROR: Max turns doesn't match, expect %u, actual %lu\n", vs.maxTurns, solver.getMaxDepth());
+    }
+
+    auto printGuesses = [](const vector<uint32_t>& guesses) {
+      printf("%x", guesses[0]);
+      for (int i = 1; i < guesses.size(); i++) printf(", %x", guesses[i]);
+    };
+
+    for (auto& g : vs.games) {
+      auto guesses = solver.getGuessesForGame(g.secret);
+      if (guesses != g.correctGuesses) {
+        printf("ERROR: Solution for secret %x, %dp%dc game, algo '%s', solver '%s', %ld moves: ", g.secret,
+               SolverConfig::PIN_COUNT, SolverConfig::COLOR_COUNT, SolverConfig::ALGO::name, Solver::name,
+               guesses.size());
+        printGuesses(guesses);
+        printf(" <-- **WRONG ANSWER**, should be ");
+        printGuesses(g.correctGuesses);
+        printf("\n");
+      }
+    }
   }
 }
 
@@ -130,8 +186,7 @@ void runSingleSolver(StatsRecorder& statsRecorder, uint32_t packedInitialGuess) 
   printf("Playing all %d pin %d color games using algorithm '%s' and solver '%s' for every possible secret...\n",
          SolverConfig::PIN_COUNT, SolverConfig::COLOR_COUNT, SolverConfig::ALGO::name, Solver::name);
 
-  // mmmfixme: needs to ask the solver for this, confusing otherwise
-  if (statsRecorder.gpuInfo.hasGPU()) {
+  if (solver.usesGPU() && statsRecorder.gpuInfo.hasGPU()) {
     printf("Using GPU '%s'\n", statsRecorder.gpuInfo.info["GPU Name"].c_str());
   }
 
@@ -162,21 +217,13 @@ void runSingleSolver(StatsRecorder& statsRecorder, uint32_t packedInitialGuess) 
   //  strategy->printStats(elapsedMS);
   //  strategy->recordStats(statsRecorder, elapsedMS);
 
-  printf("\n");
-  // mmmfixme: this was number of games bucketed by turns taken. Kinda fun to see.
-  //  for (int i = 0; i < histogramSize; i++) {
-  //    if (histogram[i] > 0) {
-  //      printf("%2d: %s ", i, commaString(histogram[i]).c_str());
-  //    }
-  //    statsRecorder.add(histogramHeaders[i], histogram[i]);
-  //  }
-  //  printf("\n");
+  validateSolutions(solver);
 
   if (shouldWriteStratFiles) {
     solver.dump();
   }
 
-  cout << "Done" << endl;
+  cout << "Done" << endl << endl;
 }
 
 // Find a unique set of initial guesses. Using different digits for the same pattern isn't useful, nor are shuffled
@@ -296,8 +343,6 @@ void playMultipleGamesWithInitialGuesses(StatsRecorder& statsRecorder) {
 
 int main(int argc, const char* argv[]) {
   runUnitTests<shouldRunTests>();
-
-  setupHistogramHeaders();
 
   StatsRecorder statsRecorder;
   statsRecorder.addAll("Git Branch", MASTERMIND_GIT_BRANCH);

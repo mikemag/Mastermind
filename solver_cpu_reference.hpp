@@ -27,6 +27,7 @@ class SolverReferenceImpl : public Solver {
   std::chrono::nanoseconds playAllGames(uint32_t packedInitialGuess) override;
 
   void dump() override;
+  vector<uint32_t> getGuessesForGame(uint32_t packedCodeword) override;
 
  private:
   CodewordT nextGuess(const vector<CodewordT>& possibleSolutions, const vector<CodewordT>& usedCodewords);

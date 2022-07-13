@@ -5,8 +5,9 @@
 
 #pragma once
 
-#include "preset_initial_guesses.h"
 #include <cmath>
+
+#include "preset_initial_guesses.h"
 
 // Multiple algorithms for solving Mastermind
 //
