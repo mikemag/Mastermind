@@ -100,6 +100,17 @@
 //     - when done, shares the ng w/ all threads in the region and they update next_guesses[0..n]
 //     - trying to avoid the device-wide reduction and extra kernel kickoff's per-region
 
+template <typename SolverConfig>
+struct Counters {
+  using S = SolverCUDA<SolverConfig>;
+  constexpr static int SCORES = find_counter(S::counterDescs, "Scores");
+  constexpr static int TINY_REGIONS = find_counter(S::counterDescs, "Tiny Regions");
+  constexpr static int TINY_GAMES = find_counter(S::counterDescs, "Tiny Games");
+  constexpr static int FDOPT_REGIONS = find_counter(S::counterDescs, "FDOpt Regions");
+  constexpr static int FDOPT_GAMES = find_counter(S::counterDescs, "FDOpt Games");
+  constexpr static int BIG_REGIONS = find_counter(S::counterDescs, "Big Regions");
+};
+
 // The core of Knuth's Mastermind algorithm, and others, as CUDA compute kernels.
 //
 // Scores here are not the classic combination of black hits and white hits. A score's ordinal is (b(p + 1) -
@@ -448,7 +459,8 @@ __global__ void fullyDiscriminatingOpt(const CodewordT* __restrict__ allCodeword
                                        const uint32_t* __restrict__ regionIDsAsIndex, uint32_t regionStart,
                                        uint32_t regionLength, uint32_t* __restrict__ nextMoves,
                                        uint32_t** __restrict__ nextMovesVecs, uint32_t nextMovesVecsSize,
-                                       IndexAndRank* __restrict__ perBlockSolutions) {
+                                       IndexAndRank* __restrict__ perBlockSolutions,
+                                       unsigned long long int* __restrict__ deviceCounters) {
   assert(blockIdx.x == 0);   // Single block
   assert(blockDim.x == 32);  // Single warp
 
@@ -485,11 +497,14 @@ __global__ void fullyDiscriminatingOpt(const CodewordT* __restrict__ allCodeword
       for (int i = 0; i < regionLength; i++) {
         nextMoves[regionIDsAsIndex[i + regionStart]] = bestSolution;
       }
+      atomicAdd(&deviceCounters[Counters<SolverConfig>::SCORES], regionLength * regionLength);
     } else {
       // Fallback on the big kernel
       launchSubsettingKernel<SubsettingAlgosKernelConfig>(allCodewords, regionIDsAsCodeword, regionIDsAsIndex,
                                                           nextMoves, regionStart, regionLength, nextMovesVecs,
                                                           nextMovesVecsSize, perBlockSolutions);
+      atomicAdd(&deviceCounters[Counters<SolverConfig>::SCORES],
+                CodewordT::TOTAL_CODEWORDS * regionLength + regionLength * regionLength);
     }
   }
 }
@@ -503,7 +518,8 @@ __global__ void nextGuessForRegions(const CodewordT* __restrict__ allCodewords,
                                     const uint32_t* __restrict__ regionStarts,
                                     const uint32_t* __restrict__ regionLengths, const uint32_t offset,
                                     const uint32_t regionCount, uint32_t** __restrict__ nextMovesVecs,
-                                    uint32_t nextMovesVecsSize, IndexAndRank* __restrict__ perBlockSolutionsPool) {
+                                    uint32_t nextMovesVecsSize, IndexAndRank* __restrict__ perBlockSolutionsPool,
+                                    unsigned long long int* __restrict__ deviceCounters) {
   uint tidGrid = blockDim.x * blockIdx.x + threadIdx.x;
 
   if (tidGrid < regionCount) {
@@ -521,17 +537,20 @@ __global__ void nextGuessForRegions(const CodewordT* __restrict__ allCodewords,
         using configFDOpt = FDOptKernelConfig<SolverConfig>;
         fullyDiscriminatingOpt<configFDOpt, config8><<<1, configFDOpt::THREADS_PER_BLOCK>>>(
             allCodewords, regionIDsAsCodeword, regionIDsAsIndex, regionStart, regionLength, nextMoves, nextMovesVecs,
-            nextMovesVecsSize, perBlockSolutions);
+            nextMovesVecsSize, perBlockSolutions, deviceCounters);
       } else {
         launchSubsettingKernel<config8>(allCodewords, regionIDsAsCodeword, regionIDsAsIndex, nextMoves, regionStart,
                                         regionLength, nextMovesVecs, nextMovesVecsSize, perBlockSolutions);
+        atomicAdd(&deviceCounters[Counters<SolverConfig>::SCORES], CodewordT::TOTAL_CODEWORDS * regionLength);
       }
     } else if (config16::shouldUseType(regionLength)) {
       launchSubsettingKernel<config16>(allCodewords, regionIDsAsCodeword, regionIDsAsIndex, nextMoves, regionStart,
                                        regionLength, nextMovesVecs, nextMovesVecsSize, perBlockSolutions);
+      atomicAdd(&deviceCounters[Counters<SolverConfig>::SCORES], CodewordT::TOTAL_CODEWORDS * regionLength);
     } else {
       launchSubsettingKernel<config32>(allCodewords, regionIDsAsCodeword, regionIDsAsIndex, nextMoves, regionStart,
                                        regionLength, nextMovesVecs, nextMovesVecsSize, perBlockSolutions);
+      atomicAdd(&deviceCounters[Counters<SolverConfig>::SCORES], CodewordT::TOTAL_CODEWORDS * regionLength);
     }
   }
 }
@@ -615,6 +634,11 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
   thrust::device_vector<uint32_t> dRegionIDsAsIndex(dRegionIDs.size());
   thrust::device_vector<CodewordT> dRegionIDsAsCodeword(dRegionIDs.size());
 
+  // A little space for some counters
+  thrust::host_vector<unsigned long long int> hDeviceCounters(counters.size(), 0);
+  thrust::device_vector<unsigned long long int> dDeviceCounters = hDeviceCounters;
+  unsigned long long int* pdDeviceCounters = thrust::raw_pointer_cast(dDeviceCounters.data());
+
   int depth = 0;
   auto dRegionIDsEnd = dRegionIDs.end();  // The set of active games contracts as we go
 
@@ -630,14 +654,15 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
     auto pdAllCodewords = thrust::raw_pointer_cast(dAllCodewords.data());
     thrust::for_each(
         dRegionIDs.begin(), dRegionIDsEnd, [depth, pdAllCodewords, pdNextMoves] __device__(RegionID & regionID) {
-            auto cwi = regionID.index;
-            unsigned __int128 apc8 = pdAllCodewords[cwi].packedColors8();               // Annoying...
-            unsigned __int128 npc8 = pdAllCodewords[pdNextMoves[cwi]].packedColors8();  // Annoying...
-            uint8_t s = scoreCodewords<SolverConfig::PIN_COUNT>(pdAllCodewords[cwi].packedCodeword(), *(uint4*)&apc8,
-                                                                pdAllCodewords[pdNextMoves[cwi]].packedCodeword(),
-                                                                *(uint4*)&npc8);
-            regionID.append(s, depth);
-        });
+                       auto cwi = regionID.index;
+                       unsigned __int128 apc8 = pdAllCodewords[cwi].packedColors8();               // Annoying...
+                       unsigned __int128 npc8 = pdAllCodewords[pdNextMoves[cwi]].packedColors8();  // Annoying...
+                       uint8_t s = scoreCodewords<SolverConfig::PIN_COUNT>(
+                           pdAllCodewords[cwi].packedCodeword(), *(uint4*)&apc8,
+                           pdAllCodewords[pdNextMoves[cwi]].packedCodeword(), *(uint4*)&npc8);
+                       regionID.append(s, depth);
+                     });
+    counters[Counters<SolverConfig>::SCORES] += dRegionIDsEnd - dRegionIDs.begin();
 
     // Push won games to the end and focus on the remaining games
     dRegionIDsEnd = thrust::partition(dRegionIDs.begin(), dRegionIDsEnd,
@@ -701,12 +726,16 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
     // Advance to a fresh next moves vector
     pdNextMoves = thrust::raw_pointer_cast(hNextMovesDeviceVecs[nextMovesVecsSize++]);
 
+    uint32_t regionIdx = 0;
     uint32_t tinyRegionCount = 0;
     uint32_t tinyGameCount = 0;
-    while (tinyRegionCount < regionCount && hRegionLengths[tinyRegionCount] <= 2) {
+    for (; regionIdx < regionCount && hRegionLengths[regionIdx] <= 2; regionIdx++) {
       tinyGameCount += hRegionLengths[tinyRegionCount];
       tinyRegionCount++;
     }
+    counters[Counters<SolverConfig>::TINY_REGIONS] += tinyRegionCount;
+    counters[Counters<SolverConfig>::TINY_GAMES] += tinyGameCount;
+
     if (tinyRegionCount > 0) {
       // mmmfixme: error check the grid launches, even the nested ones, especially for
       //  cudaErrorLaunchPendingCountExceeded
@@ -717,16 +746,17 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
       nextGuessTiny<<<1, 128>>>(pdRegionsAsIndex, pdNextMoves, pdRegionStarts, pdRegionLengths, tinyRegionCount);
     }
 
-    if (LOG) {
-      printf("Tiny regions: %d, totalling %d games\n", tinyRegionCount, tinyGameCount);
+    uint32_t fdRegionCount = 0;
+    uint32_t fdGameCount = 0;
+    for (; regionIdx < regionCount && hRegionLengths[regionIdx] < SolverConfig::TOTAL_PACKED_SCORES; regionIdx++) {
+      fdGameCount += hRegionLengths[tinyRegionCount];
+      fdRegionCount++;
+    }
+    counters[Counters<SolverConfig>::FDOPT_REGIONS] += fdRegionCount;
+    counters[Counters<SolverConfig>::FDOPT_GAMES] += fdGameCount;
 
-      uint32_t fdRegionCount = 0;
-      uint32_t fdGameCount = 0;
-      for (uint32_t k = tinyRegionCount; k < regionCount && hRegionLengths[k] < SolverConfig::TOTAL_PACKED_SCORES;
-           k++) {
-        fdGameCount += hRegionLengths[k];
-        fdRegionCount++;
-      }
+    if (LOG) {
+      printf("Tiny regions: %d, totalling %d games\n", tinyRegionCount, fdRegionCount);
       printf("Possibly fully discriminating regions: %d, totalling %d games\n", fdRegionCount, fdGameCount);
     }
 
@@ -739,9 +769,10 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
       auto pdPerBlockSolutions = thrust::raw_pointer_cast(dPerBlockSolutions.data());
       nextGuessForRegions<SolverConfig><<<(regionsToDo + threadsPerBlock - 1) / threadsPerBlock, threadsPerBlock>>>(
           pdAllCodewords, pdRegionsAsCodeword, pdRegionsAsIndex, pdNextMoves, pdRegionStarts, pdRegionLengths, offset,
-          regionsToDo, pdNextMovesVecs, nextMovesVecsSize, pdPerBlockSolutions);
+          regionsToDo, pdNextMovesVecs, nextMovesVecsSize, pdPerBlockSolutions, pdDeviceCounters);
     }
 
+    counters[Counters<SolverConfig>::BIG_REGIONS] += bigBoyLaunches;
     if (LOG) printf("Big Boy Launches: %d\n", bigBoyLaunches);
     CubDebug(cudaDeviceSynchronize());
 
@@ -762,6 +793,11 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
   auto endTime = chrono::high_resolution_clock::now();
 
   if (LOG) cout << "Last actual depth: " << depth << endl;
+
+  hDeviceCounters = dDeviceCounters;
+  for (int i = 0; i < counterDescs.descs.size(); i++) {
+    counters[i] += hDeviceCounters[i];
+  }
 
   // Post-process for stats
   hRegionIDs = dRegionIDs;

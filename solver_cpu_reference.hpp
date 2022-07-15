@@ -24,21 +24,39 @@ class SolverReferenceImpl : public Solver {
   using SolverConfig = SolverConfig_;
   constexpr static const char* name = "CPU Reference Impl";
 
+  SolverReferenceImpl() : counters(counterDescs.descs.size()) {}
+
   std::chrono::nanoseconds playAllGames(uint32_t packedInitialGuess) override;
 
   void dump() override;
   vector<uint32_t> getGuessesForGame(uint32_t packedCodeword) override;
 
+  void printStats() override {
+    for (auto& c : counterDescs.descs) {
+      cout << c.desc << ": " << commaString(counters[c.index]) << endl;
+    }
+  }
+  void recordStats(StatsRecorder& sr) override {
+    for (auto& c : counterDescs.descs) {
+      sr.add(c.name, counters[c.index]);
+    }
+  }
+
+  constexpr static CounterDescriptors<1> counterDescs{{
+      {"Scores", "Codeword comparisons"},
+  }};
+
  private:
+  vector<vector<CodewordT>> nextMovesList;
+  vector<RegionID> regionIDs;
+  vector<unsigned long long int> counters;
+
   CodewordT nextGuess(const vector<CodewordT>& possibleSolutions, const vector<CodewordT>& usedCodewords);
 
   uint32_t getPackedCodewordForRegion(int level, uint32_t regionIndex) const override {
     return nextMovesList[level][regionIndex].packedCodeword();
   }
   uint8_t getStandardScore(uint8_t score) override { return score; }
-
-  vector<vector<CodewordT>> nextMovesList;
-  vector<RegionID> regionIDs;
 };
 
 #include "solver_cpu_reference.inl"

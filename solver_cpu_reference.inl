@@ -60,7 +60,7 @@ std::chrono::nanoseconds SolverReferenceImpl<SolverConfig>::playAllGames(uint32_
     for (auto& regionID : regionIDs) {
       if (!regionID.isGameOver()) {
         auto s = allCodewords[regionID.index].score(nextMoves[regionID.index]);
-        scoreCount++;
+        counters[find_counter(counterDescs, "Scores")]++;
         regionID.append(s.result, depth);
         if (s == CodewordT::WINNING_SCORE) {
           this->maxDepth = max(this->maxDepth, (size_t)depth);
@@ -177,7 +177,7 @@ typename SolverConfig::CodewordT SolverReferenceImpl<SolverConfig>::nextGuess(
         isPossibleSolution = true;  // Remember if this guess is in the set of possible solutions
       }
     }
-    scoreCount += possibleSolutions.size();
+    counters[find_counter(counterDescs, "Scores")] += possibleSolutions.size();
 
     typename ALGO::RankingAccumulatorType rankingAccumulator{};
     for (auto& s : subsetSizes) {

@@ -22,6 +22,8 @@ class SolverCUDA : public Solver {
   using SolverConfig = SolverConfig_;
   constexpr static const char* name = "CUDA";
 
+  SolverCUDA() : counters(counterDescs.descs.size()) {}
+
   std::chrono::nanoseconds playAllGames(uint32_t packedInitialGuess) override;
 
   bool usesGPU() const override { return true; }
@@ -29,7 +31,32 @@ class SolverCUDA : public Solver {
   void dump() override;
   vector<uint32_t> getGuessesForGame(uint32_t packedCodeword) override;
 
+  void printStats() override {
+    for (auto& c : counterDescs.descs) {
+      cout << c.desc << ": " << commaString(counters[c.index]) << endl;
+    }
+  }
+  void recordStats(StatsRecorder& sr) override {
+    for (auto& c : counterDescs.descs) {
+      sr.add(c.name, counters[c.index]);
+    }
+  }
+
+  constexpr static CounterDescriptors<6> counterDescs{{
+      {"Scores", "Codeword comparisons"},
+      {"Tiny Regions", "Total tiny regions"},
+      {"Tiny Games", "Total tiny games"},
+      {"FDOpt Regions", "Total FD Opt regions"},
+      {"FDOpt Games", "Total FD Opt games"},
+      {"Big Regions", "Total big regions"},
+  }};
+
  private:
+  vector<RegionID> regionIDs;
+  vector<vector<uint32_t>> nextMovesList;
+  vector<uint8_t> packedToStandardScore;
+  vector<unsigned long long int> counters;
+
   uint32_t getPackedCodewordForRegion(int level, uint32_t regionIndex) const override {
     return CodewordT::getAllCodewords()[nextMovesList[level][regionIndex]].packedCodeword();
   }
@@ -45,10 +72,6 @@ class SolverCUDA : public Solver {
     }
     return packedToStandardScore[score];
   }
-
-  vector<RegionID> regionIDs;
-  vector<vector<uint32_t>> nextMovesList;
-  vector<uint8_t> packedToStandardScore;
 };
 
 #include "solver_cuda.inl"

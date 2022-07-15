@@ -44,8 +44,8 @@ static constexpr bool shouldPlaySingleGame = true;
 template <typename T>
 using SingleGameSolver = DefaultSolver<T>;
 using SingleGameAlgo = Algos::Knuth;
-static constexpr uint8_t singleGamePinCount = 7;    // 1-8, 4 is classic
-static constexpr uint8_t singleGameColorCount = 7;  // 1-15, 6 is classic
+static constexpr uint8_t singleGamePinCount = 8;    // 1-8, 4 is classic
+static constexpr uint8_t singleGameColorCount = 5;  // 1-15, 6 is classic
 static constexpr bool singleGameLog = true;
 
 // Config for playing a set of games
@@ -212,10 +212,9 @@ void runSingleSolver(StatsRecorder& statsRecorder, uint32_t packedInitialGuess) 
   cout << "Elapsed time " << commaString(elapsedS.count()) << "s" << endl;
   statsRecorder.add("Elapsed (s)", elapsedS.count());
 
-  // mmmfixme: need these two back!
-  //  - these printed and saved CPU & GPU score counts, kernels executed
-  //  strategy->printStats(elapsedMS);
-  //  strategy->recordStats(statsRecorder, elapsedMS);
+  cout << endl;
+  solver.printStats();
+  solver.recordStats(statsRecorder);
 
   validateSolutions(solver);
 
