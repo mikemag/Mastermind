@@ -7,6 +7,7 @@
 
 #include <string_view>
 #include <tuple>
+#include <array>
 
 // Sets up counters with names, descriptions, and most importantly a zero-based index. Used to have arrays of counters
 // on CPU and GPU which match, can be used on either size, and added together at the end.

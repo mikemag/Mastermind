@@ -9,8 +9,8 @@
 
 #include "algos.hpp"
 #include "codeword.hpp"
-#include "region.hpp"
 #include "counters.hpp"
+#include "region.hpp"
 
 struct SolverConfigBase {};
 
@@ -36,9 +36,9 @@ class Solver {
  public:
   virtual std::chrono::nanoseconds playAllGames(uint32_t packedInitialGuess) = 0;
 
-  uint64_t getMaxDepth() const { return maxDepth; }
-  uint64_t getTotalTurns() const { return totalTurns; }
- virtual bool usesGPU() const { return false; }
+  uint getMaxDepth() const { return maxDepth; }
+  unsigned long long int getTotalTurns() const { return totalTurns; }
+  virtual bool usesGPU() const { return false; }
 
   // Output the strategy for visualization with GraphViz. Copy-and-paste the output file to sites
   // like https://dreampuf.github.io/GraphvizOnline or http://www.webgraphviz.com/. Or install
@@ -52,17 +52,17 @@ class Solver {
   virtual vector<uint32_t> getGuessesForGame(uint32_t packedCodeword) = 0;
 
   virtual void printStats() = 0;
-  virtual void recordStats(StatsRecorder& sr) = 0;
+  virtual void recordStats(StatsRecorder &sr) = 0;
 
  protected:
-  uint64_t maxDepth = 0;
-  uint64_t totalTurns = 0;
+  uint maxDepth = 0;
+  unsigned long long int totalTurns = 0;
 
   template <typename SolverConfig, typename CodewordT, typename RegionID>
   void dump(vector<RegionID> &regionIDs);
 
   template <typename Solver, typename SolverConfig, typename CodewordT, typename RegionID>
-  vector<uint32_t> getGuessesForGame(uint32_t packedCodeword,  vector<RegionID> &regionIDs);
+  vector<uint32_t> getGuessesForGame(uint32_t packedCodeword, vector<RegionID> &regionIDs);
 
   virtual uint32_t getPackedCodewordForRegion(int level, uint32_t regionIndex) const = 0;
   virtual uint8_t getStandardScore(uint8_t score) = 0;

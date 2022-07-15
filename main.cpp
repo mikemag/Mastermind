@@ -44,8 +44,8 @@ static constexpr bool shouldPlaySingleGame = true;
 template <typename T>
 using SingleGameSolver = DefaultSolver<T>;
 using SingleGameAlgo = Algos::Knuth;
-static constexpr uint8_t singleGamePinCount = 8;    // 1-8, 4 is classic
-static constexpr uint8_t singleGameColorCount = 5;  // 1-15, 6 is classic
+static constexpr uint8_t singleGamePinCount = 4;    // 1-8, 4 is classic
+static constexpr uint8_t singleGameColorCount = 6;  // 1-15, 6 is classic
 static constexpr bool singleGameLog = true;
 
 // Config for playing a set of games
@@ -99,7 +99,7 @@ void runUnitTests() {
 // A little struct to hold info about a valid result from a solver.
 struct ValidSolution {
   uint maxTurns;
-  uint64_t totalTurns;
+  unsigned long long int totalTurns;
 
   struct SingleGame {
     uint32_t secret;
@@ -146,13 +146,13 @@ void validateSolutions(Solver& solver) {
     const ValidSolution& vs = vsIter->second;
 
     if (solver.getTotalTurns() != vs.totalTurns) {
-      printf("ERROR: Total turns doesn't match, expect %lu (%.4f), actual %lu (%.4f)\n", vs.totalTurns,
+      printf("ERROR: Total turns doesn't match, expect %llu (%.4f), actual %llu (%.4f)\n", vs.totalTurns,
              (double)vs.totalTurns / CodewordT::TOTAL_CODEWORDS, solver.getTotalTurns(),
              (double)solver.getTotalTurns() / CodewordT::TOTAL_CODEWORDS);
     }
 
     if (solver.getMaxDepth() != vs.maxTurns) {
-      printf("ERROR: Max turns doesn't match, expect %u, actual %lu\n", vs.maxTurns, solver.getMaxDepth());
+      printf("ERROR: Max turns doesn't match, expect %u, actual %u\n", vs.maxTurns, solver.getMaxDepth());
     }
 
     auto printGuesses = [](const vector<uint32_t>& guesses) {

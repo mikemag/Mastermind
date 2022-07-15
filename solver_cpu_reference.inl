@@ -45,7 +45,7 @@ std::chrono::nanoseconds SolverReferenceImpl<SolverConfig>::playAllGames(uint32_
   regionIDs = vector<RegionID>(allCodewords.size());
   for (int i = 0; i < regionIDs.size(); i++) regionIDs[i].index = i;
 
-  int depth = 0;
+  uint depth = 0;
   bool anyNewMoves = true;
 
   // If no games have new moves, then we're done
@@ -63,7 +63,7 @@ std::chrono::nanoseconds SolverReferenceImpl<SolverConfig>::playAllGames(uint32_
         counters[find_counter(counterDescs, "Scores")]++;
         regionID.append(s.result, depth);
         if (s == CodewordT::WINNING_SCORE) {
-          this->maxDepth = max(this->maxDepth, (size_t)depth);
+          this->maxDepth = max(this->maxDepth, depth);
           this->totalTurns += depth;
         }
       }
