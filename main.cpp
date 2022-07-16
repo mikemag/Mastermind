@@ -44,8 +44,8 @@ static constexpr bool shouldPlaySingleGame = true;
 template <typename T>
 using SingleGameSolver = DefaultSolver<T>;
 using SingleGameAlgo = Algos::Knuth;
-static constexpr uint8_t singleGamePinCount = 4;    // 1-8, 4 is classic
-static constexpr uint8_t singleGameColorCount = 6;  // 1-15, 6 is classic
+static constexpr uint8_t singleGamePinCount = 7;    // 1-8, 4 is classic
+static constexpr uint8_t singleGameColorCount = 7;  // 1-15, 6 is classic
 static constexpr bool singleGameLog = true;
 
 // Config for playing a set of games
@@ -133,6 +133,12 @@ static std::map<std::type_index, ValidSolution> validSolutions = {
       2315454,
       {
           {0x11223344, {0x11112222, 0x11331134, 0x44331222, 0x23142134, 0x11223344}},
+      }}},
+    {typeid(ValidSolutionsKey<7, 7, Algos::Knuth>),
+     {9,
+      5181948,
+      {
+          {0x1122334, {0x1112222, 0x1341112, 0x1232351, 0x1212334, 0x1111124, 0x1122334}},
       }}},
 };
 

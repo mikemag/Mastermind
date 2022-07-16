@@ -172,6 +172,32 @@ __device__ void computeSubsetSizes(SubsetSizeT* __restrict__ subsetSizes, const 
   }
 }
 
+// mmmfixme
+//  - stagger PS accesses to try to parallelize and coalesce reads.
+//  - strictly worse than the other way, a lot worse.
+//  - gives the right answer.
+//  - too much overhead? Bad theory? Shrinking bs to 16 or 8 goes faster than blockDim.x
+template <typename SolverConfig, typename SubsetSizeT, typename CodewordT>
+__device__ void computeSubsetSizesStaggered(SubsetSizeT* __restrict__ subsetSizes, const uint32_t secret,
+                                            const uint4 secretColors, const CodewordT* __restrict__ regionIDsAsCodeword,
+                                            uint32_t regionStart, uint32_t regionLength) {
+  auto s = regionStart;
+  auto e = regionStart + regionLength;
+  auto bs = blockDim.x;
+  for (auto i = s; i < e; i += bs) {
+    auto l = min(bs, e - i);
+    auto j = i + (threadIdx.x % l);
+    auto ke = i + l;
+    for (auto k = i; k < ke; k++) {
+      auto& ps = regionIDsAsCodeword[j++];
+      if (j == ke) j = i;
+      unsigned __int128 pc8 = ps.packedColors8();  // Annoying...
+      uint score = scoreCodewords<SolverConfig::PIN_COUNT>(secret, secretColors, ps.packedCodeword(), *(uint4*)&pc8);
+      SolverConfig::ALGO::accumulateSubsetSize(subsetSizes[score]);
+    }
+  }
+}
+
 // Keeps an index into the all codewords vector together with a rank on the GPU, and whether this codeword is a
 // possible solution.
 struct IndexAndRank {
@@ -654,14 +680,14 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
     auto pdAllCodewords = thrust::raw_pointer_cast(dAllCodewords.data());
     thrust::for_each(
         dRegionIDs.begin(), dRegionIDsEnd, [depth, pdAllCodewords, pdNextMoves] __device__(RegionID & regionID) {
-                       auto cwi = regionID.index;
-                       unsigned __int128 apc8 = pdAllCodewords[cwi].packedColors8();               // Annoying...
-                       unsigned __int128 npc8 = pdAllCodewords[pdNextMoves[cwi]].packedColors8();  // Annoying...
-                       uint8_t s = scoreCodewords<SolverConfig::PIN_COUNT>(
-                           pdAllCodewords[cwi].packedCodeword(), *(uint4*)&apc8,
-                           pdAllCodewords[pdNextMoves[cwi]].packedCodeword(), *(uint4*)&npc8);
-                       regionID.append(s, depth);
-                     });
+          auto cwi = regionID.index;
+          unsigned __int128 apc8 = pdAllCodewords[cwi].packedColors8();               // Annoying...
+          unsigned __int128 npc8 = pdAllCodewords[pdNextMoves[cwi]].packedColors8();  // Annoying...
+          uint8_t s = scoreCodewords<SolverConfig::PIN_COUNT>(pdAllCodewords[cwi].packedCodeword(), *(uint4*)&apc8,
+                                                              pdAllCodewords[pdNextMoves[cwi]].packedCodeword(),
+                                                              *(uint4*)&npc8);
+          regionID.append(s, depth);
+        });
     counters[Counters<SolverConfig>::SCORES] += dRegionIDsEnd - dRegionIDs.begin();
 
     // Push won games to the end and focus on the remaining games
@@ -756,7 +782,7 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
     counters[Counters<SolverConfig>::FDOPT_GAMES] += fdGameCount;
 
     if (LOG) {
-      printf("Tiny regions: %d, totalling %d games\n", tinyRegionCount, fdRegionCount);
+      printf("Tiny regions: %d, totalling %d games\n", tinyRegionCount, tinyGameCount);
       printf("Possibly fully discriminating regions: %d, totalling %d games\n", fdRegionCount, fdGameCount);
     }
 

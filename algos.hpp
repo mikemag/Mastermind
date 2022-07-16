@@ -27,9 +27,7 @@
 
 namespace Algos {
 
-struct Algo {};
-
-struct Knuth : public Algo {
+struct Knuth {
   using MaxSubsetSizeT = int32_t;
   constexpr static const char* name = "Knuth";
 
@@ -57,7 +55,7 @@ struct Knuth : public Algo {
   }
 };
 
-struct MostParts : public Algo {
+struct MostParts {
   using MaxSubsetSizeT = int8_t;
   constexpr static const char* name = "Most Parts";
 
