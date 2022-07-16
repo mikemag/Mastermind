@@ -132,27 +132,36 @@ struct Counters {
 
 // TODO: early draft https://godbolt.org/z/ea7YjEPqf
 
-template <uint PIN_COUNT>
+template <typename SolverConfig>
 __device__ uint scoreCodewords(const uint32_t secret, const uint4 secretColors, const uint32_t guess,
                                const uint4 guessColors) {
-  constexpr uint unusedPinsMask = 0xFFFFFFFFu & ~((1lu << PIN_COUNT * 4u) - 1);
+  constexpr uint unusedPinsMask = 0xFFFFFFFFu & ~((1lu << SolverConfig::PIN_COUNT * 4u) - 1);
   uint v = secret ^ guess;  // Matched pins are now 0.
   v |= unusedPinsMask;      // Ensure that any unused pin positions are non-zero.
   uint r = ~((((v & 0x77777777u) + 0x77777777u) | v) | 0x77777777u);  // Yields 1 bit per matched pin
   uint b = __popc(r);
 
-  uint mins1 = __vminu4(secretColors.x, guessColors.x);
-  uint mins2 = __vminu4(secretColors.y, guessColors.y);
-  uint mins3 = __vminu4(secretColors.z, guessColors.z);
-  uint mins4 = __vminu4(secretColors.w, guessColors.w);
-  uint allHits = __vsadu4(mins1, 0);
-  allHits += __vsadu4(mins2, 0);
-  allHits += __vsadu4(mins3, 0);
-  allHits += __vsadu4(mins4, 0);
+  uint allHits;
+  if constexpr (SolverConfig::CodewordT::isSize2()) {
+    uint mins3 = __vminu4(secretColors.z, guessColors.z);
+    uint mins4 = __vminu4(secretColors.w, guessColors.w);
+    allHits = __vsadu4(mins3, 0);
+    allHits += __vsadu4(mins4, 0);
+  } else {
+    static_assert(SolverConfig::CodewordT::isSize4());
+    uint mins1 = __vminu4(secretColors.x, guessColors.x);
+    uint mins2 = __vminu4(secretColors.y, guessColors.y);
+    uint mins3 = __vminu4(secretColors.z, guessColors.z);
+    uint mins4 = __vminu4(secretColors.w, guessColors.w);
+    allHits = __vsadu4(mins1, 0);
+    allHits += __vsadu4(mins2, 0);
+    allHits += __vsadu4(mins3, 0);
+    allHits += __vsadu4(mins4, 0);
+  }
 
   // Given w = ah - b, simplify to i = bp - ((b - 1)b) / 2) + ah. I wonder if the compiler noticed that.
   // https://godbolt.org/z/ab5vTn -- gcc 10.2 notices and simplifies, clang 11.0.0 misses it.
-  return b * PIN_COUNT - ((b - 1) * b) / 2 + allHits;
+  return b * SolverConfig::PIN_COUNT - ((b - 1) * b) / 2 + allHits;
 }
 
 // mmmfixme: which of these, if any, are screwed up due to the Thrust device vectors being properly sized, and not
@@ -166,8 +175,7 @@ __device__ void computeSubsetSizes(SubsetSizeT* __restrict__ subsetSizes, const 
                                    uint32_t regionStart, uint32_t regionLength) {
   for (uint32_t i = regionStart; i < regionStart + regionLength; i++) {
     auto& ps = regionIDsAsCodeword[i];
-    unsigned __int128 pc8 = ps.packedColors8();  // Annoying...
-    uint score = scoreCodewords<SolverConfig::PIN_COUNT>(secret, secretColors, ps.packedCodeword(), *(uint4*)&pc8);
+    uint score = scoreCodewords<SolverConfig>(secret, secretColors, ps.packedCodeword(), ps.packedColorsCUDA());
     SolverConfig::ALGO::accumulateSubsetSize(subsetSizes[score]);
   }
 }
@@ -191,8 +199,7 @@ __device__ void computeSubsetSizesStaggered(SubsetSizeT* __restrict__ subsetSize
     for (auto k = i; k < ke; k++) {
       auto& ps = regionIDsAsCodeword[j++];
       if (j == ke) j = i;
-      unsigned __int128 pc8 = ps.packedColors8();  // Annoying...
-      uint score = scoreCodewords<SolverConfig::PIN_COUNT>(secret, secretColors, ps.packedCodeword(), *(uint4*)&pc8);
+      uint score = scoreCodewords<SolverConfig>(secret, secretColors, ps.packedCodeword(), ps.packedColorsCUDA());
       SolverConfig::ALGO::accumulateSubsetSize(subsetSizes[score]);
     }
   }
@@ -239,7 +246,7 @@ struct SubsettingAlgosKernelConfig {
   static constexpr uint8_t COLOR_COUNT = SolverConfig::COLOR_COUNT;
   static constexpr bool LOG = SolverConfig::LOG;
   using ALGO = typename SolverConfig::ALGO;
-  using CodewordT = Codeword<PIN_COUNT, COLOR_COUNT>;
+  using CodewordT = typename SolverConfig::CodewordT;
 
   // Total scores = (PIN_COUNT * (PIN_COUNT + 3)) / 2, but +1 for imperfect packing.
   static constexpr int TOTAL_PACKED_SCORES = ((PIN_COUNT * (PIN_COUNT + 3)) / 2) + 1;
@@ -329,10 +336,9 @@ __global__ void subsettingAlgosKernel(const CodewordT* __restrict__ allCodewords
   auto subsetSizes = &sharedMem.subsetSizes[threadIdx.x * SubsettingAlgosKernelConfig::TOTAL_PACKED_SCORES];
   for (int i = 0; i < SubsettingAlgosKernelConfig::TOTAL_PACKED_SCORES; i++) subsetSizes[i] = 0;
 
-  unsigned __int128 apc8 = allCodewords[tidGrid].packedColors8();  // Annoying...
   computeSubsetSizes<SubsettingAlgosKernelConfig::SolverConfig>(subsetSizes, allCodewords[tidGrid].packedCodeword(),
-                                                                *(uint4*)&apc8, regionIDsAsCodeword, regionStart,
-                                                                regionLength);
+                                                                allCodewords[tidGrid].packedColorsCUDA(),
+                                                                regionIDsAsCodeword, regionStart, regionLength);
 
   auto possibleSolutionsCount = regionLength;
   bool isPossibleSolution = subsetSizes[SubsettingAlgosKernelConfig::TOTAL_PACKED_SCORES - 1] > 0;
@@ -447,7 +453,7 @@ struct FDOptKernelConfig {
   static constexpr uint8_t PIN_COUNT = SolverConfig::PIN_COUNT;
   static constexpr uint8_t COLOR_COUNT = SolverConfig::COLOR_COUNT;
   static constexpr bool LOG = SolverConfig::LOG;
-  using CodewordT = Codeword<PIN_COUNT, COLOR_COUNT>;
+  using CodewordT = typename SolverConfig::CodewordT;
 
   // Total scores = (PIN_COUNT * (PIN_COUNT + 3)) / 2, but +1 for imperfect packing.
   static constexpr int TOTAL_PACKED_SCORES = ((PIN_COUNT * (PIN_COUNT + 3)) / 2) + 1;
@@ -498,9 +504,9 @@ __global__ void fullyDiscriminatingOpt(const CodewordT* __restrict__ allCodeword
     auto subsetSizes = &sharedMem.subsetSizes[idx * SolverConfig::TOTAL_PACKED_SCORES];
     for (int i = 0; i < SolverConfig::TOTAL_PACKED_SCORES; i++) subsetSizes[i] = 0;
 
-    unsigned __int128 apc8 = regionIDsAsCodeword[idx + regionStart].packedColors8();  // Annoying...
     computeSubsetSizes<SolverConfig>(subsetSizes, regionIDsAsCodeword[idx + regionStart].packedCodeword(),
-                                     *(uint4*)&apc8, regionIDsAsCodeword, regionStart, regionLength);
+                                     regionIDsAsCodeword[idx + regionStart].packedColorsCUDA(), regionIDsAsCodeword,
+                                     regionStart, regionLength);
 
     uint32_t totalUsedSubsets = 0;
     for (int i = 0; i < SolverConfig::TOTAL_PACKED_SCORES; i++) {
@@ -681,11 +687,9 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
     thrust::for_each(
         dRegionIDs.begin(), dRegionIDsEnd, [depth, pdAllCodewords, pdNextMoves] __device__(RegionID & regionID) {
           auto cwi = regionID.index;
-          unsigned __int128 apc8 = pdAllCodewords[cwi].packedColors8();               // Annoying...
-          unsigned __int128 npc8 = pdAllCodewords[pdNextMoves[cwi]].packedColors8();  // Annoying...
-          uint8_t s = scoreCodewords<SolverConfig::PIN_COUNT>(pdAllCodewords[cwi].packedCodeword(), *(uint4*)&apc8,
-                                                              pdAllCodewords[pdNextMoves[cwi]].packedCodeword(),
-                                                              *(uint4*)&npc8);
+          uint8_t s = scoreCodewords<SolverConfig>(
+              pdAllCodewords[cwi].packedCodeword(), pdAllCodewords[cwi].packedColorsCUDA(),
+              pdAllCodewords[pdNextMoves[cwi]].packedCodeword(), pdAllCodewords[pdNextMoves[cwi]].packedColorsCUDA());
           regionID.append(s, depth);
         });
     counters[Counters<SolverConfig>::SCORES] += dRegionIDsEnd - dRegionIDs.begin();

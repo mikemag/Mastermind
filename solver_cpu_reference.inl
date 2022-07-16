@@ -42,7 +42,7 @@ std::chrono::nanoseconds SolverReferenceImpl<SolverConfig>::playAllGames(uint32_
   // Starting case: all games get the same initial guess, region ids are empty
   vector<CodewordT> nextMoves(allCodewords.size(), packedInitialGuess);
 
-  regionIDs = vector<RegionID>(allCodewords.size());
+  regionIDs = vector<RegionIDT>(allCodewords.size());
   for (int i = 0; i < regionIDs.size(); i++) regionIDs[i].index = i;
 
   uint depth = 0;
@@ -71,11 +71,11 @@ std::chrono::nanoseconds SolverReferenceImpl<SolverConfig>::playAllGames(uint32_
 
     // Sort all games by region id
     std::stable_sort(regionIDs.begin(), regionIDs.end(),
-                     [&](const RegionID& a, const RegionID& b) { return a.value < b.value; });
+                     [&](const RegionIDT& a, const RegionIDT& b) { return a.value < b.value; });
 
     // Get start and run length for each region
     struct RegionBounds {
-      RegionID regionID;
+      RegionIDT regionID;
       int start;
       int length;
     };

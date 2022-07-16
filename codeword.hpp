@@ -17,17 +17,34 @@
 // 128 bits for different versions of the scoring functions.
 template <uint8_t PIN_COUNT, uint8_t COLOR_COUNT>
 class Codeword {
- public:
-  CUDA_HOST_AND_DEVICE constexpr Codeword() noexcept : codeword(0xFFFFFFFF), colorCounts8(0) {}
+#if defined(__CUDACC__)
+  using CT = typename std::conditional<(COLOR_COUNT <= sizeof(uint64_t)), uint64_t, unsigned __int128>::type;
+#else
+  // TODO: improve the CPU version to handle smaller color counts
+  using CT = unsigned __int128;
+#endif
 
-  constexpr Codeword(uint32_t codeword) noexcept : codeword(codeword), colorCounts8(computeColorCounts8(codeword)) {}
+ public:
+  CUDA_HOST_AND_DEVICE constexpr Codeword() noexcept : codeword(0xFFFFFFFF), colorCounts(0) {}
+
+  constexpr Codeword(uint32_t codeword) noexcept : codeword(codeword), colorCounts(computeColorCounts(codeword)) {}
 
   CUDA_HOST_AND_DEVICE bool isInvalid() const { return codeword == 0xFFFFFFFF; }
 
   CUDA_HOST_AND_DEVICE bool operator==(const Codeword other) const { return codeword == other.codeword; }
 
   CUDA_HOST_AND_DEVICE uint32_t packedCodeword() const { return codeword; }
-  CUDA_HOST_AND_DEVICE unsigned __int128 packedColors8() const { return colorCounts8; }
+  CT packedColors() const { return colorCounts; }
+#if defined(__CUDACC__)
+  CUDA_HOST_AND_DEVICE uint4 packedColorsCUDA() const {
+    if constexpr (isSize2()) {
+      return {0, 0, ccOverlay.z, ccOverlay.w};
+    } else {
+      static_assert(isSize4());
+      return {ccOverlay.x, ccOverlay.y, ccOverlay.z, ccOverlay.w};
+    }
+  }
+#endif
 
   constexpr static uint64_t TOTAL_CODEWORDS = constPow<uint64_t>(COLOR_COUNT, PIN_COUNT);
   constexpr static Score WINNING_SCORE = Score(PIN_COUNT, 0);  // "0x40" for a 4-pin game.
@@ -50,8 +67,24 @@ class Codeword {
     return o;
   }
 
+  CUDA_HOST_AND_DEVICE constexpr static bool isSize2() { return sizeof(CT) == 8; }
+  CUDA_HOST_AND_DEVICE constexpr static bool isSize4() { return sizeof(CT) == 16; }
+
  private:
-  unsigned __int128 colorCounts8;  // Room for 16 8-bit counters
+  struct UInt128Overlay {
+    unsigned int x, y, z, w;
+  };
+
+  struct UInt64Overlay {
+    unsigned int z, w;
+  };
+
+  using OT = typename std::conditional<std::is_same_v<CT, uint64_t>, UInt64Overlay, UInt128Overlay>::type;
+
+  union {
+    CT colorCounts;  // Room for 8 or 16 8-bit counters, depending on COLOR_COUNT
+    OT ccOverlay;
+  };
   uint32_t codeword;
 
   // All codewords for the given pin and color counts.
@@ -62,27 +95,23 @@ class Codeword {
   Score scoreCountingAutoVec(const Codeword &guess) const;
   Score scoreCountingHandVec(const Codeword &guess) const;
 
-  // Pre-compute color counts for all Codewords. Building this two ways right now for experimentation. The packed 4-bit
-  // counters are good for the scalar versions and overall memory usage, while the 8-bit counters are needed for SSE/AVX
-  // vectorization, both auto and by-hand. https://godbolt.org/z/bfM86K
-  constexpr static unsigned __int128 computeColorCounts8(uint32_t word) {
-    unsigned __int128 cc8 = 0;
+  // Pre-compute color counts for all Codewords. Building this two ways right now for experimentation. The packed
+  // 4-bit counters are good for the scalar versions and overall memory usage, while the 8-bit counters are needed for
+  // SSE/AVX vectorization, both auto and by-hand. https://godbolt.org/z/bfM86K
+  constexpr static CT computeColorCounts(uint32_t word) {
+    CT cc8 = 0;
     for (int i = 0; i < PIN_COUNT; i++) {
-      cc8 += ((unsigned __int128)1) << ((word & 0xFu) * 8);
+      cc8 += ((CT)1) << (((word & 0xFu) - 1) * 8);
       word >>= 4u;
     }
     return cc8;
   }
-
-  constexpr static uint64_t computeColorCounts4(uint32_t word) {
-    uint64_t cc4 = 0;
-    for (int i = 0; i < PIN_COUNT; i++) {
-      cc4 += 1lu << ((word & 0xFu) * 4);
-      word >>= 4u;
-    }
-    return cc4;
-  }
 };
+
+static_assert(sizeof(Codeword<4, 8>) == 16);
+static_assert(__alignof__(Codeword<4, 8>) == 8);
+static_assert(sizeof(Codeword<4, 9>) == 32);
+static_assert(__alignof__(Codeword<4, 9>) == 16);
 
 template <uint8_t PIN_COUNT, uint8_t COLOR_COUNT>
 std::ostream &operator<<(std::ostream &stream, const Codeword<PIN_COUNT, COLOR_COUNT> &codeword);

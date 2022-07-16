@@ -18,7 +18,7 @@
 template <typename SolverConfig_>
 class SolverReferenceImpl : public Solver {
   using CodewordT = typename SolverConfig_::CodewordT;
-  using RegionID = RegionID<unsigned __int128, SolverConfig_::CodewordT::WINNING_SCORE.result>;
+  using RegionIDT = RegionID<unsigned __int128, SolverConfig_::CodewordT::WINNING_SCORE.result>;
 
  public:
   using SolverConfig = SolverConfig_;
@@ -48,7 +48,7 @@ class SolverReferenceImpl : public Solver {
 
  private:
   vector<vector<CodewordT>> nextMovesList;
-  vector<RegionID> regionIDs;
+  vector<RegionIDT> regionIDs;
   vector<unsigned long long int> counters;
 
   CodewordT nextGuess(const vector<CodewordT>& possibleSolutions, const vector<CodewordT>& usedCodewords);

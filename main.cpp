@@ -68,24 +68,24 @@ template <bool shouldRun>
 void runUnitTests() {
   if constexpr (shouldRun) {
     // Test cases from Miyoshi
-    constexpr Codeword<4, 6> testSecret(0x6684);
+    constexpr Codeword<4, 10> testSecret(0x6684);
     bool success = true;
-    success &= (testSecret.score(Codeword<4, 6>(0x0000)) == Score(0, 0));
-    success &= (testSecret.score(Codeword<4, 6>(0x6666)) == Score(2, 0));
-    success &= (testSecret.score(Codeword<4, 6>(0x0123)) == Score(0, 0));
-    success &= (testSecret.score(Codeword<4, 6>(0x4567)) == Score(0, 2));
-    success &= (testSecret.score(Codeword<4, 6>(0x4589)) == Score(1, 1));
-    success &= (testSecret.score(Codeword<4, 6>(0x6700)) == Score(1, 0));
-    success &= (testSecret.score(Codeword<4, 6>(0x0798)) == Score(0, 1));
-    success &= (testSecret.score(Codeword<4, 6>(0x6484)) == Score(3, 0));
-    success &= (testSecret.score(Codeword<4, 6>(0x6480)) == Score(2, 1));
-    success &= (testSecret.score(Codeword<4, 6>(0x6884)) == Score(3, 0));
-    success &= (testSecret.score(Codeword<4, 6>(0x6684)) == Score(4, 0));
+    success &= (testSecret.score(Codeword<4, 10>(0x5555)) == Score(0, 0));
+    success &= (testSecret.score(Codeword<4, 10>(0x6666)) == Score(2, 0));
+    success &= (testSecret.score(Codeword<4, 10>(0x5123)) == Score(0, 0));
+    success &= (testSecret.score(Codeword<4, 10>(0x4567)) == Score(0, 2));
+    success &= (testSecret.score(Codeword<4, 10>(0x4589)) == Score(1, 1));
+    success &= (testSecret.score(Codeword<4, 10>(0x6755)) == Score(1, 0));
+    success &= (testSecret.score(Codeword<4, 10>(0x5798)) == Score(0, 1));
+    success &= (testSecret.score(Codeword<4, 10>(0x6484)) == Score(3, 0));
+    success &= (testSecret.score(Codeword<4, 10>(0x6485)) == Score(2, 1));
+    success &= (testSecret.score(Codeword<4, 10>(0x6884)) == Score(3, 0));
+    success &= (testSecret.score(Codeword<4, 10>(0x6684)) == Score(4, 0));
 
     // Three extra tests to detect subtly broken scoring functions.
-    success &= (testSecret.score(Codeword<4, 6>(0x8468)) == Score(0, 3));
-    success &= (testSecret.score(Codeword<4, 6>(0x8866)) == Score(0, 3));
-    success &= (testSecret.score(Codeword<4, 6>(0x8466)) == Score(0, 4));
+    success &= (testSecret.score(Codeword<4, 10>(0x8468)) == Score(0, 3));
+    success &= (testSecret.score(Codeword<4, 10>(0x8866)) == Score(0, 3));
+    success &= (testSecret.score(Codeword<4, 10>(0x8466)) == Score(0, 4));
 
     if (success) {
       printf("Tests pass\n\n");

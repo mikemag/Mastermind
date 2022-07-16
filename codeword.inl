@@ -114,8 +114,8 @@ Score Codeword<PIN_COUNT, COLOR_COUNT>::scoreCountingAutoVec(const Codeword &gue
   uint8_t b = _mm_popcnt_u32(r);
 
   int allHits = 0;
-  auto *scc = (uint8_t *)&(this->colorCounts8);
-  auto *gcc = (uint8_t *)&(guess.colorCounts8);
+  auto *scc = (uint8_t *)&(this->colorCounts);
+  auto *gcc = (uint8_t *)&(guess.colorCounts);
   for (int i = 0; i < 16; i++) {
     allHits += std::min(scc[i], gcc[i]);
   }
@@ -138,8 +138,8 @@ Score Codeword<PIN_COUNT, COLOR_COUNT>::scoreCountingHandVec(const Codeword &gue
   uint8_t b = _mm_popcnt_u32(r);
 
   // Load the 128-bit color counts into vector registers. Each one is 16 8-bit counters.
-  __m128i_u secretColorsVec = _mm_loadu_si128((__m128i_u *)&this->colorCounts8);
-  __m128i_u guessColorsVec = _mm_loadu_si128((__m128i_u *)&guess.colorCounts8);
+  __m128i_u secretColorsVec = _mm_loadu_si128((__m128i_u *)&this->colorCounts);
+  __m128i_u guessColorsVec = _mm_loadu_si128((__m128i_u *)&guess.colorCounts);
 
   // Find the minimum of each pair of 8-bit counters in one instruction.
   __m128i_u minColorsVec = _mm_min_epu8(secretColorsVec, guessColorsVec);
@@ -190,7 +190,8 @@ std::ostream &Codeword<PIN_COUNT, COLOR_COUNT>::dump(std::ostream &stream) const
   state.copyfmt(stream);
   stream << std::hex << std::setw(PIN_COUNT) << std::setfill('0') << codeword;
   // stream << " o:" << ordinal << " cc4:" << std::setw(16) << colorCounts4 << " cc8:" << std::setw(32) << (unsigned
-  // long long)colorCounts8;
+  // long long)colorCounts;
   stream.copyfmt(state);
   return stream;
 }
+
