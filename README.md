@@ -45,6 +45,8 @@ the [game_at_a_time](https://github.com/mikemag/Mastermind/tree/game_at_a_time) 
 
 ## Results
 
+@TODO: these are old results from the game_at_a_time branch.
+
 More results and data are in the [results directory](results/).
 Using the GPU for larger games is much faster, as you would expect. 5p8c is a nice example:
 

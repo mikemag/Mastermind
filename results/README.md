@@ -4,6 +4,8 @@ Various results are summarized here. Raw data is in the .csv files in subdirecto
 
 All results are from my MacBook Pro (16-inch, 2019) running macOS Catalina 10.15.7 and the AMD Radeon Pro 5500M.
 
+@TODO: these are old results from the game_at_a_time branch.
+
 ## Average turns over all games
 
 ### Knuth

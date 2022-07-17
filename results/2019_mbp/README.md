@@ -1,5 +1,7 @@
 # Results from MacBook Pro (16-inch, 2019)
 
+@TODO: these are old results from the game_at_a_time branch.
+
 * macOS Catalina 10.15.7 (19H15)
 * Processor: 2.4 GHz 8-Core Intel Core i9-9980HK
 * Memory: 64 GB 2667 MHz DDR4 
