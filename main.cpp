@@ -23,13 +23,11 @@ namespace ss = solver_sets;
 
 // Mastermind
 //
-// Play the game Mastermind, which is to guess a sequence of colors (the "secret") with feedback
-// about how many you have guessed correctly, and how many are in the right place.
+// Play the game Mastermind, which is to guess a sequence of pins with different colors (the "secret") with feedback
+// about how many you have guessed correctly, and how many are in the right place. This will play the game for every
+// possible secret and tell us the average and maximum number of tries needed across all of them.
 //
-// This will play the game for every possible secret and tell us the average and maximum number of
-// tries needed across all of them.
-//
-// There are a few algorithms to play with. See algos.hpp.
+// See the README.md for more details, results, and links to more docs describing what's going on here.
 
 #ifdef __CUDACC__
 template <typename T>

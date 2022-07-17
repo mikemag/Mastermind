@@ -24,7 +24,7 @@ namespace solver_sets {
 // until they hit Solvers, then we apply a templated functor type to actually instantiate the Solver and run it.
 //
 // I only dabble in TMP, I'm no expert by any stretch, and I expect there's better ways to do these. I tried to keep
-// these short and relatively readable (is any TMP actually readble?!) at the expense of efficiency.
+// these short and relatively readable (is any TMP actually readable?!) at the expense of efficiency.
 
 // Aliases to shorten the inputs
 template <std::size_t... Is>

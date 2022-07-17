@@ -12,6 +12,10 @@
 #include "counters.hpp"
 #include "region.hpp"
 
+// Configuration for a single solver type, which will play all games of a given pin count, color count, and algorithm.
+//
+// These are used to specialize a wide variety of implementation types, all of which use the details here to optimize
+// compilation for the game at hand.
 struct SolverConfigBase {};
 
 template <uint8_t PIN_COUNT_, uint8_t COLOR_COUNT_, bool LOG_, typename ALGO_>
@@ -32,6 +36,8 @@ struct SolverConfig : public SolverConfigBase {
   constexpr static int TOTAL_PACKED_SCORES = TOTAL_SCORES + 1;
 };
 
+// A Solver plays all games of a given configuration and can produce an output strategy graph, info about any individual
+// game, and overall gameplay stats. Subclasses provide the implementation on CPU or GPU.
 class Solver {
  public:
   virtual std::chrono::nanoseconds playAllGames(uint32_t packedInitialGuess) = 0;

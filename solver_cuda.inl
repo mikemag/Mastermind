@@ -3,7 +3,6 @@
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree.
 
-#include <new>
 #define CUB_STDERR
 #include <thrust/device_free.h>
 #include <thrust/device_malloc.h>
@@ -19,87 +18,22 @@
 #include <cassert>
 #include <cub/cub.cuh>
 #include <cuda/barrier>
+#include <new>
 #include <vector>
 
 #include "algos.hpp"
 #include "codeword.hpp"
 
 // CUDA implementation for playing all games at once
-//
-// TODO: this needs a lot of notes and docs consolidated
-//
-//
-// This plays all games at once, playing a turn on each game and forming a set of next guesses for the next turn.
-// Scoring all games subdivides those games with the same score into disjoint regions. We form an id for each region
-// made up of a growing list of scores, and sorting the list of games by region id groups the regions together. Then we
-// can find a single best guess for each region and play that for all games in the region.
-//
-// Region ids are chosen to ensure that a stable sort keeps games within each region in their original lexical order.
-// Many algorithms pick the first lexical game on ties.
-//
-// Pseudocode for the algorithm:
-//   start: all games get the same initial guess
-//
-//   while any games have guesses to play:
-//     score all games against their next guess, if any, which was given per-region
-//       append their score to their region id
-//       if no games have guesses, then we're done
-//     stable sort all games by region id
-//     get start and run length for each region by id
-//     for reach region:
-//       games with a win at the end of their region id get no new guess
-//       otherwise, find next guess using the region itself as the possible solutions set PS
 
-// scoring all games in a region subdivides it, one new region per score.
-// - sorting the region by score gets us runs of games we can apply the same guess to
+// The core of Knuth's Mastermind algorithm, and others, as CUDA compute kernels.
+//
+// nb: cores here are not the classic combination of black hits and white hits. A score's ordinal is (b(p + 1) -
+// ((b - 1)b) / 2) + w. See docs/Score_Ordinals.md for details. By using the score's ordinal we can have densely packed
+// set of counters to form the subset counts as we go. These scores never escape the GPU, so it doesn't matter that they
+// don't match any other forms of scores in the rest of the program.
 
-// region id: [s1, s2, s3, s4, ...] <-- sort by that, stable to keep lexical ordering
-
-// - start: all games get the same initial guess
-//
-// - while any games have guesses to play:
-//   - score all games against their next guess, if any, which was given per-region
-//     - append their score to their region id
-//     - if no games have guesses, then we're done
-//   - sort all games by region id
-//     - this re-shuffles within each region only
-//   - get start and run length for each region by id
-//     - at the start there are 14, at the end there are likely 1296
-//   - for reach region:
-//     - find next guess using the region as PS, this is the next guess for all games in this region
-//       - games with a win at the end of their region id get no new guess
-
-// for GPU
-//
-// - start:
-//   - next_guesses[0..n] = IG
-//   - PS[0..n] = AC[0..n]
-//   - region_id[0..n] = {}
-//
-// - while true:
-//   - grid to score PS[0..n] w/ next_guesses[0..n] => updated region_id[0..n]
-//     - s = PS[i].score(next_guesses[i])
-//     - s is in a local per-thread
-//     - append s to region_id[i]
-//   - reduce scores to a single, non-winning score, if any
-//   - if no non-winning scores, break, we're done
-//
-//   - grid to sort PS by region_id
-//
-//   - grid to reduce PS to a set of regions
-//     - list of region_id, start index, and length
-//
-//   - grid per-region to find next guess and update next_guesses
-//     - regions with a win at the end get no new guess, -1ish
-
-// or, for the last two:
-//
-//   - grid over PS
-//     - first thread in region kicks off the work for finding the next guess for that region
-//       - first thread if rid_i != rid_(i-1)
-//     - when done, shares the ng w/ all threads in the region and they update next_guesses[0..n]
-//     - trying to avoid the device-wide reduction and extra kernel kickoff's per-region
-
+// Counter's we'll use on both the CPU and GPU
 template <typename SolverConfig>
 struct Counters {
   using S = SolverCUDA<SolverConfig>;
@@ -111,13 +45,6 @@ struct Counters {
   constexpr static int BIG_REGIONS = find_counter(S::counterDescs, "Big Regions");
 };
 
-// The core of Knuth's Mastermind algorithm, and others, as CUDA compute kernels.
-//
-// Scores here are not the classic combination of black hits and white hits. A score's ordinal is (b(p + 1) -
-// ((b - 1)b) / 2) + w. See docs/Score_Ordinals.md for details. By using the score's ordinal we can have densely packed
-// set of counters to form the subset counts as we go. These scores never escape the GPU, so it doesn't matter that they
-// don't match any other forms of scores in the rest of the program.
-
 // Mastermind scoring function
 //
 // This mirrors the scalar version very closely. It's the full counting method from Knuth, plus some fun bit twiddling
@@ -127,10 +54,14 @@ struct Counters {
 // variation on determining if a word has a zero byte from https://graphics.stanford.edu/~seander/bithacks.html. This
 // part ends with using the GPU's SIMD popcount() to count the zero nibbles.
 //
-// Next, color counts come from the parallel buffer, and we can run over them and add up total hits, per Knuth[1], by
-// aggregating min color counts between the secret and guess.
-
-// TODO: early draft https://godbolt.org/z/ea7YjEPqf
+// Next, color counts come pre-computed, and we can run over them and add up total hits, per Knuth[1], by aggregating
+// min color counts between the secret and guess.
+//
+// Note this is specialized based on the number of colors in the game. Up to 8 colors are packed into an uint64_t and
+// require fewer ops to reduce.
+//
+// Here's the asm for an early draft: https://godbolt.org/z/n1GE5P5GP The current code has a bunch of dependencies that
+// make a quick compiler explorer link hard.
 
 template <typename SolverConfig>
 __device__ uint scoreCodewords(const uint32_t secret, const uint4 secretColors, const uint32_t guess,
@@ -164,9 +95,6 @@ __device__ uint scoreCodewords(const uint32_t secret, const uint4 secretColors, 
   return b * SolverConfig::PIN_COUNT - ((b - 1) * b) / 2 + allHits;
 }
 
-// mmmfixme: which of these, if any, are screwed up due to the Thrust device vectors being properly sized, and not
-//  rounded up to the next block size?
-
 // Score all possible solutions against a given secret and compute subset sizes, which are the number of codewords per
 // score.
 template <typename SolverConfig, typename SubsetSizeT, typename CodewordT>
@@ -180,11 +108,9 @@ __device__ void computeSubsetSizes(SubsetSizeT* __restrict__ subsetSizes, const 
   }
 }
 
-// mmmfixme
-//  - stagger PS accesses to try to parallelize and coalesce reads.
-//  - strictly worse than the other way, a lot worse.
-//  - gives the right answer.
-//  - too much overhead? Bad theory? Shrinking bs to 16 or 8 goes faster than blockDim.x
+// TODO: this is an attempt to stagger access to PS across all threads in the block, to try to parallelize and coalesce
+// reads. It's strictly worse than the normal way above, though I expected it to do better. Too much overhead? Bad
+// theory? Shrinking bs to 16 or 8 goes faster than blockDim.x
 template <typename SolverConfig, typename SubsetSizeT, typename CodewordT>
 __device__ void computeSubsetSizesStaggered(SubsetSizeT* __restrict__ subsetSizes, const uint32_t secret,
                                             const uint4 secretColors, const CodewordT* __restrict__ regionIDsAsCodeword,
@@ -472,18 +398,18 @@ struct FDOptKernelConfig {
 };
 
 // Optimization from [2]: if the possible solution set is smaller than the number of possible scores, and if one
-// codeword can fully discriminate all of the possible solutions (i.e., it produces a different score for each one),
-// then play it right away since it will tell us the winner.
+// codeword can fully discriminate all the possible solutions (i.e., it produces a different score for each one), then
+// play it right away since it will tell us the winner.
 //
 // This compares PS with itself looking for a fully discriminating guess, and falls back to the full algo if none is
 // found.
 //
-// This is an interesting shortcut. It doesn't change the results of any of the subsetting algorithms at all: average
-// turns, max turns, max secret, and the full histograms all remain precisely the same. What does change is the number
-// of scores computed, and the runtime.
+// This is an interesting shortcut. It doesn't change the results of the subsetting algorithms at all: average turns,
+// max turns, max secret, and the full histograms all remain precisely the same. What does change is the number of
+// scores computed, and the run time.
 //
 // nb: one block, one warp for this one. Max region length is 45 for 8 pin games, which is our pin max, so fewer than
-// half the threads even have to loop to pickup all the data and we get away with a single warp reduction.
+// half the threads even have to loop to pickup all the data, and we get away with a single warp reduction.
 
 template <typename FDOptKernelConfig, typename SubsettingAlgosKernelConfig, typename CodewordT>
 __global__ void fullyDiscriminatingOpt(const CodewordT* __restrict__ allCodewords,
@@ -604,26 +530,26 @@ __global__ void nextGuessTiny(const uint32_t* __restrict__ regionIDsAsIndex, uin
   }
 }
 
-// mmmfixme: docs
-//  - Need to outline the key parts of the translation to GPU
-//  - This uses a lot of device memory right now. Need to figure out the max size game as is and go from there.
-//    - the pins of a packed codeword are 32bits. Could drop the colors and re-compute them as needed on-device.
-//    - could make a packed regionID w/ 6bit scores
-//    - region starts and lengths could be delta coded and variable size, etc.
-//  - Much of this work is a serial list of Thrust or kernels and could be a parallel graph, but the time spent outside
-//    of the main subsetting kernel is a tiny fraction of the overall work right now, so keeping it simple.
-
+// See the overview of the algorithm in solver_cuda.hpp.
+//
+// This builds all the buffers we need on-device for gameplay state, then loops playing all games a turn at a time
+// until all games have been won. I've used Thrust to try to keep the bulk of it fairly simple.
+//
+// Note: this uses a lot of device memory right now. Need to figure out the max size game as is and go from there.
+//  - the pins of a packed codeword are 32bits. Could drop the colors and re-compute them as needed on-device.
+//  - could make a packed regionID w/ 6bit scores
+//  - region starts and lengths could be delta coded and variable size, etc.
+//
+// Much of this work is a serial list of Thrust kernels and could be a parallel graph, but the time spent outside the
+// main subsetting kernel is a tiny fraction of the overall work right now, so keeping it simple.
 template <typename SolverConfig>
 std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedInitialGuess) {
   constexpr static bool LOG = SolverConfig::LOG;
 
   auto startTime = chrono::high_resolution_clock::now();
 
+  // All codewords go to the device once
   thrust::device_vector<CodewordT> dAllCodewords = CodewordT::getAllCodewords();
-
-  // mmmfixme: how to do this with a thrust vector?
-  //  CubDebugExit(cudaMemAdvise(thrust::raw_pointer_cast(dAllCodewords.data()), sizeof(CodewordT) *
-  //  allCodewords.size(), cudaMemAdviseSetReadMostly, 0));
 
   // Hold the next moves in a parallel vector to the all codewords vector. We need one such vector per turn played,
   // so we can have a "used codewords" list, and so we can form the full output graphs of moves when done.
@@ -641,7 +567,7 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
   thrust::copy(hNextMovesDeviceVecs.begin(), hNextMovesDeviceVecs.end(), dNextMovesVecs.begin());
   uint32_t** pdNextMovesVecs = thrust::raw_pointer_cast(dNextMovesVecs.data());
 
-  // Starting case: all games, initial guess.
+  // Starting case: all games playable, same initial guess.
   int nextMovesVecsSize = 0;
   auto dNextMoves = thrust::device_pointer_cast(hNextMovesDeviceVecs[nextMovesVecsSize++]);
   thrust::fill(dNextMoves, dNextMoves + dAllCodewords.size(), CodewordT::computeOrdinal(packedInitialGuess));
@@ -663,6 +589,8 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
   thrust::device_vector<IndexAndRank> dPerBlockSolutions(
       SubsettingAlgosKernelConfig<SolverConfig, uint32_t>::LARGEST_NUM_BLOCKS * chunkSize);
 
+  // Space to pre-process regions to codeword indices, or actual codewords. Helps speed up some later kernels as they
+  // can avoid multiple reads due to indirection. At the expense of a decent amount of memory, though.
   thrust::device_vector<uint32_t> dRegionIDsAsIndex(dRegionIDs.size());
   thrust::device_vector<CodewordT> dRegionIDsAsCodeword(dRegionIDs.size());
 
@@ -675,7 +603,6 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
   auto dRegionIDsEnd = dRegionIDs.end();  // The set of active games contracts as we go
 
   while (true) {
-    // mmmfixme: tmp
     auto startTime = chrono::high_resolution_clock::now();
     depth++;
 
@@ -734,7 +661,7 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
     thrust::transform(dRegionIDs.begin(), dRegionIDsEnd, dRegionIDsAsCodeword.begin(),
                       [pdAllCodewords] __device__(const RegionID& r) { return pdAllCodewords[r.index]; });
 
-    if (LOG) {  // mmmfixme: tmp, factor if I decide to keep it
+    if (LOG) {
       auto endTime = chrono::high_resolution_clock::now();
       chrono::duration<float, milli> elapsedMS = endTime - startTime;
       auto elapsedS = elapsedMS.count() / 1000;
@@ -756,6 +683,8 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
     // Advance to a fresh next moves vector
     pdNextMoves = thrust::raw_pointer_cast(hNextMovesDeviceVecs[nextMovesVecsSize++]);
 
+    // Process "tiny" regions specially. They need virtually no work, but it all has to act on device memory, so we use
+    // a single small kernel to take care of them all very, very quickly.
     uint32_t regionIdx = 0;
     uint32_t tinyRegionCount = 0;
     uint32_t tinyGameCount = 0;
@@ -776,6 +705,8 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
       nextGuessTiny<<<1, 128>>>(pdRegionsAsIndex, pdNextMoves, pdRegionStarts, pdRegionLengths, tinyRegionCount);
     }
 
+    // Small regions amenable to the fully discriminating opt come next. These are counted here, but really handled by
+    // the normal kernel. May process them separately at some point.
     uint32_t fdRegionCount = 0;
     uint32_t fdGameCount = 0;
     for (; regionIdx < regionCount && hRegionLengths[regionIdx] < SolverConfig::TOTAL_PACKED_SCORES; regionIdx++) {
@@ -790,6 +721,8 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
       printf("Possibly fully discriminating regions: %d, totalling %d games\n", fdRegionCount, fdGameCount);
     }
 
+    // Kickoff the full subsetting kernel for each large region, with each kernel processing a chunk of reagions at a
+    // time. This is where all the time is spent.
     int bigBoyLaunches = 0;
     for (size_t offset = tinyRegionCount; offset < regionCount; offset += chunkSize) {
       auto regionsToDo = min(chunkSize, regionCount - offset);
@@ -804,9 +737,10 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
 
     counters[Counters<SolverConfig>::BIG_REGIONS] += bigBoyLaunches;
     if (LOG) printf("Big Boy Launches: %d\n", bigBoyLaunches);
+
     CubDebug(cudaDeviceSynchronize());
 
-    if (LOG) {  // mmmfixme: tmp, factor if I decide to keep it
+    if (LOG) {
       auto endTime = chrono::high_resolution_clock::now();
       chrono::duration<float, milli> elapsedMS = endTime - startTime;
       auto elapsedS = elapsedMS.count() / 1000;

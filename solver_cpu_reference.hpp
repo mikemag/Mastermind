@@ -14,7 +14,6 @@
 //
 // This is a simple impl to serve as a reference for all the others. It's not optimized for speed. Hopefully it's clear.
 // More details w/ the impl.
-
 template <typename SolverConfig_>
 class SolverReferenceImpl : public Solver {
   using CodewordT = typename SolverConfig_::CodewordT;
@@ -25,9 +24,7 @@ class SolverReferenceImpl : public Solver {
   constexpr static const char* name = "CPU Reference Impl";
 
   SolverReferenceImpl() : counters(counterDescs.descs.size()) {}
-
   std::chrono::nanoseconds playAllGames(uint32_t packedInitialGuess) override;
-
   void dump() override;
   vector<uint32_t> getGuessesForGame(uint32_t packedCodeword) override;
 
@@ -36,6 +33,7 @@ class SolverReferenceImpl : public Solver {
       cout << c.desc << ": " << commaString(counters[c.index]) << endl;
     }
   }
+
   void recordStats(StatsRecorder& sr) override {
     for (auto& c : counterDescs.descs) {
       sr.add(c.name, counters[c.index]);
