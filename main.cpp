@@ -12,6 +12,7 @@
 #include "score.hpp"
 #include "solver.hpp"
 #include "solver_cpu_reference.hpp"
+#include "solver_cpu_opt.hpp"
 #include "solver_sets.hpp"
 
 #ifdef __CUDACC__
@@ -34,7 +35,7 @@ template <typename T>
 using DefaultSolver = SolverCUDA<T>;
 #else
 template <typename T>
-using DefaultSolver = SolverReferenceImpl<T>;
+using DefaultSolver = SolverCPUFaster<T>;
 #endif
 
 // Config for a single game
@@ -126,17 +127,23 @@ static std::map<std::type_index, ValidSolution> validSolutions = {
           {0x3632, {0x1123, 0x2344, 0x3255, 0x3632}},
           {0x1111, {0x1123, 0x1425, 0x2326, 0x1111}},
       }}},
-    {typeid(ValidSolutionsKey<8, 5, Algos::Knuth>),
-     {8,
-      2315454,
+    {typeid(ValidSolutionsKey<5, 8, Algos::Knuth>),
+     {7,
+      183775,
       {
-          {0x11223344, {0x11112222, 0x11331134, 0x44331222, 0x23142134, 0x11223344}},
+          {0x34567, {0x11223, 0x34455, 0x53657, 0x35856, 0x34567}},
       }}},
     {typeid(ValidSolutionsKey<7, 7, Algos::Knuth>),
      {9,
       5181948,
       {
           {0x1122334, {0x1112222, 0x1341112, 0x1232351, 0x1212334, 0x1111124, 0x1122334}},
+      }}},
+    {typeid(ValidSolutionsKey<8, 5, Algos::Knuth>),
+     {8,
+      2315454,
+      {
+          {0x11223344, {0x11112222, 0x11331134, 0x44331222, 0x23142134, 0x11223344}},
       }}},
 };
 

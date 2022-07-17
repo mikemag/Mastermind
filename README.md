@@ -45,22 +45,15 @@ the [game_at_a_time](https://github.com/mikemag/Mastermind/tree/game_at_a_time) 
 
 ## Results
 
-@TODO: these are old results from the game_at_a_time branch.
-
 More results and data are in the [results directory](results/).
-Using the GPU for larger games is much faster, as you would expect. 5p8c is a nice example:
+Using the GPU for larger games is much faster, as you would expect. 5p8c is a nice example, SolverCPUFaster vs. SolverCUDA:
 
-|Strategy|Initial Guess|Max Turns|GPU Mode|Average Turns|Time (s)|CPU Scores|GPU Scores|GPU Kernels|
-|:---:|:---:|:---:|:---:|:---:|---:|---:|---:|:---:|
-|First One|87654|9|CPU|5.9092|0.0393|2,596,79|
-|Knuth|11223|7|CPU|5.6084|6.6558|3,296,841,082|
-| | | |Both|5.6084|1.0228| 2,541,260|3,455,090,688|2,824|
-|Most Parts|11223|8|CPU|5.5491|6.7347|3,327,257,765|
-| | | |Both|5.5491|1.2146| 2,742,071|3,471,933,440|2,795|
-|Entropy|11223|7|CPU|5.4846|10.6226|3,212,855,854|
-| | |7|Both|5.4855|1.1068| 2,671,408|3,359,539,200|2,523|
-|Expected Size|11223|7|CPU|5.5016|8.4684|3,218,686,624|
-| | | |Both|5.4995|0.9620| 2,624,778|3,358,359,552|2,550|
+|   Strategy    | Initial Guess | Max Turns | Average Turns | CPU-only (s) | GPU-only (s) |
+|:-------------:|:-------------:|:---------:|:-------------:|:------------:|:------------:|
+|     Knuth     |     11223     |     7     |    5.6084     |    9.9862    |    0.0413    |
+|  Most Parts   |     11223     |     8     |    5.5491     |    5.4996    |    0.0408    |
+| Expected Size |     11223     |     7     |    5.4997     |    9.3927    |    0.0398    |
+|    Entropy    |     11223     |     7     |    5.4854     |    8.8997    |    0.0372    |
 
 ## Strategy Output
 
@@ -108,7 +101,6 @@ Documents and images are copyright by [Michael Magruder](https://github.com/mike
 1305.1010 [cs.GT]. https://arxiv.org/abs/1305.1010
 
 [3] Barteld Kooi, Yet another mastermind strategy. International Computer Games Association Journal, 28(1):13–20,
-
 2005. https://www.researchgate.net/publication/30485793_Yet_another_Mastermind_strategy
 
 [4] Stuart Reges and Marty Stepp, Building Java Programs: a back to basics approach, 2nd edition, 2011,

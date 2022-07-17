@@ -108,8 +108,13 @@ class Codeword {
   }
 };
 
+#if defined(__CUDACC__)
 static_assert(sizeof(Codeword<4, 8>) == 16);
 static_assert(__alignof__(Codeword<4, 8>) == 8);
+#else
+static_assert(sizeof(Codeword<4, 8>) == 32);
+static_assert(__alignof__(Codeword<4, 8>) == 16);
+#endif
 static_assert(sizeof(Codeword<4, 9>) == 32);
 static_assert(__alignof__(Codeword<4, 9>) == 16);
 
