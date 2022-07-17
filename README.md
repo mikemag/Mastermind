@@ -18,9 +18,8 @@ This repo holds most of my work on playing all games of various sizes quickly:
   - Most Parts
   - Expected Size
   - Entropy
-- A GPU implementation using CUDA which runs the scoring function and the inner loops of Knuth, Most Parts, etc.
-  - The CUDA implementation has been tailored for compute capability 8.6, CUDA 11.7, running on an NVIDIA
-    GeForce RTX 3070.
+- A GPU implementation using CUDA which runs the scoring function and the inner loops of Knuth, Most Parts, etc. This
+  has been tailored for compute capability 8.6, CUDA 11.7, running on an NVIDIA GeForce RTX 3070.
 - Various gameplay optimizations from Ville[2].
 
 ## Previous Versions and Easier Implementations
@@ -29,11 +28,12 @@ I originally wrote similar code in Java, since I was first motivated by the APCS
 pretty straightforward, and it is an easier introduction to the problem than the optimized C++ code you'll find here.
 See https://github.com/mikemag/CS-Education/tree/master/APCS/Mastermind
 
-This C++ version was originally an evolution of the Java version, based on playing one game at a time. It grew to include
-a GPU implementation written in Apple's Metal API for AMD GPUs, which I then ported to CUDA for Nvidia. However, playing
-one game at a time isn't the best way to take full advantage of available GPU resources, so I made a large switch to playing
-all games concurrently. The older version is interesting for a) the Metal impl, and b) the caching approach to growing a gameplay strategy
-over time. I've kept it on the game_at_a_time branch in this repo for reference.
+This C++ version was originally an evolution of the Java version, based on playing one game at a time. It grew to
+include a GPU implementation written in Apple's Metal API for AMD GPUs, which I then ported to CUDA for Nvidia. However,
+playing one game at a time isn't the best way to take full advantage of available GPU resources, so I made a large
+switch to playing all games concurrently. The older version is interesting for a) the Metal impl, and b) the caching
+approach to growing a gameplay strategy over time. I've kept it on
+the [game_at_a_time](https://github.com/mikemag/Mastermind/tree/game_at_a_time) branch in this repo for reference.
 
 ## Docs
 
@@ -86,7 +86,8 @@ Various experiment control flags are scattered throughout the Strategy classes.
 A CSV file with stats and run parameters is produced at the end.
 
 All development and tests done (so far) on a MacBook Pro (16-inch, 2019) running macOS Monterey 12.4, and Ubuntu 22.04.
-The GPU kernels have been tested on an NVIDIA GeForce RTX 3070, CUDA 11.7. The program will tell you about the GPUs on your
+The GPU kernels have been tested on an NVIDIA GeForce RTX 3070, CUDA 11.7. The program will tell you about the GPUs on
+your
 system and which one it selected when you run. System, CPU, and GPU details are recorded in the .csv files.
 
 ## License
@@ -105,6 +106,7 @@ Documents and images are copyright by [Michael Magruder](https://github.com/mike
 1305.1010 [cs.GT]. https://arxiv.org/abs/1305.1010
 
 [3] Barteld Kooi, Yet another mastermind strategy. International Computer Games Association Journal, 28(1):13–20,
+
 2005. https://www.researchgate.net/publication/30485793_Yet_another_Mastermind_strategy
 
 [4] Stuart Reges and Marty Stepp, Building Java Programs: a back to basics approach, 2nd edition, 2011,
