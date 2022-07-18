@@ -377,22 +377,38 @@ void playMultipleSpecificGamesWithInitialGuesses(StatsRecorder& statsRecorder) {
   if constexpr (shouldRun) {
     using namespace ss;
     {
-      using gameConfigs = solver_config_list<ss::pin_counts<7>, ss::color_counts<10>, MultiGameAlgos, multiGameLog>;
+      using gameConfigs = solver_config_list<ss::pin_counts<5>, ss::color_counts<13, 14, 15>, MultiGameAlgos, multiGameLog>;
       using gameSolvers = build_solvers<MultiGameSolver, gameConfigs::type>;
       run_multiple_solvers(gameSolvers::type{}, PlayAllGamesWithAllInitialGuesses(statsRecorder));
     }
     {
-      using gameConfigs = solver_config_list<ss::pin_counts<8>, ss::color_counts<8>, MultiGameAlgos, multiGameLog>;
+      using gameConfigs = solver_config_list<ss::pin_counts<6>, ss::color_counts<9, 10, 11, 12>, MultiGameAlgos, multiGameLog>;
       using gameSolvers = build_solvers<MultiGameSolver, gameConfigs::type>;
       run_multiple_solvers(gameSolvers::type{}, PlayAllGamesWithAllInitialGuesses(statsRecorder));
     }
+//    {
+//      using gameConfigs = solver_config_list<ss::pin_counts<7>, ss::color_counts<7, 8, 9>, MultiGameAlgos, multiGameLog>;
+//      using gameSolvers = build_solvers<MultiGameSolver, gameConfigs::type>;
+//      run_multiple_solvers(gameSolvers::type{}, PlayAllGamesWithAllInitialGuesses(statsRecorder));
+//    }
+//    {
+//      using gameConfigs = solver_config_list<ss::pin_counts<8>, ss::color_counts<5, 6, 7>, MultiGameAlgos, multiGameLog>;
+//      using gameSolvers = build_solvers<MultiGameSolver, gameConfigs::type>;
+//      run_multiple_solvers(gameSolvers::type{}, PlayAllGamesWithAllInitialGuesses(statsRecorder));
+//    }
   }
 }
 
 int main(int argc, const char* argv[]) {
   runUnitTests<shouldRunTests>();
 
-  StatsRecorder statsRecorder;
+  tm t = {};
+  istringstream ss(MASTERMIND_GIT_COMMIT_DATE);
+  ss >> get_time(&t, "%Y-%m-%d %H:%M:%S");
+  stringstream fs;
+  fs << "mastermind_run_stats_" << put_time(&t, "%Y%m%d_%H%M%S") << "_" << MASTERMIND_GIT_COMMIT_HASH << fileTag
+     << ".json";
+  StatsRecorder statsRecorder(fs.str());
   statsRecorder.addAll("Git Branch", MASTERMIND_GIT_BRANCH);
   statsRecorder.addAll("Git Commit Hash", MASTERMIND_GIT_COMMIT_HASH);
   statsRecorder.addAll("Git Commit Date", MASTERMIND_GIT_COMMIT_DATE);
@@ -403,18 +419,7 @@ int main(int argc, const char* argv[]) {
   playMultipleSpecificGames<shouldPlayMultipleSpecificGames>(statsRecorder);
 
   playMultipleGamesWithInitialGuesses<shouldFindBestFirstGuesses>(statsRecorder);
-  playMultipleSpecificGames<shouldFindBestFirstSpecificGuesses>(statsRecorder);
-
-  // mmmfixme: move the file setup into the constructor, and write runs as the complete & flush so we don't lose work on
-  //  crash
-  //  - Honestly, switch to JSON (so all rows don't have to be the same) and use https://github.com/nlohmann/json
-  tm t = {};
-  istringstream ss(MASTERMIND_GIT_COMMIT_DATE);
-  ss >> get_time(&t, "%Y-%m-%d %H:%M:%S");
-  stringstream fs;
-  fs << "mastermind_run_stats_" << put_time(&t, "%Y%m%d_%H%M%S") << "_" << MASTERMIND_GIT_COMMIT_HASH << fileTag
-     << ".csv";
-  statsRecorder.writeStats(fs.str());
+  playMultipleSpecificGamesWithInitialGuesses<shouldFindBestFirstSpecificGuesses>(statsRecorder);
 
   return 0;
 }

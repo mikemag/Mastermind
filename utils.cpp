@@ -8,9 +8,11 @@
 #include <algorithm>
 #include <fstream>
 #include <limits>
+#include <nlohmann/json.hpp>
 #include <set>
 
 using namespace std;
+using json = nlohmann::json;
 
 string commaString(float f) {
   locale comma_locale(locale(), new comma_numpunct());
@@ -20,70 +22,33 @@ string commaString(float f) {
   return ss.str();
 }
 
-void StatsRecorder::writeStats(const std::string &filename) {
-  if (runs.empty()) {
-    cout << "No stats to write" << endl;
-    return;
+StatsRecorder::StatsRecorder(const std::string &filename) : js(filename) {
+  for (const auto &a : osInfo.info) {
+    all[a.first] = a.second;
   }
 
-  cout << "Writing all game stats to " << filename << endl;
-
-  // Common data that we want to show up first, to make the files easier to read quickly.
-  vector<string> common = {
-      "Pin Count", "Color Count", "Strategy", "Solver", "Initial Guess", "Average Turns", "Max Turns", "Elapsed (s)",
-  };
-
-  // TODO: I haven't checked if this is sufficient.
-  auto escape = [](string s) {
-    if (s.find(',') != std::string::npos) {
-      return "\"" + s + "\"";
-    }
-    return s;
-  };
-
-  // Some runs may include stats that others don't, so aggregate the headers from them all so every row as the same
-  // number of columns in the same order.
-  set<string> headers;
-  for (const auto &run : runs) {
-    for (const auto &s : run) {
-      if (find(begin(common), end(common), s.first) != common.end()) continue;
-      headers.insert(s.first);
-    }
+  for (const auto &a : gpuInfo.info) {
+    all[a.first] = a.second;
   }
 
-  ofstream ss(filename);
+  json allInfo = {{"system_specs", json(all)}};
+  js << "[" << endl;
+  js << allInfo << endl;
+  js << flush;
+}
 
-  // Write header row first
-  auto cit = common.begin();
-  ss << escape(*cit);
-  for (++cit; cit != common.end(); ++cit) {
-    ss << "," << escape(*cit);
-  }
-  for (const auto &h : headers) {
-    ss << "," << escape(h);
-  }
-  for (const auto &a : all) {
-    ss << "," << escape(a.first);
-  }
-  ss << endl;
+StatsRecorder::~StatsRecorder() {
+  newRun();
+  js << "]" << endl;
+  js.close();
+}
 
-  // One row per game
-  for (auto &run : runs) {
-    cit = common.begin();
-    ss << escape(run[*cit]);
-    for (++cit; cit != common.end(); ++cit) {
-      ss << "," << escape(run[*cit]);
-    }
-    for (const auto &h : headers) {
-      ss << "," << escape(run[h]);
-    }
-    for (const auto &a : all) {
-      ss << "," << escape(a.second);
-    }
-    ss << endl;
+void StatsRecorder::newRun() {
+  if (!run.empty()) {
+    json runInfo = {{"run", json(run)}};
+    js << "," << runInfo << endl << flush;
+    run.clear();
   }
-
-  ss.close();
 }
 
 // ------------------------------------------------------------------------------------

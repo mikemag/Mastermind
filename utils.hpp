@@ -6,6 +6,7 @@
 #pragma once
 
 #include <climits>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <locale>
@@ -107,36 +108,26 @@ std::ostream &operator<<(std::ostream &stream, const GPUInfo &r) {
 // A way to record various stats about a game so we can write a nice csv of results.
 class StatsRecorder {
  public:
-  std::vector<std::unordered_map<std::string, std::string>> runs;
-  size_t currentRun = 0;
+  std::unordered_map<std::string, std::string> run;
   std::map<std::string, std::string> all;
   OSInfo osInfo;
   GPUInfo gpuInfo;
+  std::ofstream js;
 
-  StatsRecorder() {
-    for (const auto &a : osInfo.info) {
-      all[a.first] = a.second;
-    }
+  explicit StatsRecorder(const std::string &filename);
+  ~StatsRecorder();
 
-    for (const auto &a : gpuInfo.info) {
-      all[a.first] = a.second;
-    }
-  }
-
-  void newRun() {
-    runs.emplace_back();
-    currentRun = runs.size() - 1;
-  }
+  void newRun();
 
   template <typename T>
   void add(const std::string &name, T value) {
     std::stringstream ss;
     ss << value;
-    runs[currentRun][name] = ss.str();
+    run[name] = ss.str();
   }
 
-  void add(const std::string &name, const std::string &value) { runs[currentRun][name] = value; }
-  void add(const std::string &name, const char *value) { runs[currentRun][name] = value; }
+  void add(const std::string &name, const std::string &value) { run[name] = value; }
+  void add(const std::string &name, const char *value) { run[name] = value; }
 
   template <typename T>
   void addAll(const std::string &name, T value) {
@@ -144,8 +135,6 @@ class StatsRecorder {
     ss << value;
     all[name] = ss.str();
   }
-
-  void writeStats(const std::string &filename);
 };
 
 // Counters for various experiments, no overhead if not enabled.

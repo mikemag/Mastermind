@@ -62,6 +62,12 @@ if (LIBCPUID_FOUND AND NOT TARGET LIBCPUID)
     target_link_libraries(mastermind PUBLIC LIBCPUID)
 endif ()
 
+include(FetchContent)
+
+FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.10.5/json.tar.xz)
+FetchContent_MakeAvailable(json)
+target_link_libraries(mastermind PRIVATE nlohmann_json::nlohmann_json)
+
 include(CheckLanguage)
 check_language(CUDA)
 
