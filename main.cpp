@@ -11,8 +11,8 @@
 #include "mastermind_config.h"
 #include "score.hpp"
 #include "solver.hpp"
-#include "solver_cpu_reference.hpp"
 #include "solver_cpu_opt.hpp"
+#include "solver_cpu_reference.hpp"
 #include "solver_sets.hpp"
 
 #ifdef __CUDACC__
@@ -49,15 +49,19 @@ static constexpr bool singleGameLog = true;
 
 // Config for playing a set of games
 static constexpr bool shouldPlayMultipleGames = false;
+static constexpr bool shouldPlayMultipleSpecificGames = false;
 template <typename T>
 using MultiGameSolver = DefaultSolver<T>;
-using MultiGameAlgos = ss::algo_list<Algos::Knuth, Algos::MostParts>;
-using MultiGamePins = ss::pin_counts<4, 5>;
-using MultiGameColors = ss::color_counts<6>;
+using MultiGameAlgos = ss::algo_list<Algos::Knuth, Algos::MostParts, Algos::ExpectedSize, Algos::Entropy>;
+using MultiGamePins = ss::pin_counts<8>;
+using MultiGameColors = ss::color_counts<2, 3, 4, 5, 6, 7>;
 static constexpr bool multiGameLog = false;
+// static constexpr const char* fileTag = "_aa_8p_2-7c";
+static constexpr const char* fileTag = "";
 
 // Initial guess exploration, plays the same games as the multi game config above
 static constexpr bool shouldFindBestFirstGuesses = false;
+static constexpr bool shouldFindBestFirstSpecificGuesses = false;
 
 // Misc config
 static constexpr bool shouldRunTests = true;  // Run unit tests and play Knuth's game
@@ -342,12 +346,46 @@ void playMultipleGames(StatsRecorder& statsRecorder) {
 }
 
 template <bool shouldRun>
+void playMultipleSpecificGames(StatsRecorder& statsRecorder) {
+  if constexpr (shouldRun) {
+    using namespace ss;
+    {
+      using gameConfigs = solver_config_list<ss::pin_counts<7>, ss::color_counts<6>, MultiGameAlgos, multiGameLog>;
+      using gameSolvers = build_solvers<MultiGameSolver, gameConfigs::type>;
+      run_multiple_solvers(gameSolvers::type{}, PlayAllGames(statsRecorder));
+    }
+    {
+      using gameConfigs = solver_config_list<ss::pin_counts<7>, ss::color_counts<5>, MultiGameAlgos, multiGameLog>;
+      using gameSolvers = build_solvers<MultiGameSolver, gameConfigs::type>;
+      run_multiple_solvers(gameSolvers::type{}, PlayAllGames(statsRecorder));
+    }
+  }
+}
+
+template <bool shouldRun>
 void playMultipleGamesWithInitialGuesses(StatsRecorder& statsRecorder) {
   if constexpr (shouldRun) {
     using namespace ss;
     using gameConfigs = solver_config_list<MultiGamePins, MultiGameColors, MultiGameAlgos, multiGameLog>;
     using gameSolvers = build_solvers<MultiGameSolver, gameConfigs::type>;
     run_multiple_solvers(gameSolvers::type{}, PlayAllGamesWithAllInitialGuesses(statsRecorder));
+  }
+}
+
+template <bool shouldRun>
+void playMultipleSpecificGamesWithInitialGuesses(StatsRecorder& statsRecorder) {
+  if constexpr (shouldRun) {
+    using namespace ss;
+    {
+      using gameConfigs = solver_config_list<ss::pin_counts<7>, ss::color_counts<10>, MultiGameAlgos, multiGameLog>;
+      using gameSolvers = build_solvers<MultiGameSolver, gameConfigs::type>;
+      run_multiple_solvers(gameSolvers::type{}, PlayAllGamesWithAllInitialGuesses(statsRecorder));
+    }
+    {
+      using gameConfigs = solver_config_list<ss::pin_counts<8>, ss::color_counts<8>, MultiGameAlgos, multiGameLog>;
+      using gameSolvers = build_solvers<MultiGameSolver, gameConfigs::type>;
+      run_multiple_solvers(gameSolvers::type{}, PlayAllGamesWithAllInitialGuesses(statsRecorder));
+    }
   }
 }
 
@@ -362,8 +400,10 @@ int main(int argc, const char* argv[]) {
   playSingleGame<shouldPlaySingleGame>(statsRecorder);
 
   playMultipleGames<shouldPlayMultipleGames>(statsRecorder);
+  playMultipleSpecificGames<shouldPlayMultipleSpecificGames>(statsRecorder);
 
   playMultipleGamesWithInitialGuesses<shouldFindBestFirstGuesses>(statsRecorder);
+  playMultipleSpecificGames<shouldFindBestFirstSpecificGuesses>(statsRecorder);
 
   // mmmfixme: move the file setup into the constructor, and write runs as the complete & flush so we don't lose work on
   //  crash
@@ -372,7 +412,8 @@ int main(int argc, const char* argv[]) {
   istringstream ss(MASTERMIND_GIT_COMMIT_DATE);
   ss >> get_time(&t, "%Y-%m-%d %H:%M:%S");
   stringstream fs;
-  fs << "mastermind_run_stats_" << put_time(&t, "%Y%m%d_%H%M%S") << "_" << MASTERMIND_GIT_COMMIT_HASH << ".csv";
+  fs << "mastermind_run_stats_" << put_time(&t, "%Y%m%d_%H%M%S") << "_" << MASTERMIND_GIT_COMMIT_HASH << fileTag
+     << ".csv";
   statsRecorder.writeStats(fs.str());
 
   return 0;
