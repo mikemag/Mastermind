@@ -53,10 +53,10 @@ static constexpr bool shouldPlayMultipleSpecificGames = false;
 template <typename T>
 using MultiGameSolver = DefaultSolver<T>;
 using MultiGameAlgos = ss::algo_list<Algos::Knuth, Algos::MostParts, Algos::ExpectedSize, Algos::Entropy>;
-using MultiGamePins = ss::pin_counts<8>;
-using MultiGameColors = ss::color_counts<2, 3, 4, 5, 6, 7>;
+using MultiGamePins = ss::pin_counts<6>;
+using MultiGameColors = ss::color_counts<2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12>;
 static constexpr bool multiGameLog = false;
-// static constexpr const char* fileTag = "_aa_8p_2-7c";
+// static constexpr const char* fileTag = "_aa_7p_2-9_8p_2-7c";
 static constexpr const char* fileTag = "";
 
 // Initial guess exploration, plays the same games as the multi game config above
@@ -350,12 +350,12 @@ void playMultipleSpecificGames(StatsRecorder& statsRecorder) {
   if constexpr (shouldRun) {
     using namespace ss;
     {
-      using gameConfigs = solver_config_list<ss::pin_counts<7>, ss::color_counts<6>, MultiGameAlgos, multiGameLog>;
+      using gameConfigs = solver_config_list<ss::pin_counts<7>, ss::color_counts<2, 3, 4, 5, 6, 7, 8, 9>, MultiGameAlgos, multiGameLog>;
       using gameSolvers = build_solvers<MultiGameSolver, gameConfigs::type>;
       run_multiple_solvers(gameSolvers::type{}, PlayAllGames(statsRecorder));
     }
     {
-      using gameConfigs = solver_config_list<ss::pin_counts<7>, ss::color_counts<5>, MultiGameAlgos, multiGameLog>;
+      using gameConfigs = solver_config_list<ss::pin_counts<8>, ss::color_counts<2, 3, 4, 5, 6, 7>, MultiGameAlgos, multiGameLog>;
       using gameSolvers = build_solvers<MultiGameSolver, gameConfigs::type>;
       run_multiple_solvers(gameSolvers::type{}, PlayAllGames(statsRecorder));
     }
