@@ -3,33 +3,27 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
-import csv
+import json
 import os
 import glob
 
 
-def load_csv(filename, results):
+def load_json(filename, results):
     with open(os.path.join(filename), 'r') as f:
-        r = csv.reader(f)
-        header = next(r)
-        p_col = header.index('Pin Count')
-        c_col = header.index('Color Count')
-        algo_col = header.index('Strategy')
-        ig_col = header.index('Initial Guess')
-        avg_turns_col = header.index('Average Turns')
-        max_turns_col = header.index('Max Turns')
+        r = json.load(f)
+        runs = [x['run'] for x in r if 'run' in x]
 
-        for row in r:
-            ar = results.setdefault(row[algo_col], {})
-            pr = ar.setdefault(int(row[p_col]), {})
-            gr = pr.setdefault(int(row[c_col]), {
+        for run in runs:
+            ar = results.setdefault(run['Strategy'], {})
+            pr = ar.setdefault(int(run['Pin Count']), {})
+            gr = pr.setdefault(int(run['Color Count']), {
                 'best_avg': [9999.9, 9999, ''],
                 'best_max': [9999.9, 9999, '']
             })
 
-            ig = row[ig_col]
-            at = float(row[avg_turns_col])
-            mt = int(row[max_turns_col])
+            ig = run['Initial Guess']
+            at = float(run['Average Turns'])
+            mt = int(run['Max Turns'])
 
             if at < gr['best_avg'][0] or (at == gr['best_avg'][0]
                                           and mt < gr['best_avg'][1]):
@@ -100,10 +94,10 @@ def generate_cxx(filename, results):
 
 def process_results():
     results = {}
-    result_files = glob.glob('../*.csv')
+    result_files = glob.glob('../*.json')
 
     for f in result_files:
-        load_csv(f, results)
+        load_json(f, results)
 
     for a, pd in results.items():
         print('### ' + a)
@@ -112,9 +106,9 @@ def process_results():
         print('|:---:' * 15, '|', sep='')
 
         for p in range(2, 9):
+            print('|' + str(p) + 'p', end='')
             if p in pd:
                 cd = pd[p]
-                print('|' + str(p) + 'p', end='')
                 for c in range(2, 16):
                     if c in cd:
                         gd = cd[c]
