@@ -56,8 +56,8 @@ using MultiGameAlgos = ss::algo_list<Algos::Knuth, Algos::MostParts, Algos::Expe
 using MultiGamePins = ss::pin_counts<6>;
 using MultiGameColors = ss::color_counts<2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12>;
 static constexpr bool multiGameLog = false;
-// static constexpr const char* fileTag = "_aa_7p_2-9_8p_2-7c";
-static constexpr const char* fileTag = "";
+static constexpr const char* fileTag = "_aa_7p_2-9c_8p_2-7c";
+// static constexpr const char* fileTag = "";
 
 // Initial guess exploration, plays the same games as the multi game config above
 static constexpr bool shouldFindBestFirstGuesses = false;
@@ -350,12 +350,14 @@ void playMultipleSpecificGames(StatsRecorder& statsRecorder) {
   if constexpr (shouldRun) {
     using namespace ss;
     {
-      using gameConfigs = solver_config_list<ss::pin_counts<7>, ss::color_counts<2, 3, 4, 5, 6, 7, 8, 9>, MultiGameAlgos, multiGameLog>;
+      using gameConfigs =
+          solver_config_list<ss::pin_counts<7>, ss::color_counts<2, 3, 4, 5, 6, 7, 8, 9>, MultiGameAlgos, multiGameLog>;
       using gameSolvers = build_solvers<MultiGameSolver, gameConfigs::type>;
       run_multiple_solvers(gameSolvers::type{}, PlayAllGames(statsRecorder));
     }
     {
-      using gameConfigs = solver_config_list<ss::pin_counts<8>, ss::color_counts<2, 3, 4, 5, 6, 7>, MultiGameAlgos, multiGameLog>;
+      using gameConfigs =
+          solver_config_list<ss::pin_counts<8>, ss::color_counts<2, 3, 4, 5, 6, 7>, MultiGameAlgos, multiGameLog>;
       using gameSolvers = build_solvers<MultiGameSolver, gameConfigs::type>;
       run_multiple_solvers(gameSolvers::type{}, PlayAllGames(statsRecorder));
     }
@@ -376,26 +378,24 @@ template <bool shouldRun>
 void playMultipleSpecificGamesWithInitialGuesses(StatsRecorder& statsRecorder) {
   if constexpr (shouldRun) {
     using namespace ss;
-    {
-      using gameConfigs = solver_config_list<ss::pin_counts<5>, ss::color_counts<13, 14, 15>, MultiGameAlgos, multiGameLog>;
-      using gameSolvers = build_solvers<MultiGameSolver, gameConfigs::type>;
-      run_multiple_solvers(gameSolvers::type{}, PlayAllGamesWithAllInitialGuesses(statsRecorder));
-    }
-    {
-      using gameConfigs = solver_config_list<ss::pin_counts<6>, ss::color_counts<9, 10, 11, 12>, MultiGameAlgos, multiGameLog>;
-      using gameSolvers = build_solvers<MultiGameSolver, gameConfigs::type>;
-      run_multiple_solvers(gameSolvers::type{}, PlayAllGamesWithAllInitialGuesses(statsRecorder));
-    }
 //    {
-//      using gameConfigs = solver_config_list<ss::pin_counts<7>, ss::color_counts<7, 8, 9>, MultiGameAlgos, multiGameLog>;
+//      using gameConfigs = solver_config_list<ss::pin_counts<6>, ss::color_counts<2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12>,
+//                                             MultiGameAlgos, multiGameLog>;
 //      using gameSolvers = build_solvers<MultiGameSolver, gameConfigs::type>;
 //      run_multiple_solvers(gameSolvers::type{}, PlayAllGamesWithAllInitialGuesses(statsRecorder));
 //    }
 //    {
-//      using gameConfigs = solver_config_list<ss::pin_counts<8>, ss::color_counts<5, 6, 7>, MultiGameAlgos, multiGameLog>;
+//      using gameConfigs =
+//          solver_config_list<ss::pin_counts<7>, ss::color_counts<2, 3, 4, 5, 6, 7, 8, 9>, MultiGameAlgos, multiGameLog>;
 //      using gameSolvers = build_solvers<MultiGameSolver, gameConfigs::type>;
 //      run_multiple_solvers(gameSolvers::type{}, PlayAllGamesWithAllInitialGuesses(statsRecorder));
 //    }
+    {
+      using gameConfigs =
+          solver_config_list<ss::pin_counts<8>, ss::color_counts<2, 3, 4, 5, 6>, MultiGameAlgos, multiGameLog>;
+      using gameSolvers = build_solvers<MultiGameSolver, gameConfigs::type>;
+      run_multiple_solvers(gameSolvers::type{}, PlayAllGamesWithAllInitialGuesses(statsRecorder));
+    }
   }
 }
 
@@ -421,5 +421,6 @@ int main(int argc, const char* argv[]) {
   playMultipleGamesWithInitialGuesses<shouldFindBestFirstGuesses>(statsRecorder);
   playMultipleSpecificGamesWithInitialGuesses<shouldFindBestFirstSpecificGuesses>(statsRecorder);
 
+  cout << "Complete." << endl;
   return 0;
 }
