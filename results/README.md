@@ -3,9 +3,7 @@
 All results are using SolverCUDA from a system running Ubuntu 22.04 LTS, with a Intel(R) Core(TM) i7-10700K CPU @ 3.80GHz,
 NVIDIA GeForce RTX 3070 and CUDA Toolkit 11.7.
 
-Raw data is in the .csv files in subdirectories here.
-
-nb: some initial guesses may not be optimal. I need to redo the best initial guess for the newer results.
+Raw data is in the .json files in subdirectories here.
 
 ## Average turns over all games
 
