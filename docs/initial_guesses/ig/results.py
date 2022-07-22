@@ -3,9 +3,10 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
+import glob
 import json
 import os
-import glob
+from collections import OrderedDict
 
 
 def load_json(filename, results, metric):
@@ -39,7 +40,7 @@ def load_json(filename, results, metric):
 
 
 def process_results(metric, metric_format, header):
-    results = {}
+    results = OrderedDict()
     result_files = glob.glob(
         '/Users/mike/dev/Mastermind/results/2022_i7-10700K_CUDA_3070_ubuntu22/*.json')
 

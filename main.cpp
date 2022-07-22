@@ -56,8 +56,8 @@ using MultiGameAlgos = ss::algo_list<Algos::Knuth, Algos::MostParts, Algos::Expe
 using MultiGamePins = ss::pin_counts<6>;
 using MultiGameColors = ss::color_counts<2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12>;
 static constexpr bool multiGameLog = false;
-static constexpr const char* fileTag = "_aa_7p_2-9c_8p_2-7c";
-// static constexpr const char* fileTag = "";
+//static constexpr const char* fileTag = "_aa_7p_2-9c_8p_2-7c";
+ static constexpr const char* fileTag = "";
 
 // Initial guess exploration, plays the same games as the multi game config above
 static constexpr bool shouldFindBestFirstGuesses = false;
