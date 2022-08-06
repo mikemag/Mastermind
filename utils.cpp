@@ -369,5 +369,23 @@ void GPUInfo::loadDeviceInfo() {
   info["GPU Warp Size"] = to_string(deviceProp.warpSize);
   info["GPU Threads per MP"] = to_string(deviceProp.maxThreadsPerMultiProcessor);
   info["GPU Threads per Block"] = to_string(deviceProp.maxThreadsPerBlock);
+
+#if __linux__
+  std::string token;
+  std::ifstream file("/proc/driver/nvidia/version");
+  char tmp[1024];
+  while (file.getline(tmp, 1024, ':')) {
+    if (string(tmp) == "NVRM version") {
+      file.getline(tmp, 1024);
+      string s(tmp);
+      // ltrim
+      s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char ch) { return !std::isspace(ch); }));
+      info["GPU Driver Version"] = s;
+    }
+    // Ignore the rest of the line
+    file.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+  }
+#endif
+
 #endif
 }
