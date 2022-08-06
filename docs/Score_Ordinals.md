@@ -73,10 +73,17 @@ $$O_{b,w} = b(p + 1) - \frac{(b - 1)b}{2} + w$$
 
 $$O_{b,w} = bp + b - \frac{(b - 1)b}{2} + a - b$$
 
-$$O_{b,w} = bp - \frac{(b - 1)b}{2} + a$$
+$$O_{b,w} = \frac{2bp}{2} - \frac{(b - 1)b}{2} + a$$
 
-It turns out that [isn't too bad to compute at all](https://godbolt.org/z/ab5vTn), and it saves significant shared
-memory on the GPU, enabling much, much better occupancy and thus throughput.
+$$O_{b,w} = \frac{2bp + (1 - b)b}{2} + a$$
+
+$$O_{b,w} = \frac{2bp + b - b^2}{2} + a$$
+
+$$O_{b,w} = \frac{b(2p + 1 - b)}{2} + a$$
+
+It turns out that [isn't too bad to compute at all](https://godbolt.org/z/j7rse3axa), and it saves significant shared
+memory on the GPU, enabling much, much better occupancy and thus throughput. This has been factored to favor more work
+at compile time, and results in 4 ops: sub from a constant, multiply, divide, add.
 
 Note, however, that the packing is not perfect. The equations above leave room for the impossible score
 $b = p - 1$, $w = 1$. This can be adjusted for programmatically, by subtracting $1$ if $b = p$, but it's not worth it in

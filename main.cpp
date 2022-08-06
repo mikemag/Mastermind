@@ -42,7 +42,7 @@ using DefaultSolver = SolverCPUFaster<T>;
 static constexpr bool shouldPlaySingleGame = true;
 template <typename T>
 using SingleGameSolver = DefaultSolver<T>;
-using SingleGameAlgo = Algos::Knuth;
+using SingleGameAlgo = Algos::MostParts;
 static constexpr uint8_t singleGamePinCount = 7;    // 1-8, 4 is classic
 static constexpr uint8_t singleGameColorCount = 7;  // 1-15, 6 is classic
 static constexpr bool singleGameLog = true;

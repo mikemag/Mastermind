@@ -90,9 +90,7 @@ __device__ uint scoreCodewords(const uint32_t secret, const uint4 secretColors, 
     allHits += __vsadu4(mins4, 0);
   }
 
-  // Given w = ah - b, simplify to i = bp - ((b - 1)b) / 2) + ah. I wonder if the compiler noticed that.
-  // https://godbolt.org/z/ab5vTn -- gcc 10.2 notices and simplifies, clang 11.0.0 misses it.
-  return b * SolverConfig::PIN_COUNT - ((b - 1) * b) / 2 + allHits;
+  return ((b * (2 * SolverConfig::PIN_COUNT + 1 - b)) / 2) + allHits;
 }
 
 // Score all possible solutions against a given secret and compute subset sizes, which are the number of codewords per
