@@ -56,8 +56,8 @@ using MultiGameAlgos = ss::algo_list<Algos::Knuth, Algos::MostParts, Algos::Expe
 using MultiGamePins = ss::pin_counts<6>;
 using MultiGameColors = ss::color_counts<2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12>;
 static constexpr bool multiGameLog = false;
-//static constexpr const char* fileTag = "_aa_7p_2-9c_8p_2-7c";
- static constexpr const char* fileTag = "";
+// static constexpr const char* fileTag = "_aa_7p_2-9c_8p_2-7c";
+static constexpr const char* fileTag = "";
 
 // Initial guess exploration, plays the same games as the multi game config above
 static constexpr bool shouldFindBestFirstGuesses = false;
@@ -138,16 +138,22 @@ static std::map<std::type_index, ValidSolution> validSolutions = {
           {0x34567, {0x11223, 0x34455, 0x53657, 0x35856, 0x34567}},
       }}},
     {typeid(ValidSolutionsKey<7, 7, Algos::Knuth>),
-     {9,
-      5181948,
+     {8,
+      5124234,
       {
-          {0x1122334, {0x1112222, 0x1341112, 0x1232351, 0x1212334, 0x1111124, 0x1122334}},
+          {0x4422334, {0x1122334, 0x1225445, 0x1512361, 0x4322334, 0x4422334}},
+      }}},
+    {typeid(ValidSolutionsKey<7, 7, Algos::MostParts>),
+     {10,
+      5073674,
+      {
+          {0x4422334, {0x1112233, 0x1121444, 0x1215156, 0x2342434, 0x2432443, 0x4422334}},
       }}},
     {typeid(ValidSolutionsKey<8, 5, Algos::Knuth>),
      {8,
-      2315454,
+      2281524,
       {
-          {0x11223344, {0x11112222, 0x11331134, 0x44331222, 0x23142134, 0x11223344}},
+          {0x11223344, {0x11122334, 0x14412131, 0x11223521, 0x11223344}},
       }}},
 };
 
@@ -378,18 +384,20 @@ template <bool shouldRun>
 void playMultipleSpecificGamesWithInitialGuesses(StatsRecorder& statsRecorder) {
   if constexpr (shouldRun) {
     using namespace ss;
-//    {
-//      using gameConfigs = solver_config_list<ss::pin_counts<6>, ss::color_counts<2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12>,
-//                                             MultiGameAlgos, multiGameLog>;
-//      using gameSolvers = build_solvers<MultiGameSolver, gameConfigs::type>;
-//      run_multiple_solvers(gameSolvers::type{}, PlayAllGamesWithAllInitialGuesses(statsRecorder));
-//    }
-//    {
-//      using gameConfigs =
-//          solver_config_list<ss::pin_counts<7>, ss::color_counts<2, 3, 4, 5, 6, 7, 8, 9>, MultiGameAlgos, multiGameLog>;
-//      using gameSolvers = build_solvers<MultiGameSolver, gameConfigs::type>;
-//      run_multiple_solvers(gameSolvers::type{}, PlayAllGamesWithAllInitialGuesses(statsRecorder));
-//    }
+    //    {
+    //      using gameConfigs = solver_config_list<ss::pin_counts<6>, ss::color_counts<2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
+    //      12>,
+    //                                             MultiGameAlgos, multiGameLog>;
+    //      using gameSolvers = build_solvers<MultiGameSolver, gameConfigs::type>;
+    //      run_multiple_solvers(gameSolvers::type{}, PlayAllGamesWithAllInitialGuesses(statsRecorder));
+    //    }
+    //    {
+    //      using gameConfigs =
+    //          solver_config_list<ss::pin_counts<7>, ss::color_counts<2, 3, 4, 5, 6, 7, 8, 9>, MultiGameAlgos,
+    //          multiGameLog>;
+    //      using gameSolvers = build_solvers<MultiGameSolver, gameConfigs::type>;
+    //      run_multiple_solvers(gameSolvers::type{}, PlayAllGamesWithAllInitialGuesses(statsRecorder));
+    //    }
     {
       using gameConfigs =
           solver_config_list<ss::pin_counts<8>, ss::color_counts<2, 3, 4, 5, 6>, MultiGameAlgos, multiGameLog>;
