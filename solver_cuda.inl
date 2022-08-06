@@ -101,7 +101,7 @@ template <typename SolverConfig, typename SubsetSizeT, typename CodewordT>
 __device__ void computeSubsetSizes(SubsetSizeT* __restrict__ subsetSizes, const uint32_t secret,
                                    const uint4 secretColors, const CodewordT* __restrict__ regionIDsAsCodeword,
                                    uint32_t regionStart, uint32_t regionLength) {
-  for (uint32_t i = regionStart; i < regionStart + regionLength; i++) {
+  for (int64_t i = regionStart; i < regionStart + regionLength; i++) {
     auto& ps = regionIDsAsCodeword[i];
     uint score = scoreCodewords<SolverConfig>(secret, secretColors, ps.packedCodeword(), ps.packedColorsCUDA());
     SolverConfig::ALGO::accumulateSubsetSize(subsetSizes[score]);
@@ -696,12 +696,6 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
     counters[Counters<SolverConfig>::TINY_GAMES] += tinyGameCount;
 
     if (tinyRegionCount > 0) {
-      // mmmfixme: error check the grid launches, even the nested ones, especially for
-      //  cudaErrorLaunchPendingCountExceeded
-      //  - default is 2048 I think.
-      //  - check and adjust as necessary for our sub-kernels
-      //    - cudaDeviceSetLimit(cudaLimitDevRuntimePendingLaunchCount, 32768);
-      //  - https://developer.nvidia.com/blog/cuda-dynamic-parallelism-api-principles/
       nextGuessTiny<<<1, 128>>>(pdRegionsAsIndex, pdNextMoves, pdRegionStarts, pdRegionLengths, tinyRegionCount);
     }
 
@@ -721,12 +715,12 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
       printf("Possibly fully discriminating regions: %d, totalling %d games\n", fdRegionCount, fdGameCount);
     }
 
-    // Kickoff the full subsetting kernel for each large region, with each kernel processing a chunk of reagions at a
+    // Kickoff the full subsetting kernel for each large region, with each kernel processing a chunk of regions at a
     // time. This is where all the time is spent.
     int bigBoyLaunches = 0;
     for (size_t offset = tinyRegionCount; offset < regionCount; offset += chunkSize) {
       auto regionsToDo = min(chunkSize, regionCount - offset);
-      int threadsPerBlock = 4;  // mmmfixme: odd... needs tuning and better blocking
+      int threadsPerBlock = 4;  // Reduce dynamic launch parallelism by 4
 
       bigBoyLaunches++;
       auto pdPerBlockSolutions = thrust::raw_pointer_cast(dPerBlockSolutions.data());
