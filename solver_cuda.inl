@@ -260,11 +260,9 @@ __global__ void subsettingAlgosKernel(const CodewordT* __restrict__ allCodewords
 
   using ALGO = typename SubsettingAlgosKernelConfig::SolverConfig::ALGO;
   typename ALGO::RankingAccumulatorType rankingAccumulator{};
-  uint32_t totalUsedSubsets = 0;
   for (int i = 0; i < SubsettingAlgosKernelConfig::TOTAL_PACKED_SCORES; i++) {
     if (subsetSizes[i] > 0) {
       ALGO::accumulateRanking(rankingAccumulator, subsetSizes[i], possibleSolutionsCount);
-      totalUsedSubsets++;
     }
   }
 
@@ -273,14 +271,12 @@ __global__ void subsettingAlgosKernel(const CodewordT* __restrict__ allCodewords
   // A rank of 0 will prevent used or invalid codewords from being chosen.
   if (tidGrid >= SubsettingAlgosKernelConfig::CodewordT::TOTAL_CODEWORDS) {
     rank = 0;
-    totalUsedSubsets = 0;
   } else {
     // Use the list of next moves sets to discard used codewords. nb: -1 to skip the new set.
     // TODO: I'd like to improve this. Ideally we wouldn't do this for low ranked guesses that won't be picked anyway.
     for (int i = 0; i < nextMovesVecsSize - 1; i++) {
       if (tidGrid == nextMovesVecs[i][regionIDsAsIndex[regionStart]]) {
         rank = 0;
-        totalUsedSubsets = 0;
         break;
       }
     }
@@ -296,18 +292,6 @@ __global__ void subsettingAlgosKernel(const CodewordT* __restrict__ allCodewords
   if (threadIdx.x == 0) {
     perBlockSolutions[blockIdx.x] = bestSolution;
   }
-
-  // mmmfixme
-  // If we find some guesses which are fully discriminating, we want to pick the first one lexically to play. tidGrid is
-  // the same as the ordinal for each member of allCodewords, so we can simply take the min tidGrid.
-  //  if (possibleSolutionsCount <= SubsettingAlgosKernelConfig::TOTAL_PACKED_SCORES) {
-  //    if (totalUsedSubsets == possibleSolutionsCount) {
-  // I don't really like this, but it's tested out faster than doing a per-block reduction and a subsequent
-  // device-wide reduction, like for the index and score above. Likewise, doing a warp-level reduction centered
-  // around __reduce_min_sync() tests the same speed as just the atomicMin().
-  //      atomicMin(&(littleStuff->fdGuess), tidGrid);
-  //    }
-  //  }
 }
 
 // Reduce the per-block best guesses from subsettingAlgosKernel to generate a single, best guess. This is then set
