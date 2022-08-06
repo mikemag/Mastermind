@@ -22,6 +22,12 @@ string commaString(float f) {
   return ss.str();
 }
 
+std::string hexString(uint32_t v) {
+  std::stringstream ss;
+  ss << std::hex << v;
+  return ss.str();
+}
+
 StatsRecorder::StatsRecorder(const std::string &filename) : js(filename) {
   for (const auto &a : osInfo.info) {
     all[a.first] = a.second;
@@ -65,18 +71,18 @@ void StatsRecorder::newRun() {
 
 #include <sys/utsname.h>
 
+#if __APPLE__
 template <typename T>
-string OSInfo::macOSSysctlByName(const string &name) {
+T OSInfo::macOSSysctlByName(const string &name) {
   T value;
   size_t size = sizeof(value);
   if (sysctlbyname(name.c_str(), &value, &size, nullptr, 0) < 0) {
     cerr << "sysctlbyname failed for " << name << std::endl;
     exit(-1);
   }
-  return to_string(value);
+  return value;
 }
 
-#if __APPLE__
 template <>
 string OSInfo::macOSSysctlByName<std::string>(const string &name) {
   char buffer[1024];
@@ -128,17 +134,17 @@ OSInfo::OSInfo() {
   }
 
   info["HW CPU Brand String"] = data.brand_str;
-  info["HW CPU Cacheline Size"] = to_string(data.l1_cacheline);
-  info["HW CPU L1 iCache Size"] = to_string(data.l1_instruction_cache * 1024);
-  info["HW CPU L1 dCache Size"] = to_string(data.l1_data_cache * 1024);
-  info["HW CPU L2 Cache Size"] = to_string(data.l2_cache * 1024);
-  info["HW CPU L3 Cache Size"] = to_string(data.l3_cache * 1024);
-  info["HW CPU Physical Count"] = to_string(data.num_cores);
-  info["HW CPU Logical Count"] = to_string(data.num_logical_cpus);
+  info["HW CPU Cacheline Size"] = data.l1_cacheline;
+  info["HW CPU L1 iCache Size"] = data.l1_instruction_cache * 1024;
+  info["HW CPU L1 dCache Size"] = data.l1_data_cache * 1024;
+  info["HW CPU L2 Cache Size"] = data.l2_cache * 1024;
+  info["HW CPU L3 Cache Size"] = data.l3_cache * 1024;
+  info["HW CPU Physical Count"] = data.num_cores;
+  info["HW CPU Logical Count"] = data.num_logical_cpus;
 
   struct sysinfo si {};
   sysinfo(&si);
-  info["HW Memory Size"] = to_string(si.totalram);
+  info["HW Memory Size"] = si.totalram;
 
   std::string token;
   std::ifstream file("/etc/os-release");
@@ -344,31 +350,30 @@ void GPUInfo::loadDeviceInfo() {
 
   info["GPU CUDA Capability"] = to_string(deviceProp.major) + "." + to_string(deviceProp.minor);
 
-  info["GPU Global Memory"] = to_string(deviceProp.totalGlobalMem);
+  info["GPU Global Memory"] = deviceProp.totalGlobalMem;
 
-  info["GPU Multiprocessors"] = to_string(deviceProp.multiProcessorCount);
-  info["GPU Cores/MP"] = to_string(_ConvertSMVer2Cores(deviceProp.major, deviceProp.minor));
-  info["GPU Cores"] =
-      to_string(_ConvertSMVer2Cores(deviceProp.major, deviceProp.minor) * deviceProp.multiProcessorCount);
+  info["GPU Multiprocessors"] = deviceProp.multiProcessorCount;
+  info["GPU Cores/MP"] = _ConvertSMVer2Cores(deviceProp.major, deviceProp.minor);
+  info["GPU Cores"] = _ConvertSMVer2Cores(deviceProp.major, deviceProp.minor) * deviceProp.multiProcessorCount;
 
-  info["GPU Max Clock Rate MHz"] = to_string(deviceProp.clockRate * 1e-3f);
+  info["GPU Max Clock Rate MHz"] = deviceProp.clockRate * 1e-3f;
 
 #if CUDART_VERSION >= 5000
-  info["GPU Memory Clock Rate MHz"] = to_string(deviceProp.memoryClockRate * 1e-3f);
-  info["GPU Memory Bus Width"] = to_string(deviceProp.memoryBusWidth);
+  info["GPU Memory Clock Rate MHz"] = deviceProp.memoryClockRate * 1e-3f;
+  info["GPU Memory Bus Width"] = deviceProp.memoryBusWidth;
 
   if (deviceProp.l2CacheSize) {
-    info["GPU L2 Cache Size"] = to_string(deviceProp.l2CacheSize);
+    info["GPU L2 Cache Size"] = deviceProp.l2CacheSize;
   }
 #endif
 
-  info["GPU Constant Memory"] = to_string(deviceProp.totalConstMem);
-  info["GPU Shared Memory per block"] = to_string(deviceProp.sharedMemPerBlock);
-  info["GPU Shared Memory per MP"] = to_string(deviceProp.sharedMemPerMultiprocessor);
-  info["GPU Registers per block"] = to_string(deviceProp.regsPerBlock);
-  info["GPU Warp Size"] = to_string(deviceProp.warpSize);
-  info["GPU Threads per MP"] = to_string(deviceProp.maxThreadsPerMultiProcessor);
-  info["GPU Threads per Block"] = to_string(deviceProp.maxThreadsPerBlock);
+  info["GPU Constant Memory"] = deviceProp.totalConstMem;
+  info["GPU Shared Memory per block"] = deviceProp.sharedMemPerBlock;
+  info["GPU Shared Memory per MP"] = deviceProp.sharedMemPerMultiprocessor;
+  info["GPU Registers per block"] = deviceProp.regsPerBlock;
+  info["GPU Warp Size"] = deviceProp.warpSize;
+  info["GPU Threads per MP"] = deviceProp.maxThreadsPerMultiProcessor;
+  info["GPU Threads per Block"] = deviceProp.maxThreadsPerBlock;
 
 #if __linux__
   std::string token;

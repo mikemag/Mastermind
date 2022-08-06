@@ -11,6 +11,7 @@
 #include <iostream>
 #include <locale>
 #include <map>
+#include <nlohmann/json.hpp>
 #include <sstream>
 #include <type_traits>
 #include <unordered_map>
@@ -21,6 +22,8 @@
 #else
 #define CUDA_HOST_AND_DEVICE
 #endif
+
+using json = nlohmann::json;
 
 // This embodies my love/hate relationship with C++. Simple shit just isn't simple :(
 class comma_numpunct : public std::numpunct<char> {
@@ -40,6 +43,8 @@ std::string commaString(T i) {
 
 std::string commaString(float v);
 
+std::string hexString(uint32_t v);
+
 // A constexpr pow()
 template <typename T>
 constexpr T constPow(T num, T pow) {
@@ -56,7 +61,7 @@ constexpr T nextPowerOfTwo(T value, unsigned maxb = sizeof(T) * CHAR_BIT, unsign
 // Get basic info about the OS, hardware, machine, etc.
 class OSInfo {
  public:
-  std::map<std::string, std::string> info;
+  std::map<std::string, json> info;
 
   OSInfo();
 
@@ -68,7 +73,7 @@ class OSInfo {
   }
 
   template <typename T>
-  std::string macOSSysctlByName(const std::string &name);
+  T macOSSysctlByName(const std::string &name);
 };
 
 template <bool enabled>
@@ -79,7 +84,7 @@ std::ostream &operator<<(std::ostream &stream, const OSInfo &r) {
 // Get basic info about the GPU, if present
 class GPUInfo {
  public:
-  std::map<std::string, std::string> info;
+  std::map<std::string, json> info;
 
   GPUInfo();
 
@@ -105,11 +110,11 @@ std::ostream &operator<<(std::ostream &stream, const GPUInfo &r) {
   return r.dump(stream);
 }
 
-// A way to record various stats about a game so we can write a nice csv of results.
+// A way to record various stats about a game, so we can write a nice json file of results.
 class StatsRecorder {
  public:
-  std::unordered_map<std::string, std::string> run;
-  std::map<std::string, std::string> all;
+  std::unordered_map<std::string, json> run;
+  std::map<std::string, json> all;
   OSInfo osInfo;
   GPUInfo gpuInfo;
   std::ofstream js;
@@ -119,22 +124,8 @@ class StatsRecorder {
 
   void newRun();
 
-  template <typename T>
-  void add(const std::string &name, T value) {
-    std::stringstream ss;
-    ss << value;
-    run[name] = ss.str();
-  }
-
-  void add(const std::string &name, const std::string &value) { run[name] = value; }
-  void add(const std::string &name, const char *value) { run[name] = value; }
-
-  template <typename T>
-  void addAll(const std::string &name, T value) {
-    std::stringstream ss;
-    ss << value;
-    all[name] = ss.str();
-  }
+  void add(const std::string &name, const json &value) { run[name] = value; }
+  void addAll(const std::string &name, const json &value) { all[name] = value; }
 };
 
 // Counters for various experiments, no overhead if not enabled.

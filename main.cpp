@@ -42,9 +42,9 @@ using DefaultSolver = SolverCPUFaster<T>;
 static constexpr bool shouldPlaySingleGame = true;
 template <typename T>
 using SingleGameSolver = DefaultSolver<T>;
-using SingleGameAlgo = Algos::MostParts;
-static constexpr uint8_t singleGamePinCount = 7;    // 1-8, 4 is classic
-static constexpr uint8_t singleGameColorCount = 7;  // 1-15, 6 is classic
+using SingleGameAlgo = Algos::Knuth;
+static constexpr uint8_t singleGamePinCount = 4;    // 1-8, 4 is classic
+static constexpr uint8_t singleGameColorCount = 6;  // 1-15, 6 is classic
 static constexpr bool singleGameLog = true;
 
 // Config for playing a set of games
@@ -208,7 +208,7 @@ void runSingleSolver(StatsRecorder& statsRecorder, uint32_t packedInitialGuess) 
          SolverConfig::PIN_COUNT, SolverConfig::COLOR_COUNT, SolverConfig::ALGO::name, Solver::name);
 
   if (solver.usesGPU() && statsRecorder.gpuInfo.hasGPU()) {
-    printf("Using GPU '%s'\n", statsRecorder.gpuInfo.info["GPU Name"].c_str());
+    printf("Using GPU %s\n", to_string(statsRecorder.gpuInfo.info["GPU Name"]).c_str());
   }
 
   statsRecorder.add("Pin Count", (int)SolverConfig::PIN_COUNT);
@@ -220,7 +220,7 @@ void runSingleSolver(StatsRecorder& statsRecorder, uint32_t packedInitialGuess) 
   statsRecorder.add("Total Codewords", CodewordT::TOTAL_CODEWORDS);
 
   cout << "Initial guess: " << CodewordT{packedInitialGuess} << endl;
-  statsRecorder.add("Initial Guess", CodewordT{packedInitialGuess});
+  statsRecorder.add("Initial Guess", hexString(packedInitialGuess));
 
   auto elapsed = solver.playAllGames(packedInitialGuess);
 
@@ -229,9 +229,17 @@ void runSingleSolver(StatsRecorder& statsRecorder, uint32_t packedInitialGuess) 
   statsRecorder.add("Average Turns", averageTurns);
   cout << "Maximum number of turns over all possible secrets was " << solver.getMaxDepth() << endl;
   statsRecorder.add("Max Turns", solver.getMaxDepth());
+  statsRecorder.add("Total Turns", solver.getTotalTurns());
   chrono::duration<float> elapsedS = elapsed;
   cout << "Elapsed time " << commaString(elapsedS.count()) << "s" << endl;
   statsRecorder.add("Elapsed (s)", elapsedS.count());
+
+  // Grab a sample game to record and use as a test case. Random pick: whatever game is 42% into the list of all games.
+  auto& allCodewords = SolverConfig::CodewordT::getAllCodewords();
+  auto guesses = solver.getGuessesForGame(allCodewords[allCodewords.size() * 0.42].packedCodeword());
+  vector<string> sampleMoves;
+  std::transform(guesses.begin(), guesses.end(), std::back_inserter(sampleMoves), hexString);
+  statsRecorder.add("Sample Game", json(sampleMoves));
 
   cout << endl;
   solver.printStats();
