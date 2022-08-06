@@ -137,7 +137,6 @@ struct IndexAndRank {
   uint32_t index;
   uint32_t rank;
   bool isPossibleSolution;
-  bool isFD;
 };
 
 // Reducer for per-thread guesses, used for CUB per-block and device reductions.
@@ -145,16 +144,6 @@ struct IndexAndRankReducer {
   __device__ __forceinline__ IndexAndRank operator()(const IndexAndRank& a, const IndexAndRank& b) const {
     // Always take the best rank. If it's a tie, take the one that could be a solution. If that's a tie, take lexically
     // first.
-#if 0  // mmmfixme: worth it?
-    if (b.isFD || a.isFD) {
-      if (b.isFD && a.isFD) {
-        if (b.isPossibleSolution ^ a.isPossibleSolution) return b.isPossibleSolution ? b : a;
-        return (b.index < a.index) ? b : a;
-      }
-      return b.isFD ? b : a;
-    }
-#endif
-
     if (b.rank > a.rank) return b;
     if (b.rank < a.rank) return a;
     if (b.isPossibleSolution ^ a.isPossibleSolution) return b.isPossibleSolution ? b : a;
@@ -300,7 +289,7 @@ __global__ void subsettingAlgosKernel(const CodewordT* __restrict__ allCodewords
   // Reduce to find the best solution we have in this block. This keeps the codeword index, rank, and possible solution
   // indicator together.
   __syncthreads();
-  IndexAndRank iar{tidGrid, rank, isPossibleSolution, false && totalUsedSubsets == possibleSolutionsCount};
+  IndexAndRank iar{tidGrid, rank, isPossibleSolution};
   IndexAndRank bestSolution =
       typename SubsettingAlgosKernelConfig::BlockReduce(sharedMem.reducerTmpStorage).Reduce(iar, IndexAndRankReducer());
 
@@ -329,7 +318,7 @@ __global__ void reduceBestGuess(IndexAndRank* __restrict__ perBlockSolutions, co
                                 const int regionStart, const int regionLength) {
   uint32_t idx = threadIdx.x;
   IndexAndRankReducer reduce;
-  IndexAndRank bestGuess{0, 0, false, false};
+  IndexAndRank bestGuess{0, 0, false};
   for (uint32_t i = idx; i < solutionsCount; i += blockSize) {
     bestGuess = reduce(bestGuess, perBlockSolutions[i]);
   }
