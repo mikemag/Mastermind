@@ -1,7 +1,9 @@
 # Mastermind
 
 This repo contains code to play the game of Mastermind with various numbers of colors and pins using various well-known
-algorithms. There are scalar, vectorized, and GPU variants of both the scoring functions and the gameplay.
+algorithms. There are scalar, vectorized, and GPU variants of both the scoring functions and the gameplay including a
+novel algorithm for playing all games at once on the GPU, implemented in CUDA and described in
+[Mastermind on the GPU](docs/Mastermind_on_the_GPU.md).
 
 I was motivated to dig into Mastermind through volunteer work with APCS high school students taught
 by [Michael Miyoshi](https://github.com/MichaelTMiyoshi) at Cedarcrest High School. They are given an assignment to
@@ -18,8 +20,9 @@ This repo holds most of my work on playing all games of various sizes quickly:
   - Most Parts
   - Expected Size
   - Entropy
-- A GPU implementation using CUDA which runs the scoring function and the inner loops of Knuth, Most Parts, etc. This
+- A GPU implementation using CUDA which runs all games at once. This
   has been tailored for compute capability 8.6, CUDA 11.7, running on an NVIDIA GeForce RTX 3070.
+- A simple reference CPU implementation, and a more optimized CPU variant to compare with the GPU version.
 - Various gameplay optimizations from Ville[2].
 
 ## Previous Versions and Easier Implementations
@@ -46,7 +49,8 @@ the [game_at_a_time](https://github.com/mikemag/Mastermind/tree/game_at_a_time) 
 ## Results
 
 More results and data are in the [results directory](results/).
-Using the GPU for larger games is much faster, as you would expect. 5p8c is a nice example, SolverCPUFaster vs. SolverCUDA:
+Using the GPU for larger games is much faster, as you would expect. 5p8c is a nice example, SolverCPUFaster vs.
+SolverCUDA:
 
 |   Strategy    | Initial Guess | Max Turns | Average Turns | CPU-only (s) | GPU-only (s) |
 |:-------------:|:-------------:|:---------:|:-------------:|:------------:|:------------:|
@@ -74,16 +78,16 @@ develop 95% of the code. Works with CLion 2022.1.3 and the bundled CMake.
 
 The XCode project works with XCode 13.4.
 
-This isn't an easy-to-use command line program; there are no command line options.
+This isn't an easy-to-use program; there are no command line options.
 Basic config is done by editing settings at the top of main.cpp. Multiple runs over different algorithms are done by
 changing the config vars in main.cpp to include the specific instantiations you wish to test.
 Various experiment control flags are scattered throughout the Strategy classes.
 A CSV file with stats and run parameters is produced at the end.
 
-All development and tests done (so far) on a MacBook Pro (16-inch, 2019) running macOS Monterey 12.4, and Ubuntu 22.04.
-The GPU kernels have been tested on an NVIDIA GeForce RTX 3070, CUDA 11.7. The program will tell you about the GPUs on
-your
-system and which one it selected when you run. System, CPU, and GPU details are recorded in the .csv files.
+All development and tests done (so far) on a MacBook Pro (16-inch, 2019) running macOS Monterey 12.4, and a gaming PC
+running Ubuntu 22.04. The GPU kernels have been tested on an NVIDIA GeForce RTX 3070, CUDA 11.7. The program will tell
+you about the GPUs on your system and which one it selected when you run. System, CPU, and GPU details are recorded in
+the .csv files.
 
 ## License
 
@@ -100,9 +104,6 @@ Documents and images are copyright by [Michael Magruder](https://github.com/mike
 [2] Geoffroy Ville, An Optimal Mastermind (4,7) Strategy and More Results in the Expected Case, March 2013, arXiv:
 1305.1010 [cs.GT]. https://arxiv.org/abs/1305.1010
 
-[3] Barteld Kooi, Yet another mastermind strategy. International Computer Games Association Journal, 28(1):13–20,
-2005. https://www.researchgate.net/publication/30485793_Yet_another_Mastermind_strategy
+[3] Barteld Kooi, Yet another mastermind strategy. International Computer Games Association Journal, 28(1):13–20, 2005. https://www.researchgate.net/publication/30485793_Yet_another_Mastermind_strategy
 
-[4] Stuart Reges and Marty Stepp, Building Java Programs: a back to basics approach, 2nd edition, 2011,
-Addison-Wesley. https://www.buildingjavaprograms.com/
   
