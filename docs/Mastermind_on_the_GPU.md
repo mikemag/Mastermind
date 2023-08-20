@@ -1,5 +1,7 @@
 # Mastermind on the GPU
 
+TODO: I need to gather some perf info to fill in a few blanks here. Doc is complete otherwise.
+
 This is an algorithm to play all games of Mastermind on a GPU. All possible games are played at once, in parallel,
 arranging per-game work and data effectively for the GPU. By doing so, we can also compute the next best guess for
 (often large) groups of games just once, and we can further gather work across games into units that make best
@@ -19,7 +21,7 @@ comparison. [Results are provided](/results/README.md) for many games up to 8 pi
 
 Multiple strategies are implemented: Knuth[^1], Expected Size[^2], Entropy[^2], and Most Parts[^3].
 
-Mmmfixme: get comparison for 8p5c, 7p7c, etc. between the branches.
+TODO: get timing comparison for 8p5c, 7p7c, etc. between the branches.
 
 # Prior Approaches
 
@@ -34,17 +36,12 @@ couldn't possibly be the solution anymore, select a new guess, and try again unt
 intermediate results significantly accelerates later games as the initial paths through the solution space are shared by
 many games, and are the most expensive with large $PS$.[^4]
 
-[^4]: My previous implementation which played games serialy can be found on
-the [`game_at_a_time` branch](https://github.com/mikemag/Mastermind/tree/game_at_a_time).
-
 A reasonable first approach to solving Mastermind on the GPU is to move the most expensive portion of the CPU-based
 algorithm into a GPU kernel, accelerating that portion, and then move more pieces as warranted. This can work quite
 well, especially since finding the next guess is so extremely expensive and amenable to parallelism.
 
 However, these approaches hit practical limits of memory bandwidth, both on-device and host-to-device, and work
 scheduling as they are unable to effectively group work between games.
-
-Mmmfixme: reference other GPU impls found on github? Need to search.
 
 # Playing all games at once
 
@@ -66,8 +63,7 @@ dispatched to the GPU in any way that best exploits the nature of the device at 
 ## The algorithm
 
 Regions are given an id $R_i$ that is the sequence of all scores which have created the region. Each id is initially
-empty,
-and scores are appended with each turn until a winning score is added and the id is complete.
+empty, and scores are appended with each turn until a winning score is added and the id is complete.
 
 Identify each game $g$ by its secret. This provides a simple, convenient ordering and a good way to lookup region ids
 and next guesses for a game.
@@ -146,6 +142,8 @@ indexes and codewords for secrets.
 
 This ends Phase 1. We now have a sorted, coalesced vector of regions, offsets and lengths into it, and other optimized
 data prepared to help later. We have the number of regions and the lengths of the regions, in order, on the CPU.
+
+TODO: need phase timings from 7p7c
 
 This sounds like a lot of work, but it is insignificant compared to the time spent in Phase 2. As an example, for a
 large game like 7p7c, the largest round spends XXXXs in Phase 1 and YYYYs in Phase 2. There are a number of obvious
@@ -230,7 +228,7 @@ bit will do for all sizes of $PS$. These can be packed into a single 64bit word 
 packed scores. The performance difference of this vs. 8-bit counters is insignificant, though, and the implementation
 has been left out.
 
-Mmmfixme: occupancy graph for 32-bit vs 8-bit kernels.
+TODO: occupancy graph for 32-bit vs 8-bit kernels.
 
 # Fully Discriminating Guesses Optimization
 
@@ -278,35 +276,17 @@ better coalescing of global memory requests, increased useful data with each req
 Finally, by reducing the color counts by half the number of vector ops to compute all hits in the scoring function is
 also reduced by half for an extra time savings.
 
-# todo
+# Processing Results
 
+There are two intersting results from this algorithm. First, the number of guesses needed to win a game configuration,
+average and maximum, and second the tree of guesses played and scores.
 
-Post processing strategy graphs
-Gen more, add some stable ones, a page explaining them
-I don't return the per-round data to the CPU while playing the games. I only do it afterwards. This is a big
-synchronization savings while playing, and allows for better bulk data transfer once the games are over.
-Time for this is not counted in the overall results, and is trivial.
+All of this is captured in the $R$ and $N$ vectors on the device. These are returned to the CPU after all work is done.
+$R$ lets us compute the max turns required, and the average. $N$ allows us to build a strategy graph which shows what
+sequence guesses to make for any game played.
 
-Dynamic launches
-Size-specific kernels are launched by `nextGuessForRegions`, as well as the FD opt.
-I think the only reason I did his here was to fan-out the parallel kernel starts, and keep the FD opt chain on the GPU.
-
-Used set
-Who uses it??
-https://github.com/mikemag/Mastermind/blob/178bebe5765c98d13e3053f8a9b5949a51c7fec3/solver_cuda.inl#L273C1-L280
-
-Go back thru commits
-
-Mmmfixme:
-CUDA dynamic parallelism blog
-CUDA programming guide
-Wikipedia on Mastermind for an overview
-Wikipedia's desc of Knuth's algo for an overview
-
-Mmmfixme: opt idea. Larger regions have worse occupancy due to the subset size type. Mix them with smaller regions, to
-let those smaller kernels fill the gaps. Need to mix sizes in the chunks.
-
-
+There are other interesting stats as a byproduct of the implemenation, e.g. number of scoring opertions, time spent,
+region counts at each level, etc. These are accumulated in device memory and extracter afterwards as well.
 
 
 [^1]: D.E. Knuth. The computer as Master Mind. Journal of Recreational Mathematics, 9(1):1–6, 1976.
@@ -317,5 +297,5 @@ let those smaller kernels fill the gaps. Need to mix sizes in the chunks.
 [^3]: Barteld Kooi, Yet another mastermind Strategy. International Computer Games Association Journal,
 28(1):13–20, 2005. https://www.researchgate.net/publication/30485793_Yet_another_Mastermind_strategy
 
-
-
+[^4]: My previous implementation which played games serialy can be found on
+the [`game_at_a_time` branch](https://github.com/mikemag/Mastermind/tree/game_at_a_time).
