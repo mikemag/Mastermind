@@ -1,7 +1,5 @@
 # Mastermind on the GPU
 
-TODO: I need to gather some perf info to fill in a few blanks here. Doc is complete otherwise.
-
 This is an algorithm to play all games of Mastermind on a GPU. All possible games are played at once, in parallel,
 arranging per-game work and data effectively for the GPU. By doing so, we can also compute the next best guess for
 (often large) groups of games just once, and we can further gather work across games into units that make best
@@ -21,7 +19,8 @@ comparison. [Results are provided](/results/README.md) for many games up to 8 pi
 
 Multiple strategies are implemented: Knuth[^1], Expected Size[^2], Entropy[^2], and Most Parts[^3].
 
-TODO: get timing comparison for 8p5c, 7p7c, etc. between the branches.
+For a 7 pin 7 color game, using Knuth's algorithm, my previous best game-at-a-time CUDA algorithm executed in 24.3s.
+The current algorithm executes in 14.2s.
 
 # Prior Approaches
 
@@ -143,10 +142,8 @@ indexes and codewords for secrets.
 This ends Phase 1. We now have a sorted, coalesced vector of regions, offsets and lengths into it, and other optimized
 data prepared to help later. We have the number of regions and the lengths of the regions, in order, on the CPU.
 
-TODO: need phase timings from 7p7c
-
 This sounds like a lot of work, but it is insignificant compared to the time spent in Phase 2. As an example, for a
-large game like 7p7c, the largest round spends XXXXs in Phase 1 and YYYYs in Phase 2. There are a number of obvious
+large game like 7p7c, the largest round spends 0.0075s in Phase 1 and 4.0350s in Phase 2. There are a number of obvious
 optimization opportunities in the current version of the code, but given the trivial time spent vs. the extra complexity
 I have chosen to ignore all of them.
 
@@ -227,8 +224,6 @@ The Most Parts algorithm[^2] doesn't even need to compute subset sizes, only rec
 bit will do for all sizes of $PS$. These can be packed into a single 64bit word with no shared memory use, again using the
 packed scores. The performance difference of this vs. 8-bit counters is insignificant, though, and the implementation
 has been left out.
-
-TODO: occupancy graph for 32-bit vs 8-bit kernels.
 
 # Fully Discriminating Guesses Optimization
 
