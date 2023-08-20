@@ -1,88 +1,301 @@
 # Mastermind on the GPU
 
-@TODO: this is an old description from the game_at_a_time branch. I need to update with the all games at once algo, and
-the current CUDA impl.
+TODO: I need to gather some perf info to fill in a few blanks here. Doc is complete otherwise.
 
-The core of most interesting Mastermind algorithms involves scoring all possible codewords, call this the All Set $AS$,
-against a diminishing set of possible solutions which we'll call the Possible Set $PS$. This is $\mathcal{O}(n^2)$ in
-the total number of codewords, which is $n = c^p$. This has to be done once for each turn in a game, and thus many, many
-times when playing all games.
+This is an algorithm to play all games of Mastermind on a GPU. All possible games are played at once, in parallel,
+arranging per-game work and data effectively for the GPU. By doing so, we can also compute the next best guess for
+(often large) groups of games just once, and we can further gather work across games into units that make best
+utilization of GPU resources. All game state is kept on-device, with minimal copying back to the host each round and
+reduced synchronization overhead. Games are batched to improve scheduling and occupancy.
 
-My implementation pushes this core algorithm over to the GPU at each stage of playing a game, and falls back to a
-regular CPU implementation for very small $AS$ & $PS$ combinations.
+This document also outlines a CUDA implementation of the algorithm and discusses details and tradeoffs. This
+implementation represents a significant speedup vs previous serial and GPU versions, allowing larger
+games to be played in reasonable times.
 
-## *AS* is Constant
+Prior methods are adaptations of game-at-a-time approaches and use the GPU to accelerate the core scoring loop, or
+attempt to play a single game at a time on the device. These methods have limited effectiveness, with high CPU and
+host-to-device overhead, and make poor use of GPU resources per-game.
 
-$AS$ is not really constant, as it seems worthless to consider a codeword which has already been played. But for any
-interesting game size the maximum number of turns is a tiny, tiny fraction of $AS$ and can be ignored. No previously
-played codeword will rise to the top in any valuation, so the only cost to keeping $AS$ constant is really the extra
-time needed to consider these few worthless codewords.
+I've provided an optimized CUDA implementation, a simple reference CPU version, and a more optimized CPU version for
+comparison. [Results are provided](/results/README.md) for many games up to 8 pins or 15 colors.
 
-There is, however, extreme value to keeping $AS$ constant in the GPU implementation. We need the codewords and
-pre-computed color counts for $AS$ in GPU memory, and keeping $AS$ constant allows us to load our largest dataset just
-once and re-use it for every game played. This is a big savings.
+Multiple strategies are implemented: Knuth[^1], Expected Size[^2], Entropy[^2], and Most Parts[^3].
 
-## Computing Subset Sizes
+TODO: get timing comparison for 8p5c, 7p7c, etc. between the branches.
 
-The first step is to score every element of $AS$ against every element of $PS$. This is done by creating a GPU thread
-for every element of $AS$ and letting it loop over $PS$, computing scores. We don't actually need to remember the
-scores, all we need is to find how many of each score we saw. This effectively subsets $PS$ by score value, one possible
-subset for every score value. This means that we need a counter for each possible score value large enough to count to
-the total number of codewords. A 32 bit counter is used, so for the classic game of $4p6c$ we need 15 counters.
+# Prior Approaches
 
-That doesn't sound like a lot of counters, and it isn't. However, it does grow as game sizes grow, and keeping the
-counters as thread local storage (i.e., consuming scalar or vector registers) quickly leads to a GPU kernel with
-low occupancy due to register pressure.
+The core of most interesting Mastermind algorithms comes from the method described by Knuth in [1]. It involves scoring
+all codewords, $AC$, against a diminishing set of possible solutions, $PS$, which splits them into subsets based on
+their scores. The sizes of those subsets guide the selection of the next guess to play. For a game of $c$ colors and $p$
+pins, there are $n = c^p$ codewords and thus $\mathcal{O}( n^2)$ scores computed for each guess played in a game.
+Overall this is $\mathcal{O}(n^3)$ when playing all $n$ games, which is the focus of this paper.
 
-Instead, the subset sizes are kept in threadgroup memory. While this memory is indeed shared among all threads in a
-theradgroup, this implementation doesn't do any sharing. It's just a fast buffer of which each thread gets a unique
-slice as temporary storage.
+Algorithms which play a single game at a time will play the next guess, reduce $PS$ by removing any codewords which
+couldn't possibly be the solution anymore, select a new guess, and try again until the game is won. Memoization of
+intermediate results significantly accelerates later games as the initial paths through the solution space are shared by
+many games, and are the most expensive with large $PS$.[^4]
 
-## Compact Scores
+A reasonable first approach to solving Mastermind on the GPU is to move the most expensive portion of the CPU-based
+algorithm into a GPU kernel, accelerating that portion, and then move more pieces as warranted. This can work quite
+well, especially since finding the next guess is so extremely expensive and amenable to parallelism.
 
-Threadgroup memory is quite limited in Metal on macOS: just 32kb. In order to do a reasonable amount of work per
-threadgroup, we use the compact score values described in [Packed Indices for Mastermind Scores](Score_Ordinals.md).
-These score values cost a little more to compute, but it's very minor. And these strange score values never escape the
-GPU, only being used to indices into the subset sizes, so it's okay that they're completely different from scores used
-elsewhere in the program. This allows us to easily have enough threadgroup memory for large games with 64 threads per
-group. That's a nice threadgroup size for my AMD GPU running under Metal: the SIMD execution width is 32, and every
-compute unit (CU) holds two SIMD units.
+However, these approaches hit practical limits of memory bandwidth, both on-device and host-to-device, and work
+scheduling as they are unable to effectively group work between games.
 
-## Consuming Subset Sizes
+# Playing all games at once
 
-Once the sizes are computed, each thread consumes them in order to produce a valuation for each member of $AS$ depending
-on the specifics of the algorithm in question. E.g., for Most Parts it counts the number of subsets, and for Kunth's it
-finds the largest subset size, etc. The result is placed in a slot in the output buffer, one slot per member of $AS$.
+When the same initial guess is played for all games (each with an unknown but unique secret), the resulting scores
+partition the games into disjoint regions with a common property: all games within a region have the same reduced $PS$.
+As such, all games in a region get the same next guess, and when that guess is played the region is further partitioned
+into new, disjoint regions with the same property. This continues until each region reduces to a single game which is
+then won. If each game is identified by its secret, then the list of games and $PS$ are initially the same, and each
+region's games are the same as that region's $PS$.
 
-## Fully Discriminating Guesses Optimization
+Regions can be identified by the ordered sequence of scores which formed them, $R_i = (s_1, s_2, ... s_{d_i})$ where
+$d_i$ is the depth of the final guess for that region. All games in a region share the same $PS$, so the next guess is
+the same for them all.
 
-There is a good optimization due to Ville[2] in which we can notice if a member of $AS$ produces one subset for every
-member of $PS$. Such guesses are called "fully discriminating", as they will tell us precisely which member of $PS$ is
-the solution. We have each thread keep track of whether or not a codeword is fully discriminating, but the question is
-how to tell the CPU so it can play the guess quickly while avoiding as much work as possible. A bit per member of $AS$
-doesn't save much time. And we only care about one such guess, not all, and it is traditional to pick the lexically
-first guess in the face of multiple options.
+Because every such region is disjoint from all others at a given depth, they may all be computed in parallel without
+synchronization or regard to order. Regions of similar size, or with similar other properties, may be grouped and
+dispatched to the GPU in any way that best exploits the nature of the device at hand.
 
-In this implementation, each SIMD group with one or more interesting guesses does a SIMD group wide reduction, using
-`simd_min()`, to determine the best guess for the entire group. Then the first thread in the group places it in a
-per-group output slot. The CPU can then quickly run over this much smaller number of values and pick the first non-zero
-element it finds and play it. This avoids looking at the full results for $AS$ and ends up saving quite a bit of time.
+## The algorithm
 
-## Scoring Function on the GPU
+Regions are given an id $R_i$ that is the sequence of all scores which have created the region. Each id is initially
+empty, and scores are appended with each turn until a winning score is added and the id is complete.
+
+Identify each game $g$ by its secret. This provides a simple, convenient ordering and a good way to lookup region ids
+and next guesses for a game.
+
+1. Set $G = \\{g_0, g_1, ... g_n\\}$
+2. Set the next guess for each game $N_g$ to the precomputed starting guess
+3. Set the region id for every game $R_g = ()$
+4. While there are games in $G$:
+   1. Score a game's next guess $N_g$ and append that score to $R_g$
+   2. Remove any game just won from $G$
+   3. For each unique, un-won region $R$
+      1. Using $PS = R$, compute a new guess $c$ for $R$
+      2. Update $N_g = c$ for each game in $R$
+
+This algorithm has a few important properties:
+
+* Order in each step doesn't matter. For example, in step 4.i we can score games and build region ids in any order.
+* Each step is parallelizable, with no shared state between games or regions within each step.
+* We can order and group work by region size in a variety of different ways depending on how we want to use GPU
+  resources.
+  Other properties than region size may also be useful, though region size is a good way to pack the $n^2$ work onto the
+  GPU.
+* Almost all game state can be held on the GPU, which minimizes copies between host and device memory, and minimizes
+  synchronization barriers.
+
+Note that any algorithm can be applied in step 4.iii.a, such as those from Knuth[^1], Ville[^2], etc.
+
+## Reference CPU Implementation
+
+A simple, serial, CPU-only, C++ implementation of this algorithm is given
+in [`solver_cpu_reference.in`l](https://github.com/mikemag/Mastermind/blob/178bebe5765c98d13e3053f8a9b5949a51c7fec3/solver_cpu_reference.inl#L37).
+There are no optimizations, and it should be fairly readable and easily proved correct, if a little slow.
+
+# Translation to CUDA
+
+This is broken down into two phases. In Phase 1 we play a turn for all active games and organize the resulting regions,
+and in Phase 2 we find new guesses to play on the next turn.
+
+Note: this has been tailored for compute capability 8.6, CUDA 11.7, running on an NVIDIA GeForce RTX 3070. Other GPUs
+might have capabilities which would suggest different tuning.
+
+## Phase 1
+
+Every game gets a stable index, which is the same as the index for its winning secret in $AC$. I.e., $G$ is $AC$. This is held
+in a single device vector and game indexes are used in a variety of places.
+
+There is a sequence of next moves per turn, $N_i$, to support a used codewords set, and for post-processing into per-game moves
+and strategy output. Space for these are pre-allocated as device vectors, each the same size as $AC$, with the first one
+pre-filled with the initial guess appropriate for the game configuration. Each $N_i$ is a parallel vector to $AC$.
+
+There is a single device vector $R$ which holds a region id $R_i$ for each game, and the game's index in $AC$. This
+allows us to reorder the regions after each turn and still reference quickly into $G$, $N_i$, etc. using the game's index.
+
+The next move for each game is played and scored in parallel for all active games. There is no ordering requirement.
+Region ids are updated with the new score.
+
+$R$ is partitioned to bring active regions (games) to the front and push completed regions to the back. This
+partitioning requires that the index of the last active region is returned to the CPU and is an early synchronization
+barrier. The algorithm terminates when there are no active regions. All subsequent steps, and iterations for further
+turns, operate on the reduced set of active regions only.
+
+$R$ is sorted by id to bring the active regions together. This doesn't need to be stable. Game indexes are used
+to break ties any time lexical ordering is required, and there are no ordering guarantees when splitting work across
+blocks on the GPU.
+
+Next, a list of start offsets and lengths for regions in $R$ is formed. This is a two
+step process. First, a `reduce_by_key` gets us run lengths, then an `exclusive_scan` builds start offsets. The reduction
+returns the count of regions to the CPU, which is a second synchronization barrier.
+
+Next, $R$ is sorted by region length in order to facilitate better grouping by work size later. At this point the region
+lengths are returned to the CPU for a third synchronization barrier, and a larger data transfer, though still small in
+the grand scheme of things.
+
+Finally, some pre-optimization is done to reduce indirection when finding new guesses. Region ids are translated to game
+indexes and codewords for secrets.
+
+This ends Phase 1. We now have a sorted, coalesced vector of regions, offsets and lengths into it, and other optimized
+data prepared to help later. We have the number of regions and the lengths of the regions, in order, on the CPU.
+
+TODO: need phase timings from 7p7c
+
+This sounds like a lot of work, but it is insignificant compared to the time spent in Phase 2. As an example, for a
+large game like 7p7c, the largest round spends XXXXs in Phase 1 and YYYYs in Phase 2. There are a number of obvious
+optimization opportunities in the current version of the code, but given the trivial time spent vs. the extra complexity
+I have chosen to ignore all of them.
+
+## Phase 2
+
+Next, we search for a new guess for every active region, and record those guesses in the $N_{i+1}$ vector to be played on
+the next round.
+
+We consider regions of size 1 and 2 "tiny", and these are all handled at once by a single kernel. This
+kernel, `nextGuessTiny`, is a single block of 128 threads with each thread handling a tiny region in parallel. The
+threads stride through these regions to request codewords in parallel and update $N_{i+1}$ with the trivially selected
+next guess.
+
+All other regions are considered "big" and handled the same. This includes seemingly tiny regions like size 3, and
+regions no larger than the number of possible scores for a game (e.g., 14 for 4p games). I implemented a raft of
+different optimizations and custom kernels for each of these cases and tested them all, and much like all of Phase 1 the
+gains are insignificant vs. the work done on larger regions. Again, I've left them all out in favor of simplicity.
+
+All big regions are handled in chunks of 256 at a time, and currently processed in order from smallest to largest. A
+simple kernel `nextGuessForRegions` is launched which uses the region size to decide which kernels to use to search for
+the best next guess.
+
+The main kernel, `subsettingAlgosKernel`, is launched when no other optimization can be performed and we must consider
+every codeword in $AC$ as a possible next guess. This is launched with maximum parallelism and is specialized for GPU
+occupancy based on the size of the region (and thus PS). See the discussion of subset sizes below for more details.
+
+Each thread considers a single codeword from $AC$ and does the work to score it against every codeword in $PS$ (aka $R_i$) to accumulate
+subset sizes. The thread's codeword is given a rank based on the algorithm being run (Knuth, Most Parts, etc.), and that
+rank is used by each thread block to reduce a single best guess for the block. Each block deposits the per-block best
+guess into temporary global GPU memory, and a reduction kernel, `reduceBestGuess`, is used to reduce these to the single
+best guess. This is written to $N_{i+1}$ in parallel by the reduction threads.
+
+If the region size is less than or equal to to the total number of possible scores then we have the opportunity to perform the fully discriminating
+optimization discussed below. The `fullyDiscriminatingOpt` kernel is launched for these regions with just 32 threads.
+Each thread considers a single codeword from $PS$ and does the work to score it against every other codeword in $PS$,
+computing the number of subsets. If a codeword is found which fully discriminates the possibilities in $PS$ then that is
+used as the best guess and $N_{i+1}$ is updated appropriately. If no such codeword is found, it
+launches `subsettingAlgosKernel`.
+
+The chunks of big regions are stacked up into the same CUDA stream so that a fixed temporary space can be used for the
+storage between `subsettingAlgosKernel` and `reduceBestGuess`.
+
+Once all kernels are launched we synchronize for the last time this round, waiting for all next guesses to be computed.
+We now have next guesses updated for all active games in the $N_{i+1}$ vector.
+
+# Computing Subset Sizes
+
+There are various well-known algorithms for playing Mastermind, and all of the interesting ones are centered around
+computing scores of one codeword vs every element of $PS$, and counting how many of each score is observed. This
+effectively partitions $PS$ into subsets by score, and it's the sizes of these subsets that become interesting. Knuth's
+algorithm[^1], for example, uses these to select the guess which minimizes the maximum number of codewords in each of 
+$k$ subsets. 
+
+The maximum number of scores per Ville(2013)[^2] is $p(p+3) \over 2$, plus 1 for inefficient packing (see below), which is 15 for 4p games,
+and maxes out at 45 for 8p games.
+
+That seemingly small number of counters quickly becomes large. Significant performance improvement comes from storing
+these counters in shared GPU memory, even though the counters don't need to be shared between threads. Such memory is
+typically limited to kilobytes per symmetric multiprocessor (SM), and on a NVidia RTX 3070 the default effective shared
+memory size per thread block is 47KiB. With 32-bit counters, 45 subsets yields an upper limit of 267 threads. Rounded
+down to the warp size of 32, it's a practical limit of 256 concurrent threads per SM, which is not enough to keep each
+processor busy each cycle, resulting in suboptimal occupancy and thus GPU utilization. The result is blocks which are
+ready to run, but cannot be scheduled only due to a lack of shared memory.
+
+We need a counter for each possible score value which is large enough to count up to, at most, $|PS|$. For any reasonable
+game, $PS$ is initially rather large and a 32bit counter is required. But $PS$ diminishes quickly and even large games
+reduce $PS$ below 64k quickly, and a significant amount of work is spent on $PS$ smaller than 256.
+
+Specializing the compute kernels with a properly sized counter type allows 2x or 4x the number of concurrent threads,
+and yields significant improvement for these games.
+
+We can pack counters for subset sizes tightly and index them directly with the score by using the packed scores
+described in [Packed Indices for Mastermind Scores](Score_Ordinals.md). These score values cost a little more to
+compute, but it's very minor. And these strange score values never escape the GPU, only being used to index into the
+subset sizes, so it's okay that they're completely different from scores used elsewhere.
+
+The Most Parts algorithm[^2] doesn't even need to compute subset sizes, only record usage of a subset, and thus a single
+bit will do for all sizes of $PS$. These can be packed into a single 64bit word with no shared memory use, again using the
+packed scores. The performance difference of this vs. 8-bit counters is insignificant, though, and the implementation
+has been left out.
+
+TODO: occupancy graph for 32-bit vs 8-bit kernels.
+
+# Fully Discriminating Guesses Optimization
+
+There is a good optimization due to Ville(2013)[^2]: if a codeword produces one subset for every member of $PS$ it is "fully
+discriminating" and can be played right away. It will produce regions of a single codeword, and thus those games will be
+won on the subsequent turn. This is only possible if $|PS| \leq$ the number of possible scores.
+
+A separate kernel, `fullyDiscriminatingOpt`, is launched for such regions which is optimized for small sizes. If it
+identifies a fully discriminating codeword, it is used as the next guess for the region, otherwise the larger subsetting
+kernel is launched to perform a complete search.
+
+A previous CPU implementation also looked for fully discriminating codewords in the full subsetting kernel, and
+performed a simple reduction to select the lexically first such codeword and play that. This saved significant CPU time
+each round, however in the current GPU implementation playing all games at once it turns out that the overhead to record
+and reduce this is strictly slower than simply playing the result of the normal reduction. Multiple approaches were
+tried, but in every case the extra overhead of the comparisons or the extra memory defeated the purpose. Thus it has
+been left out of the current implementation.
+
+# Scoring Function on the GPU
 
 The scoring function used is based on the hand-vectorized version in [codeword.inl](../codeword.inl). The first portion,
-computing $b$ with the constant operations on a single 32 bit value was kept unchanged. Happily, GPU's provide popcount.
+computing $b$ with the constant operations on a single 32 bit value was kept unchanged. Happily, GPU's
+provide `popcount`.
 
-The second part changed a bit. Metal provides vector data types, like `uint4` and `uchar4`, and automatically turns
-common operations on them like addition and minimum into vector ops. Minimums of the pair of 16 color counts are taken
-with four vector ops on `uchar4`'s, then the mins are reduced with a combination of a few vector adds followed by a
-couple of scalar additions. It would have been nice to have full-width min or add operations over the full possible
-vector width instead of being limited to 32 bits via `uchar4`. I don't have enough insight into the final code
-generation on the GPU to know if the compiler was smarter about that in the end.
+The second part, computing all hits based on color counts, changed a bit. GPUs provide data types which pack 8-bit
+integers into vectors of 4 values, and automatically turn common operations on them like addition and minimum into
+vector ops. Minimums of the pair of 16 color counts are taken with four such vector ops, then the minimus are reduced
+with a series of a few vector additions.
 
-## References
+This ends up being very efficient and, like the CPU version, far faster than any attempts to memoize results for reuse
+later.
 
-[1] D.E. Knuth. The computer as Master Mind. Journal of Recreational Mathematics, 9(1):1–6, 1976.
+# Variable Sized Codewords
 
-[2] Geoffroy Ville, An Optimal Mastermind (4,7) Strategy and More Results in the Expected Case, March 2013, arXiv:
+A codeword up to 8 pins is encoded in a single 32-bit value, with each pin up to 15 colors represented by 4 bits. Color
+counts are pre-computed when forming the codewords and are encoded with 8 bits per count. For a 15 color game we need
+120 bits, so it's encoded into a 128-bit value. However, half the games we wish to play have 8 or fewer colors, wasting
+half of the color count memory.
+
+The current implementation specializes the `Codeword` type based on game size, and uses 64-bit values for packed color
+counts on smaller game sizes. This is a significant win in terms of memory not only because of the obvious savings of 8
+bytes per codeword, but also due to alignment requirements on the type which resulted in much more waste. This yields
+better coalescing of global memory requests, increased useful data with each request, etc.
+
+Finally, by reducing the color counts by half the number of vector ops to compute all hits in the scoring function is
+also reduced by half for an extra time savings.
+
+# Processing Results
+
+There are two intersting results from this algorithm. First, the number of guesses needed to win a game configuration,
+average and maximum, and second the tree of guesses played and scores.
+
+All of this is captured in the $R$ and $N$ vectors on the device. These are returned to the CPU after all work is done.
+$R$ lets us compute the max turns required, and the average. $N$ allows us to build a strategy graph which shows what
+sequence guesses to make for any game played.
+
+There are other interesting stats as a byproduct of the implemenation, e.g. number of scoring opertions, time spent,
+region counts at each level, etc. These are accumulated in device memory and extracter afterwards as well.
+
+
+[^1]: D.E. Knuth. The computer as Master Mind. Journal of Recreational Mathematics, 9(1):1–6, 1976.
+
+[^2]: Geoffroy Ville, An Optimal Mastermind (4,7) Strategy and More Results in the Expected Case, March 2013, arXiv:
 1305.1010 [cs.GT]. https://arxiv.org/abs/1305.1010
+
+[^3]: Barteld Kooi, Yet another mastermind Strategy. International Computer Games Association Journal,
+28(1):13–20, 2005. https://www.researchgate.net/publication/30485793_Yet_another_Mastermind_strategy
+
+[^4]: My previous implementation which played games serialy can be found on
+the [`game_at_a_time` branch](https://github.com/mikemag/Mastermind/tree/game_at_a_time).
