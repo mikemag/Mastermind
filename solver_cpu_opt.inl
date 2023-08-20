@@ -123,7 +123,7 @@ std::chrono::nanoseconds SolverCPUFaster<SolverConfig>::playAllGames(uint32_t pa
         }
 
         if (!fdoptSuccessful) {
-          // TODO: I don't recall exactly which algos need the use set
+          // TODO: I don't recall exactly which algos need the used set
           vector<CodewordT> usedCodewords;
           for (auto& previousMoves : nextMovesList) {
             usedCodewords.push_back(previousMoves[region.regionID.index]);

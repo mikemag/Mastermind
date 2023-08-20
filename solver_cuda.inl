@@ -25,13 +25,12 @@
 #include "codeword.hpp"
 
 // CUDA implementation for playing all games at once
-
-// The core of Knuth's Mastermind algorithm, and others, as CUDA compute kernels.
 //
-// nb: cores here are not the classic combination of black hits and white hits. A score's ordinal is (b(p + 1) -
+// See solver_cuda.hpp for an overview.
+//
+// nb: scores here are not the classic combination of black hits and white hits. A score's ordinal is (b(p + 1) -
 // ((b - 1)b) / 2) + w. See docs/Score_Ordinals.md for details. By using the score's ordinal we can have densely packed
-// set of counters to form the subset counts as we go. These scores never escape the GPU, so it doesn't matter that they
-// don't match any other forms of scores in the rest of the program.
+// set of counters to form the subset counts as we go.
 
 // Counter's we'll use on both the CPU and GPU
 template <typename SolverConfig>
@@ -62,7 +61,6 @@ struct Counters {
 //
 // Here's the asm for an early draft: https://godbolt.org/z/n1GE5P5GP The current code has a bunch of dependencies that
 // make a quick compiler explorer link hard.
-
 template <typename SolverConfig>
 __device__ uint scoreCodewords(const uint32_t secret, const uint4 secretColors, const uint32_t guess,
                                const uint4 guessColors) {
@@ -381,7 +379,6 @@ struct FDOptKernelConfig {
 //
 // nb: one block, one warp for this one. Max region length is 45 for 8 pin games, which is our pin max, so fewer than
 // half the threads even have to loop to pickup all the data, and we get away with a single warp reduction.
-
 template <typename FDOptKernelConfig, typename SubsettingAlgosKernelConfig, typename CodewordT>
 __global__ void fullyDiscriminatingOpt(const CodewordT* __restrict__ allCodewords,
                                        const CodewordT* __restrict__ regionIDsAsCodeword,
@@ -517,7 +514,7 @@ template <typename SolverConfig>
 std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedInitialGuess) {
   constexpr static bool LOG = SolverConfig::LOG;
 
-  auto startTime = chrono::high_resolution_clock::now();
+  auto overallStartTime = chrono::high_resolution_clock::now();
 
   // All codewords go to the device once
   thrust::device_vector<CodewordT> dAllCodewords = CodewordT::getAllCodewords();
@@ -554,11 +551,12 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
   thrust::device_vector<uint32_t> dRegionLengths(dRegionIDs.size());
   thrust::host_vector<uint32_t> hRegionLengths(dRegionIDs.size());
 
-  // Space for the intermediate reduction results out of the subsetting algos kernel.
-  // mmmfixme: we need a set per concurrent kernel
-  size_t chunkSize = 256;  // mmmfixme: placement
+  // Space for the intermediate reduction results out of the main subsetting algos kernel. We need a chunk of space for
+  // every concurrent kernel execution, and we more or less blocks depending on the subset sizes. So allocate the max
+  // number of blocks possible, one set per concurrent kernel.
+  constexpr static size_t concurrentSubsettingKernels = 256;
   thrust::device_vector<IndexAndRank> dPerBlockSolutions(
-      SubsettingAlgosKernelConfig<SolverConfig, uint32_t>::LARGEST_NUM_BLOCKS * chunkSize);
+      SubsettingAlgosKernelConfig<SolverConfig, uint32_t>::LARGEST_NUM_BLOCKS * concurrentSubsettingKernels);
 
   // Space to pre-process regions to codeword indices, or actual codewords. Helps speed up some later kernels as they
   // can avoid multiple reads due to indirection. At the expense of a decent amount of memory, though.
@@ -634,9 +632,8 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
 
     if (LOG) {
       auto endTime = chrono::high_resolution_clock::now();
-      chrono::duration<float, milli> elapsedMS = endTime - startTime;
-      auto elapsedS = elapsedMS.count() / 1000;
-      cout << "P1 elapsed time " << commaString(elapsedS) << "s" << endl;
+      chrono::duration<float> elapsedS = endTime - startTime;
+      cout << "Phase 1 elapsed time " << commaString(elapsedS.count()) << "s" << endl;
       startTime = chrono::high_resolution_clock::now();
     }
 
@@ -656,61 +653,59 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
 
     // Process "tiny" regions specially. They need virtually no work, but it all has to act on device memory, so we use
     // a single small kernel to take care of them all very, very quickly.
-    uint32_t regionIdx = 0;
     uint32_t tinyRegionCount = 0;
     uint32_t tinyGameCount = 0;
-    for (; regionIdx < regionCount && hRegionLengths[regionIdx] <= 2; regionIdx++) {
+    for (uint32_t i = 0; i < regionCount && hRegionLengths[i] <= 2; i++) {
       tinyGameCount += hRegionLengths[tinyRegionCount];
       tinyRegionCount++;
     }
-    counters[Counters<SolverConfig>::TINY_REGIONS] += tinyRegionCount;
-    counters[Counters<SolverConfig>::TINY_GAMES] += tinyGameCount;
 
     if (tinyRegionCount > 0) {
       nextGuessTiny<<<1, 128>>>(pdRegionsAsIndex, pdNextMoves, pdRegionStarts, pdRegionLengths, tinyRegionCount);
     }
 
-    // Small regions amenable to the fully discriminating opt come next. These are counted here, but really handled by
-    // the normal kernel. May process them separately at some point.
-    uint32_t fdRegionCount = 0;
-    uint32_t fdGameCount = 0;
-    for (; regionIdx < regionCount && hRegionLengths[regionIdx] < SolverConfig::TOTAL_PACKED_SCORES; regionIdx++) {
-      fdGameCount += hRegionLengths[tinyRegionCount];
-      fdRegionCount++;
-    }
-    counters[Counters<SolverConfig>::FDOPT_REGIONS] += fdRegionCount;
-    counters[Counters<SolverConfig>::FDOPT_GAMES] += fdGameCount;
-
-    if (LOG) {
-      printf("Tiny regions: %d, totalling %d games\n", tinyRegionCount, tinyGameCount);
-      printf("Possibly fully discriminating regions: %d, totalling %d games\n", fdRegionCount, fdGameCount);
-    }
-
     // Kickoff the full subsetting kernel for each large region, with each kernel processing a chunk of regions at a
     // time. This is where all the time is spent.
-    int bigBoyLaunches = 0;
-    for (size_t offset = tinyRegionCount; offset < regionCount; offset += chunkSize) {
-      auto regionsToDo = min(chunkSize, regionCount - offset);
+    for (size_t offset = tinyRegionCount; offset < regionCount; offset += concurrentSubsettingKernels) {
+      auto regionsToDo = min(concurrentSubsettingKernels, regionCount - offset);
       int threadsPerBlock = 4;  // Reduce dynamic launch parallelism by 4
 
-      bigBoyLaunches++;
       auto pdPerBlockSolutions = thrust::raw_pointer_cast(dPerBlockSolutions.data());
       nextGuessForRegions<SolverConfig><<<(regionsToDo + threadsPerBlock - 1) / threadsPerBlock, threadsPerBlock>>>(
           pdAllCodewords, pdRegionsAsCodeword, pdRegionsAsIndex, pdNextMoves, pdRegionStarts, pdRegionLengths, offset,
           regionsToDo, pdNextMovesVecs, nextMovesVecsSize, pdPerBlockSolutions, pdDeviceCounters);
     }
 
-    counters[Counters<SolverConfig>::BIG_REGIONS] += bigBoyLaunches;
-    if (LOG) printf("Big Boy Launches: %d\n", bigBoyLaunches);
+    // Small regions are amenable to the fully discriminating opt. These are counted here, but really handled by
+    // the normal kernel. I've processed these separately in other versions, but it makes minimal difference. All the
+    // time is really spent on the big ones.
+    uint32_t fdRegionCount = 0;
+    uint32_t fdGameCount = 0;
+    for (uint32_t i = tinyRegionCount; i < regionCount && hRegionLengths[i] < SolverConfig::TOTAL_PACKED_SCORES; i++) {
+      fdGameCount += hRegionLengths[i];
+      fdRegionCount++;
+    }
+
+    counters[Counters<SolverConfig>::TINY_REGIONS] += tinyRegionCount;
+    counters[Counters<SolverConfig>::TINY_GAMES] += tinyGameCount;
+    counters[Counters<SolverConfig>::FDOPT_REGIONS] += fdRegionCount;
+    counters[Counters<SolverConfig>::FDOPT_GAMES] += fdGameCount;
+
+    uint32_t bigRegionCount = regionCount - tinyRegionCount - fdRegionCount;
+    counters[Counters<SolverConfig>::BIG_REGIONS] += bigRegionCount;
+
+    if (LOG) {
+      printf("Tiny regions: %d, totalling %d games\n", tinyRegionCount, tinyGameCount);
+      printf("Possibly fully discriminating regions: %d, totalling %d games\n", fdRegionCount, fdGameCount);
+      printf("Big regions: %d\n", bigRegionCount);
+    }
 
     CubDebug(cudaDeviceSynchronize());
 
     if (LOG) {
       auto endTime = chrono::high_resolution_clock::now();
-      chrono::duration<float, milli> elapsedMS = endTime - startTime;
-      auto elapsedS = elapsedMS.count() / 1000;
-      cout << "P2 elapsed time " << commaString(elapsedS) << "s" << endl;
-      startTime = chrono::high_resolution_clock::now();
+      chrono::duration<float> elapsedS = endTime - startTime;
+      cout << "Phase 2 elapsed time " << commaString(elapsedS.count()) << "s" << endl;
     }
 
     if (depth == MAX_SUPPORTED_TURNS) {
@@ -719,7 +714,7 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
     }
   }
 
-  auto endTime = chrono::high_resolution_clock::now();
+  auto overallEndTime = chrono::high_resolution_clock::now();
 
   if (LOG) cout << "Last actual depth: " << depth << endl;
 
@@ -746,7 +741,7 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
     nextMovesList.push_back(nm);
   }
 
-  return endTime - startTime;
+  return overallEndTime - overallStartTime;
 }
 
 template <typename SolverConfig>
