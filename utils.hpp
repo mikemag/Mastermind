@@ -113,11 +113,8 @@ std::ostream &operator<<(std::ostream &stream, const GPUInfo &r) {
 // A way to record various stats about a game, so we can write a nice json file of results.
 class StatsRecorder {
  public:
-  std::unordered_map<std::string, json> run;
-  std::map<std::string, json> all;
   OSInfo osInfo;
   GPUInfo gpuInfo;
-  std::ofstream js;
 
   explicit StatsRecorder(const std::string &filename);
   ~StatsRecorder();
@@ -125,7 +122,12 @@ class StatsRecorder {
   void newRun();
 
   void add(const std::string &name, const json &value) { run[name] = value; }
-  void addAll(const std::string &name, const json &value) { all[name] = value; }
+
+ private:
+  std::ofstream js;
+  std::string filename;
+  std::unordered_map<std::string, json> run;
+  static constexpr auto tmpFilename = "tmp_run_results.json";
 };
 
 // Counters for various experiments, no overhead if not enabled.

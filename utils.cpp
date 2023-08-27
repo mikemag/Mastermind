@@ -6,10 +6,13 @@
 #include "utils.hpp"
 
 #include <algorithm>
+#include <filesystem>
 #include <fstream>
 #include <limits>
 #include <nlohmann/json.hpp>
 #include <set>
+
+#include "mastermind_config.h"
 
 using namespace std;
 using json = nlohmann::json;
@@ -28,18 +31,25 @@ std::string hexString(uint32_t v) {
   return ss.str();
 }
 
-StatsRecorder::StatsRecorder(const std::string &filename) : js(filename) {
+StatsRecorder::StatsRecorder(const std::string &filename) : filename(filename) {
+  std::map<std::string, json> sysInfo;
+
   for (const auto &a : osInfo.info) {
-    all[a.first] = a.second;
+    sysInfo[a.first] = a.second;
   }
 
   for (const auto &a : gpuInfo.info) {
-    all[a.first] = a.second;
+    sysInfo[a.first] = a.second;
   }
 
-  json allInfo = {{"system_specs", json(all)}};
+  sysInfo["Git Branch"] = MASTERMIND_GIT_BRANCH;
+  sysInfo["Git Commit Hash"] = MASTERMIND_GIT_COMMIT_HASH;
+  sysInfo["Git Commit Date"] = MASTERMIND_GIT_COMMIT_DATE;
+
+  json sysInfoJSON = {{"system_specs", json(sysInfo)}};
+  js = ofstream(tmpFilename);
   js << "[" << endl;
-  js << allInfo << endl;
+  js << sysInfoJSON << endl;
   js << flush;
 }
 
@@ -47,6 +57,7 @@ StatsRecorder::~StatsRecorder() {
   newRun();
   js << "]" << endl;
   js.close();
+  std::filesystem::rename(tmpFilename, filename);
 }
 
 void StatsRecorder::newRun() {

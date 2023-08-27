@@ -204,6 +204,13 @@ void runSingleSolver(StatsRecorder& statsRecorder, uint32_t packedInitialGuess) 
   Solver solver;
 
   statsRecorder.newRun();
+
+  auto now = std::chrono::system_clock::now();
+  std::time_t now_time = std::chrono::system_clock::to_time_t(now);
+  std::stringstream ss;
+  ss << std::put_time(std::localtime(&now_time), "%FT%T%z");
+  statsRecorder.add("Time", ss.str());
+
   printf("Playing all %d pin %d color games using algorithm '%s' and solver '%s' for every possible secret...\n",
          SolverConfig::PIN_COUNT, SolverConfig::COLOR_COUNT, SolverConfig::ALGO::name, Solver::name);
 
@@ -425,9 +432,6 @@ int main(int argc, const char* argv[]) {
   fs << "mastermind_run_stats_" << put_time(&t, "%Y%m%d_%H%M%S") << "_" << MASTERMIND_GIT_COMMIT_HASH << fileTag
      << ".json";
   StatsRecorder statsRecorder(fs.str());
-  statsRecorder.addAll("Git Branch", MASTERMIND_GIT_BRANCH);
-  statsRecorder.addAll("Git Commit Hash", MASTERMIND_GIT_COMMIT_HASH);
-  statsRecorder.addAll("Git Commit Date", MASTERMIND_GIT_COMMIT_DATE);
 
   playSingleGame<shouldPlaySingleGame>(statsRecorder);
 
