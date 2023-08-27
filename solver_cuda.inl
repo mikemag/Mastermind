@@ -13,6 +13,8 @@
 #include <thrust/iterator/zip_iterator.h>
 #include <thrust/logical.h>
 #include <thrust/zip_function.h>
+#include <thrust/partition.h>
+#include <thrust/iterator/constant_iterator.h>
 
 #include <algorithm>
 #include <cassert>
