@@ -4,8 +4,10 @@
 // LICENSE file in the root directory of this source tree.
 
 #include <chrono>
+#include <filesystem>
 #include <set>
 #include <typeindex>
+#include <unordered_set>
 
 #include "codeword.hpp"
 #include "mastermind_config.h"
@@ -66,6 +68,22 @@ static constexpr bool shouldFindBestFirstSpecificGuesses = false;
 // Misc config
 static constexpr bool shouldRunTests = true;  // Run unit tests and play Knuth's game
 static constexpr bool shouldWriteStratFiles = false;
+
+static constexpr auto statsFilenamePrefix = "mastermind_run_stats_";
+static constexpr auto pinCountTag = "Pin Count";
+static constexpr auto colorCountTag = "Color Count";
+static constexpr auto strategyTag = "Strategy";
+static constexpr auto solverTag = "Solver";
+static constexpr auto initialGuessTag = "Initial Guess";
+
+// Previous runs visible in the current dir
+static std::unordered_set<string> previousRuns;
+
+string buildRunKey(int pc, int cc, string strategy, string solver, string initialGuess) {
+  stringstream k;
+  k << pc << cc << strategy << solver << initialGuess;
+  return k.str();
+}
 
 template <bool shouldRun>
 void runUnitTests() {
@@ -201,6 +219,14 @@ void runSingleSolver(StatsRecorder& statsRecorder, uint32_t packedInitialGuess) 
   using SolverConfig = typename Solver::SolverConfig;
   using CodewordT = typename SolverConfig::CodewordT;
 
+  auto runKey = buildRunKey(SolverConfig::PIN_COUNT, SolverConfig::COLOR_COUNT, SolverConfig::ALGO::name, Solver::name,
+                            hexString(packedInitialGuess));
+  if (auto iter = previousRuns.find(runKey); iter != previousRuns.end()) {
+    printf("Skipping completed run for %dp%dc '%s', initial guess '%s', and solver '%s'.\n\n", SolverConfig::PIN_COUNT,
+           SolverConfig::COLOR_COUNT, SolverConfig::ALGO::name, hexString(packedInitialGuess).c_str(), Solver::name);
+    return;
+  }
+
   Solver solver;
 
   statsRecorder.newRun();
@@ -218,16 +244,16 @@ void runSingleSolver(StatsRecorder& statsRecorder, uint32_t packedInitialGuess) 
     printf("Using GPU %s\n", to_string(statsRecorder.gpuInfo.info["GPU Name"]).c_str());
   }
 
-  statsRecorder.add("Pin Count", (int)SolverConfig::PIN_COUNT);
-  statsRecorder.add("Color Count", (int)SolverConfig::COLOR_COUNT);
-  statsRecorder.add("Strategy", SolverConfig::ALGO::name);
-  statsRecorder.add("Solver", Solver::name);
+  statsRecorder.add(pinCountTag, (int)SolverConfig::PIN_COUNT);
+  statsRecorder.add(colorCountTag, (int)SolverConfig::COLOR_COUNT);
+  statsRecorder.add(strategyTag, SolverConfig::ALGO::name);
+  statsRecorder.add(solverTag, Solver::name);
 
   cout << "Total codewords: " << commaString(CodewordT::TOTAL_CODEWORDS) << endl;
   statsRecorder.add("Total Codewords", CodewordT::TOTAL_CODEWORDS);
 
   cout << "Initial guess: " << CodewordT{packedInitialGuess} << endl;
-  statsRecorder.add("Initial Guess", hexString(packedInitialGuess));
+  statsRecorder.add(initialGuessTag, hexString(packedInitialGuess));
 
   auto elapsed = solver.playAllGames(packedInitialGuess);
 
@@ -422,15 +448,49 @@ void playMultipleSpecificGamesWithInitialGuesses(StatsRecorder& statsRecorder) {
   }
 }
 
+void readAllStats() {
+  cout << "Reading existing stats files..." << endl;
+
+  for (const auto& entry : std::filesystem::directory_iterator(".")) {
+    string filename = entry.path().filename();
+
+    if (filename.rfind(statsFilenamePrefix, 0) == 0) {
+      cout << filename << endl;
+
+      ifstream i(filename);
+      std::string line;
+      while (std::getline(i, line)) {
+        if (line == "[" || line == "]") continue;
+        if (line[0] == ',') line[0] = ' ';
+        try {
+          auto j = json::parse(line);
+
+          if (j.contains("run")) {
+            auto run = j["run"];
+            auto runKey = buildRunKey(run[pinCountTag], run[colorCountTag], run[strategyTag], run[solverTag],
+                                      run[initialGuessTag]);
+            previousRuns.insert(runKey);
+          }
+
+        } catch (json::parse_error& ex) {
+          // Just drop bad lines and re-do those runs.
+        }
+      }
+    }
+  }
+
+  cout << "Done reading previous runs." << endl << endl;
+}
+
 int main(int argc, const char* argv[]) {
   runUnitTests<shouldRunTests>();
 
-  tm t = {};
-  istringstream ss(MASTERMIND_GIT_COMMIT_DATE);
-  ss >> get_time(&t, "%Y-%m-%d %H:%M:%S");
+  readAllStats();
+
+  auto now = std::chrono::system_clock::now();
+  std::time_t now_time = std::chrono::system_clock::to_time_t(now);
   stringstream fs;
-  fs << "mastermind_run_stats_" << put_time(&t, "%Y%m%d_%H%M%S") << "_" << MASTERMIND_GIT_COMMIT_HASH << fileTag
-     << ".json";
+  fs << statsFilenamePrefix << put_time(std::localtime(&now_time), "%Y%m%d_%H%M%S") << fileTag << ".json";
   StatsRecorder statsRecorder(fs.str());
 
   playSingleGame<shouldPlaySingleGame>(statsRecorder);

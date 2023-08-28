@@ -111,12 +111,17 @@ std::ostream &operator<<(std::ostream &stream, const GPUInfo &r) {
 }
 
 // A way to record various stats about a game, so we can write a nice json file of results.
+// Note: the file is an array of objects. The first object is overall system info, then one object for each run
+// completed. Each object is on its own line, and the array start and end are on their own lines. If we're interrupted
+// while writing, the worst case is the last line is broken. That may be data for a completed run, and that's lost. Or
+// it may be we're just missing the close "]" for the array. In either case, the other data is still readable a line at
+// a time, and readers can deal with an incomplete file. This allows for interrupting and restarting runs.
 class StatsRecorder {
  public:
   OSInfo osInfo;
   GPUInfo gpuInfo;
 
-  explicit StatsRecorder(const std::string &filename);
+  explicit StatsRecorder(const std::string &filename) : filename(filename) {}
   ~StatsRecorder();
 
   void newRun();
@@ -127,7 +132,8 @@ class StatsRecorder {
   std::ofstream js;
   std::string filename;
   std::unordered_map<std::string, json> run;
-  static constexpr auto tmpFilename = "tmp_run_results.json";
+
+  void emitSysInfo();
 };
 
 // Counters for various experiments, no overhead if not enabled.
