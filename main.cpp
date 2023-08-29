@@ -490,7 +490,13 @@ int main(int argc, const char* argv[]) {
   auto now = std::chrono::system_clock::now();
   std::time_t now_time = std::chrono::system_clock::to_time_t(now);
   stringstream fs;
-  fs << statsFilenamePrefix << put_time(std::localtime(&now_time), "%Y%m%d_%H%M%S") << fileTag << ".json";
+  fs << statsFilenamePrefix << put_time(std::localtime(&now_time), "%Y%m%d_%H%M%S");
+  auto st = std::getenv("MASTERMIND_STATS_TAG");
+  if (st) {
+    fs << "_" << st;
+  }
+  fs << fileTag << ".json";
+  cout << "Will write stats to: " << fs.str() << endl << endl;
   StatsRecorder statsRecorder(fs.str());
 
   playSingleGame<shouldPlaySingleGame>(statsRecorder);
