@@ -38,9 +38,6 @@ def load_json(filename, results):
                 'sysinfo': sysinfo,
             }
 
-            if run['Pin Count'] == 7 and run['Color Count'] == 7:
-                print('7p7c')
-
             if d['avg'] < gr['best']['avg'] or (
                     d['avg'] == gr['best']['avg'] and
                     run['Solver'] == 'CUDA' and
@@ -64,8 +61,12 @@ def build_system_list(results):
     return system_names
 
 
-def process_results(f, results, systems, metric, metric_format, header):
+def process_results(f, results, systems, metric, metric_format, header, desc):
     f.write(f'## {header}\n\n')
+
+    if desc:
+        f.write(desc)
+        f.write('\n\n')
 
     for a, pd in results.items():
         f.write(f'### {a}\n\n')
@@ -83,11 +84,17 @@ def process_results(f, results, systems, metric, metric_format, header):
                     if c in cd:
                         gd = cd[c]
                         ba = gd['best']
-                        f.write(metric_format.format(ba[metric]))
+                        # todo: lots of special cases for time... annoying.
                         if metric == 'time':
+                            if ba[metric] < 100:
+                                f.write(metric_format.format(ba[metric]))
+                            else:
+                                f.write('{:,d}'.format(int(ba[metric])))
                             sys_num = systems.index(ba['sys_str']) + 1
                             if sys_num > 1:
-                                f.write(f'<sup>{sys_num}</sup>')
+                                f.write(f'<sup>({sys_num})</sup>')
+                        else:
+                            f.write(metric_format.format(ba[metric]))
             f.write('|\n')
         f.write('\n')
 
@@ -107,17 +114,22 @@ if __name__ == '__main__':
 
     with open('../../../results/README.md', 'w') as f:
         f.write('# Results\n\n')
-        f.write(
-            'All results obtained using SolverCUDA from one of the following systems:\n\n')
+        f.write('All results obtained using SolverCUDA from one of the following '
+                'systems:\n\n')
         f.write('\n'.join([f'{i + 1}. {s}' for i, s in enumerate(systems)]))
         f.write('\n\n')
+        f.write("I only show results for games where I've determined the best "
+                "starting guess. This takes a long time for larger games, thus the "
+                "tables are only partially filled.\n\n")
         f.write('*Times reported are from the first system unless otherwise marked.* ')
         f.write('*Raw data is in the .json files in subdirectories here.*\n\n')
 
         process_results(f, results, systems, 'avg', '{:,.4f}',
-                        'Average turns over all games')
-        process_results(f, results, systems, 'max', '{:,d}', 'Max turns over all games')
-        process_results(f, results, systems, 'time', '{:,.3f}s', 'Run time')
-        process_results(f, results, systems, 'ig', '{}', 'Initial guess')
+                        'Average turns over all games', '')
+        process_results(f, results, systems, 'max', '{:,d}', 'Max turns over all games',
+                        '')
+        process_results(f, results, systems, 'time', '{:,.3f}', 'Run time',
+                        'All times in seconds.')
+        process_results(f, results, systems, 'ig', '{}', 'Initial guess', '')
         process_results(f, results, systems, 'scores', '{:,d}',
-                        'Codeword scores performed')
+                        'Codeword scores performed', '')
