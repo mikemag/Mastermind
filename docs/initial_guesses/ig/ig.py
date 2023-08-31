@@ -96,9 +96,12 @@ def generate_cxx(filename, results):
 
 def process_results():
     results = OrderedDict()
-    result_files = glob.glob('../*.json')
+    result_files = []
+    result_files.extend(glob.glob('../../../results/**/*_ig_*.json', recursive=True))
+    result_files.extend(glob.glob('../*_ig_*.json', recursive=True))
 
     for f in result_files:
+        print(f)
         load_json(f, results)
 
     for a, pd in results.items():

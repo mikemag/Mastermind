@@ -9,9 +9,10 @@ import os
 from collections import OrderedDict
 
 
-def load_json(filename, results, metric):
+def load_json(filename, results):
     with open(os.path.join(filename), 'r') as f:
         r = json.load(f)
+        sysinfo = [x['system_specs'] for x in r if 'system_specs' in x][0]
         runs = [x['run'] for x in r if 'run' in x]
 
         for run in runs:
@@ -29,50 +30,94 @@ def load_json(filename, results, metric):
 
             d = {
                 'ig': run['Initial Guess'],
-                'avg': float(run['Average Turns']),
+                # nb, old results had lower precision.
+                'avg': round(float(run['Average Turns']), 5),
                 'max': int(run['Max Turns']),
                 'time': float(run['Elapsed (s)']),
                 'scores': int(run['Scores']),
+                'sysinfo': sysinfo,
             }
 
-            if d[metric] < gr['best'][metric] or run['Solver'] == 'CUDA':
+            if run['Pin Count'] == 7 and run['Color Count'] == 7:
+                print('7p7c')
+
+            if d['avg'] < gr['best']['avg'] or (
+                    d['avg'] == gr['best']['avg'] and
+                    run['Solver'] == 'CUDA' and
+                    d['time'] < gr['best']['time']):
                 gr['best'] = d
 
 
-def process_results(metric, metric_format, header):
-    results = OrderedDict()
-    result_files = glob.glob(
-        '/Users/mike/dev/Mastermind/results/2022_i7-10700K_CUDA_3070_ubuntu22/*.json')
+def build_system_list(results):
+    systems = {}
+    for a, pd in results.items():
+        for p, cd in pd.items():
+            for c, gd in cd.items():
+                si = gd['best']['sysinfo']
+                sys = f"{si['GPU Name']}, CUDA Toolkit {si['GPU CUDA Runtime Version']} on {si['OS Product Version']}, {si['HW CPU Brand String']}"
+                systems.setdefault(sys, 0)
+                systems[sys] += 1
+                gd['best']['sys_str'] = sys
 
-    for f in result_files:
-        load_json(f, results, metric)
+    system_names = [k for k, v in
+                    sorted(systems.items(), key=lambda item: item[1], reverse=True)]
+    return system_names
 
-    print('##', header)
-    print()
+
+def process_results(f, results, systems, metric, metric_format, header):
+    f.write(f'## {header}\n\n')
 
     for a, pd in results.items():
-        print('### ' + a)
-        print()
-        print('', ' ', *[str(c) + 'c' for c in range(2, 16)], '', sep='|')
-        print('|---:' * 15, '|', sep='')
+        f.write(f'### {a}\n\n')
+        f.write('|'.join(['', ' ', *[str(c) + 'c' for c in range(2, 16)], '']))
+        f.write('\n')
+        f.write(''.join(['|---:' * 15, '|']))
+        f.write('\n')
 
         for p in range(2, 9):
-            print('|' + str(p) + 'p', end='')
+            f.write('|' + str(p) + 'p')
             if p in pd:
                 cd = pd[p]
                 for c in range(2, 16):
-                    print('|', end='')
+                    f.write('|')
                     if c in cd:
                         gd = cd[c]
                         ba = gd['best']
-                        print(metric_format.format(ba[metric]), end='')
-            print('|')
-        print()
+                        f.write(metric_format.format(ba[metric]))
+                        if metric == 'time':
+                            sys_num = systems.index(ba['sys_str']) + 1
+                            if sys_num > 1:
+                                f.write(f'<sup>{sys_num}</sup>')
+            f.write('|\n')
+        f.write('\n')
 
 
 if __name__ == '__main__':
-    process_results('avg', '{:,.4f}', 'Average turns over all games')
-    process_results('max', '{:,d}', 'Max turns over all games')
-    process_results('time', '{:,.5f}s', 'Run time')
-    process_results('ig', '{}', 'Initial guess')
-    process_results('scores', '{:,d}', 'Codeword scores performed')
+    results = OrderedDict()
+    result_files = []
+    result_files.extend(glob.glob(
+        '/Users/mike/dev/Mastermind/results/2022_i7-10700K_CUDA_3070_ubuntu22/*.json'))
+    result_files.extend(glob.glob(
+        '/Users/mike/dev/Mastermind/results/2023_GCE_Various/*.json'))
+
+    for f in result_files:
+        load_json(f, results)
+
+    systems = build_system_list(results)
+
+    with open('../../../results/README.md', 'w') as f:
+        f.write('# Results\n\n')
+        f.write(
+            'All results obtained using SolverCUDA from one of the following systems:\n\n')
+        f.write('\n'.join([f'{i + 1}. {s}' for i, s in enumerate(systems)]))
+        f.write('\n\n')
+        f.write('*Times reported are from the first system unless otherwise marked.* ')
+        f.write('*Raw data is in the .json files in subdirectories here.*\n\n')
+
+        process_results(f, results, systems, 'avg', '{:,.4f}',
+                        'Average turns over all games')
+        process_results(f, results, systems, 'max', '{:,d}', 'Max turns over all games')
+        process_results(f, results, systems, 'time', '{:,.3f}s', 'Run time')
+        process_results(f, results, systems, 'ig', '{}', 'Initial guess')
+        process_results(f, results, systems, 'scores', '{:,d}',
+                        'Codeword scores performed')
