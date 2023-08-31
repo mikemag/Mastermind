@@ -112,6 +112,7 @@ constexpr uint32_t presetInitialGuessKnuth() {
       return 0x1122334;
     case 0x78:
     case 0x79:
+    case 0x7a:
       return 0x1122345;
     case 0x82:
       return 0x11111222;
@@ -227,6 +228,7 @@ constexpr uint32_t presetInitialGuessMostParts() {
       return 0x1112233;
     case 0x78:
     case 0x79:
+    case 0x7a:
       return 0x1122334;
     case 0x82:
       return 0x11112222;
@@ -343,6 +345,7 @@ constexpr uint32_t presetInitialGuessExpectedSize() {
     case 0x78:
       return 0x1112234;
     case 0x79:
+    case 0x7a:
       return 0x1234567;
     case 0x82:
       return 0x11111222;
@@ -458,6 +461,7 @@ constexpr uint32_t presetInitialGuessEntropy() {
     case 0x77:
     case 0x78:
     case 0x79:
+    case 0x7a:
       return 0x1122334;
     case 0x82:
       return 0x11112222;
