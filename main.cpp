@@ -45,8 +45,8 @@ static constexpr bool shouldPlaySingleGame = true;
 template <typename T>
 using SingleGameSolver = DefaultSolver<T>;
 using SingleGameAlgo = Algos::Knuth;
-static constexpr uint8_t singleGamePinCount = 4;    // 1-8, 4 is classic
-static constexpr uint8_t singleGameColorCount = 6;  // 1-15, 6 is classic
+static constexpr uint8_t singleGamePinCount = 5;    // 1-8, 4 is classic
+static constexpr uint8_t singleGameColorCount = 10;  // 1-15, 6 is classic
 static constexpr bool singleGameLog = true;
 
 // Config for playing a set of games
@@ -56,7 +56,9 @@ template <typename T>
 using MultiGameSolver = DefaultSolver<T>;
 using MultiGameAlgos = ss::algo_list<Algos::Knuth, Algos::MostParts, Algos::ExpectedSize, Algos::Entropy>;
 using MultiGamePins = ss::pin_counts<6>;
-using MultiGameColors = ss::color_counts<2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12>;
+// mmmfixme: faster build even though these shouldn't be used??
+//using MultiGameColors = ss::color_counts<2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12>;
+using MultiGameColors = ss::color_counts<6>;
 static constexpr bool multiGameLog = false;
 // static constexpr const char* fileTag = "_aa_7p_2-9c_8p_2-7c";
 static constexpr const char* fileTag = "";
@@ -485,7 +487,25 @@ void readAllStats() {
 int main(int argc, const char* argv[]) {
   runUnitTests<shouldRunTests>();
 
-  readAllStats();
+  //  readAllStats();
+
+  {
+    using TestSolver =
+        SingleGameSolver<SolverConfig<singleGamePinCount, singleGameColorCount, singleGameLog, SingleGameAlgo>>;
+    TestSolver testSolver;
+
+    vector<uint32_t> zeros = {0x11111111, 0x22222222};
+    vector<uint8_t> frees = {3, 4, 5, 6};
+    vector<bool> isFree = {false, false, false, true, true, true, true};
+
+    vector<uint32_t> tests = {0x1122, 0x1234, 0x1243, 0x1256, 0x1255, 0x1266,
+                              0x1265, 0x4321, 0x1324, 0x3456, 0x1111, 0x3333};
+
+    for (auto t : tests) {
+      auto n = testSolver.symTransform(t, zeros, frees, isFree);
+      cout << hexString(t) << " --> " << hexString(n) << endl;
+    }
+  }
 
   auto now = std::chrono::system_clock::now();
   std::time_t now_time = std::chrono::system_clock::to_time_t(now);

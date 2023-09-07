@@ -17,6 +17,7 @@
 // 128 bits for different versions of the scoring functions.
 template <uint8_t PIN_COUNT, uint8_t COLOR_COUNT>
 class Codeword {
+ public:
 #if defined(__CUDACC__)
   using CT = typename std::conditional<(COLOR_COUNT <= sizeof(uint64_t)), uint64_t, unsigned __int128>::type;
 #else
@@ -24,7 +25,6 @@ class Codeword {
   using CT = unsigned __int128;
 #endif
 
- public:
   CUDA_HOST_AND_DEVICE constexpr Codeword() noexcept : codeword(0xFFFFFFFF), colorCounts(0) {}
 
   constexpr Codeword(uint32_t codeword) noexcept : codeword(codeword), colorCounts(computeColorCounts(codeword)) {}
@@ -95,6 +95,7 @@ class Codeword {
   Score scoreCountingAutoVec(const Codeword &guess) const;
   Score scoreCountingHandVec(const Codeword &guess) const;
 
+  // mmmfixme: stale comment
   // Pre-compute color counts for all Codewords. Building this two ways right now for experimentation. The packed
   // 4-bit counters are good for the scalar versions and overall memory usage, while the 8-bit counters are needed for
   // SSE/AVX vectorization, both auto and by-hand. https://godbolt.org/z/bfM86K

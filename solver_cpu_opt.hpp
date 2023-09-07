@@ -52,13 +52,21 @@ class SolverCPUFaster : public Solver {
   vector<RegionIDT> regionIDs;
   vector<unsigned long long int> counters;
 
-  CodewordT nextGuess(const vector<CodewordT>& possibleSolutions, const vector<CodewordT>& usedCodewords);
+  CodewordT nextGuess(const vector<CodewordT>& allCodewords, const vector<CodewordT>& possibleSolutions,
+                      const vector<CodewordT>& usedCodewords);
   bool shortcutSmallSets(const vector<CodewordT>& possibleSolutions, CodewordT& nextGuess);
+  vector<typename SolverConfig::CodewordT> getReducedAC(const vector<CodewordT>& allCodewords,
+                                                        const vector<CodewordT>& possibleSolutions,
+                                                        const vector<CodewordT>& usedCodewords);
 
   uint32_t getPackedCodewordForRegion(int level, uint32_t regionIndex) const override {
     return nextMovesList[level][regionIndex].packedCodeword();
   }
   uint8_t getStandardScore(uint8_t score) override { return score; }
+
+ public:  // mmmfixme
+  uint32_t symTransform(const uint32_t cw, const vector<uint32_t>& zeros, const vector<uint8_t>& frees,
+                        const vector<bool>& isFree) const;
 };
 
 #include "solver_cpu_opt.inl"

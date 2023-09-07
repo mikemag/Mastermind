@@ -67,4 +67,9 @@ struct RegionID {
     if ((value & mask) == 0) return numeric_limits<T>::max();
     return value >> shift;
   }
+
+  uint8_t getScore(int depth) const {
+    assert(depth < 16);
+    return (value >> (numeric_limits<T>::digits - (depth * CHAR_BIT))) & 0xFF;
+  }
 };

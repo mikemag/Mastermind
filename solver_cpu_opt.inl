@@ -8,6 +8,8 @@
 #include <iostream>
 #include <iterator>
 #include <limits>
+#include <ranges>
+#include <span>
 
 // CPU Implementation w/ Some Optimizations
 //
@@ -46,11 +48,11 @@ std::chrono::nanoseconds SolverCPUFaster<SolverConfig>::playAllGames(uint32_t pa
   regionIDs = vector<RegionIDT>(allCodewords.size());
   for (int i = 0; i < regionIDs.size(); i++) regionIDs[i].index = i;
 
-  // Space for PS later
+  // Space for PS
   vector<CodewordT> ps;
   ps.reserve(allCodewords.size());
 
-  // Space for a nextMovesIter vector for each possible turn
+  // Space for a next moves vector for each possible turn
   nextMovesList.resize(MAX_SUPPORTED_TURNS, vector<CodewordT>(allCodewords.size()));
   auto nextMovesIter = nextMovesList.begin();
   std::fill(nextMovesIter->begin(), nextMovesIter->end(), CodewordT(packedInitialGuess));
@@ -58,7 +60,6 @@ std::chrono::nanoseconds SolverCPUFaster<SolverConfig>::playAllGames(uint32_t pa
   uint depth = 0;
   auto regionIDsEnd = regionIDs.end();  // The set of active games contracts as we go
 
-  // If no games have new moves, then we're done
   while (true) {
     depth++;
     if (LOG) printf("\nDepth = %d\n", depth);
@@ -123,13 +124,40 @@ std::chrono::nanoseconds SolverCPUFaster<SolverConfig>::playAllGames(uint32_t pa
         }
 
         if (!fdoptSuccessful) {
-          // TODO: I don't recall exactly which algos need the used set
           vector<CodewordT> usedCodewords;
           for (auto& previousMoves : nextMovesList) {
             usedCodewords.push_back(previousMoves[region.regionID.index]);
           }
 
-          ng = nextGuess(ps, usedCodewords);
+          // (no opts on the new process, doing for all regions except <=2)
+          // 5p8c
+          // - orig: 3,294,713,093
+          // - new:  1,153,113,626 -- 34.99%
+
+          // 4p6c
+          // - orig: 3,194,275
+          // - new:    996,233 -- 31.18%
+
+          // 6p6c
+          // Average number of turns was 5.3186
+          // Maximum number of turns over all possible secrets was 7
+          // - orig: 6,085,592,187
+          // - new:  4,715,110,146 -- 77.48%
+
+          // 5p10c
+          // Average number of turns was 6.2656
+          // Maximum number of turns over all possible secrets was 8
+          // - orig: 37,297,011,649
+          // - new:  13,988,611,644 --  37.51%
+
+
+          if constexpr (true) {  // depth == 1 && region.regionID.getScore(depth) == 0x00) {
+            auto reducedAC = getReducedAC(allCodewords, ps, usedCodewords);
+            ng = nextGuess(reducedAC, ps, usedCodewords);
+            assert(ng == nextGuess(allCodewords, ps, usedCodewords));
+          } else {
+            ng = nextGuess(allCodewords, ps, usedCodewords);
+          }
         }
       }
 
@@ -180,14 +208,14 @@ std::chrono::nanoseconds SolverCPUFaster<SolverConfig>::playAllGames(uint32_t pa
 // [3] Barteld Kooi, Yet another mastermind Strategy. International Computer Games Association Journal,
 // 28(1):13–20, 2005. https://www.researchgate.net/publication/30485793_Yet_another_Mastermind_strategy
 template <typename SolverConfig>
-typename SolverConfig::CodewordT SolverCPUFaster<SolverConfig>::nextGuess(const vector<CodewordT>& possibleSolutions,
+typename SolverConfig::CodewordT SolverCPUFaster<SolverConfig>::nextGuess(const vector<CodewordT>& allCodewords,
+                                                                          const vector<CodewordT>& possibleSolutions,
                                                                           const vector<CodewordT>& usedCodewords) {
   using ALGO = typename SolverConfig::ALGO;
 
   CodewordT bestGuess;
   size_t bestRank = 0;
   bool bestIsPossibleSolution = false;
-  auto& allCodewords = CodewordT::getAllCodewords();
   int subsetSizes[SolverConfig::MAX_SCORE_SLOTS];
   fill(begin(subsetSizes), end(subsetSizes), 0);
 
@@ -260,6 +288,121 @@ bool SolverCPUFaster<SolverConfig>::shortcutSmallSets(const vector<CodewordT>& p
     }
   }
   return false;
+}
+
+// mmmfixme: docs
+// transform func
+template <typename SolverConfig>
+uint32_t SolverCPUFaster<SolverConfig>::symTransform(uint32_t cw, const vector<uint32_t>& zeros,
+                                                     const vector<uint8_t>& frees, const vector<bool>& isFree) const {
+  constexpr static uint32_t unusedPinsMask = (uint32_t)(0xFFFFFFFFlu << (SolverConfig::PIN_COUNT * 4u));
+
+  if (zeros.size() > 0) {
+    auto firstZero = zeros[0];
+
+    for (auto zc : zeros) {
+      uint32_t v = cw ^ zc;  // Matched pins are now 0.
+      v |= unusedPinsMask;   // Ensure that any unused pin positions are non-zero.
+      uint32_t mask =
+          (((v & 0x77777777u) + 0x77777777u) | v) & 0x88888888u;  // High bits only set for any non-zero position
+      mask = mask | (mask >> 1) | (mask >> 2) | (mask >> 3);      // Mask for matching pins
+      cw &= mask;
+      cw |= (firstZero & ~mask);
+    }
+  }
+
+  // mmmfixme: just needs to be big enough to hold all colors.
+  vector<uint8_t> subs(16, 0xF);
+  uint32_t nextSub = 0;
+
+  for (int i = SolverConfig::PIN_COUNT - 1; i >= 0; i--) {
+    uint32_t mask = 0xF << i * 4;
+    auto p = (cw & mask) >> (i * 4);
+    if (isFree[p]) {
+      if (subs[p] == 0xF) {
+        subs[p] = nextSub++;
+      }
+      cw &= ~mask;
+      cw |= frees[subs[p]] << (i * 4);
+    }
+  }
+
+  return cw;
+}
+
+// mmmfixme: docs
+// - will use Ville's terms "zero" and "free". Ref the paper and section, and define here.
+//
+template <typename SolverConfig>
+vector<typename SolverConfig::CodewordT> SolverCPUFaster<SolverConfig>::getReducedAC(
+    const vector<CodewordT>& allCodewords, const vector<CodewordT>& possibleSolutions,
+    const vector<CodewordT>& usedCodewords) {
+  // We can form the Zeros set by looking at which colors are present in PS. PS represents all codewords which are
+  // consistent with the guesses so far, and therefore contains the colors which could still be in the final solution.
+  // If a color is absent, that color will not be part of the solution, and is therefore part of the Zeros set.
+  typename CodewordT::CT usedColors = 0;
+  for (auto& cw : possibleSolutions) {
+    usedColors |= cw.packedColors();
+  }
+
+  // Later code expects the Zeros set to be in lexicographical order, so transformed codewords are as well.
+  vector<uint32_t> zeros = {};
+  int color = 1;
+  while (usedColors != 0) {
+    if ((usedColors & 0xFF) == 0) {
+      zeros.push_back(0x11111111 * color);
+    }
+    usedColors >>= 8;
+    color++;
+  }
+
+  // We can form the Frees set by looking at all colors played to reach this PS.
+  typename CodewordT::CT playedColors = 0;
+  for (const auto& cw : usedCodewords) {
+    if (cw.isInvalid()) break;
+    playedColors |= cw.packedColors();
+  }
+
+  // Again, later code expects the Frees set to be in lexicographical order, so transformed codewords are as well.
+  vector<uint8_t> frees = {};
+  vector<bool> isFree(16, false);  // Big enough for every possible color
+  color = 1;
+  while (color <= SolverConfig::COLOR_COUNT) {
+    if ((playedColors & 0xFF) == 0) {
+      frees.push_back(color);
+      isFree[color] = true;
+    }
+    playedColors >>= 8;
+    color++;
+  }
+
+  // mmmfixme: bail if both sets are empty.
+
+  struct ti {
+    uint32_t cw;
+    size_t i;
+  };
+
+  vector<ti> repZ(allCodewords.size());
+  for (size_t i = 0; i < allCodewords.size(); i++) {
+    repZ[i] = {symTransform(allCodewords[i].packedCodeword(), zeros, frees, isFree), i};
+  }
+
+  // This needs to ensure we select the lexically first representative.
+  // mmmfixme: test speed
+  //    std::sort(repZ.begin(), repZ.end(), [](const ti& a, const ti& b) { return a.cw < b.cw || (a.cw == b.cw && a.i
+  //    < b.i); });
+  std::stable_sort(repZ.begin(), repZ.end(), [](const ti& a, const ti& b) { return a.cw < b.cw; });
+
+  auto last_unique = std::unique(repZ.begin(), repZ.end(), [](const ti& a, const ti& b) { return a.cw == b.cw; });
+
+  vector<CodewordT> acRepZ(last_unique - repZ.begin());
+  std::transform(repZ.begin(), last_unique, acRepZ.begin(),
+                 [&allCodewords](const auto& v) { return allCodewords[v.i]; });
+
+  //  cout << acRepZ.size() << endl;
+
+  return acRepZ;
 }
 
 template <typename SolverConfig>

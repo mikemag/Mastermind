@@ -36,7 +36,7 @@ set(MASTERMIND_SOURCES_LIST
 add_executable(mastermind ${MASTERMIND_SOURCES_LIST})
 target_include_directories(mastermind PUBLIC SYSTEM .)
 set_target_properties(mastermind PROPERTIES
-        CXX_STANDARD 17
+        CXX_STANDARD 20
         CXX_STANDARD_REQUIRED ON
         )
 target_compile_options(mastermind PRIVATE
@@ -75,8 +75,8 @@ if (CMAKE_CUDA_COMPILER)
     enable_language(CUDA)
     set_source_files_properties(${MASTERMIND_SOURCES_LIST} PROPERTIES LANGUAGE CUDA)
     set_target_properties(mastermind PROPERTIES
-            CXX_STANDARD 17
-            CUDA_STANDARD 17
+            CXX_STANDARD 20
+            CUDA_STANDARD 20
             CUDA_STANDARD_REQUIRED ON
             CUDA_SEPARABLE_COMPILATION ON
             CUDA_ARCHITECTURES "86")
@@ -88,7 +88,7 @@ if (CMAKE_CUDA_COMPILER)
             -fno-omit-frame-pointer
             --extended-lambda
             -dc
-            --std=c++17
+            --std=c++20
             --forward-unknown-to-host-compiler -march=native
             >)
 endif ()

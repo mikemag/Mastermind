@@ -29,19 +29,19 @@ struct CounterDescriptors {
 };
 
 // nb: stuck on C++17 right now w/ CUDA, so copy in the constexpr std::find_if.
-template <class InputIt, class UnaryPredicate>
-constexpr InputIt constexpr_find_if(InputIt first, InputIt last, UnaryPredicate p) {
-  for (; first != last; ++first) {
-    if (p(*first)) {
-      return first;
-    }
-  }
-  return last;
-}
+//template <class InputIt, class UnaryPredicate>
+//constexpr InputIt constexpr_find_if(InputIt first, InputIt last, UnaryPredicate p) {
+//  for (; first != last; ++first) {
+//    if (p(*first)) {
+//      return first;
+//    }
+//  }
+//  return last;
+//}
 
 template <std::size_t S>
 constexpr static auto find_counter(const CounterDescriptors<S>& a, const char* counterName) {
-  return constexpr_find_if(
+  return std::find_if(
              a.descs.begin(), a.descs.end(),
              [counterName](const CounterDescriptor& c) { return std::string_view(c.name) == counterName; })
       ->index;
