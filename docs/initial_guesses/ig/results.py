@@ -131,7 +131,7 @@ if __name__ == '__main__':
         process_results(f, results, systems, 'time', '{:,.3f}', 'Run time',
                         'All times in seconds.')
         process_results(f, results, systems, 'ig', '{}', 'Initial guess',
-                        'These were determined by running all unique intial guesses '
+                        'These were determined by running all unique initial guesses '
                         'and selecting the one with the lowest average turns.')
         process_results(f, results, systems, 'scores', '{:,d}',
                         'Codeword scores performed', '')

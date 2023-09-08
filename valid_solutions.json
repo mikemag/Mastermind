@@ -1,0 +1,4856 @@
+{
+  "Knuth": {
+    "2": {
+      "2": {
+        "total_turns": 8,
+        "max_turns": 3,
+        "sample_games": [
+          [
+            "12"
+          ]
+        ],
+        "desc": "Knuth 2p2c"
+      },
+      "3": {
+        "total_turns": 21,
+        "max_turns": 3,
+        "sample_games": [
+          [
+            "12",
+            "21"
+          ]
+        ],
+        "desc": "Knuth 2p3c"
+      },
+      "4": {
+        "total_turns": 45,
+        "max_turns": 4,
+        "sample_games": [
+          [
+            "12",
+            "23"
+          ]
+        ],
+        "desc": "Knuth 2p4c"
+      },
+      "5": {
+        "total_turns": 84,
+        "max_turns": 5,
+        "sample_games": [
+          [
+            "12",
+            "23",
+            "31"
+          ]
+        ],
+        "desc": "Knuth 2p5c"
+      },
+      "6": {
+        "total_turns": 132,
+        "max_turns": 5,
+        "sample_games": [
+          [
+            "12",
+            "34"
+          ]
+        ],
+        "desc": "Knuth 2p6c"
+      },
+      "7": {
+        "total_turns": 202,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "12",
+            "34",
+            "35",
+            "63",
+            "37"
+          ]
+        ],
+        "desc": "Knuth 2p7c"
+      },
+      "8": {
+        "total_turns": 285,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "12",
+            "34",
+            "43"
+          ]
+        ],
+        "desc": "Knuth 2p8c"
+      },
+      "9": {
+        "total_turns": 394,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "12",
+            "34",
+            "45",
+            "67",
+            "48"
+          ]
+        ],
+        "desc": "Knuth 2p9c"
+      },
+      "10": {
+        "total_turns": 520,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "12",
+            "34",
+            "45",
+            "53"
+          ]
+        ],
+        "desc": "Knuth 2p10c"
+      },
+      "11": {
+        "total_turns": 676,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "12",
+            "34",
+            "56",
+            "57"
+          ]
+        ],
+        "desc": "Knuth 2p11c"
+      },
+      "12": {
+        "total_turns": 853,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "12",
+            "23",
+            "45",
+            "67",
+            "61"
+          ]
+        ],
+        "desc": "Knuth 2p12c"
+      },
+      "13": {
+        "total_turns": 1064,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "12",
+            "34",
+            "56",
+            "57",
+            "68",
+            "66"
+          ]
+        ],
+        "desc": "Knuth 2p13c"
+      },
+      "14": {
+        "total_turns": 1300,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "12",
+            "34",
+            "56",
+            "67",
+            "89",
+            "ab",
+            "cd",
+            "6d"
+          ]
+        ],
+        "desc": "Knuth 2p14c"
+      },
+      "15": {
+        "total_turns": 1574,
+        "max_turns": 10,
+        "sample_games": [
+          [
+            "12",
+            "34",
+            "56",
+            "67",
+            "75"
+          ]
+        ],
+        "desc": "Knuth 2p15c"
+      }
+    },
+    "3": {
+      "2": {
+        "total_turns": 18,
+        "max_turns": 3,
+        "sample_games": [
+          [
+            "112",
+            "122"
+          ]
+        ],
+        "desc": "Knuth 3p2c"
+      },
+      "3": {
+        "total_turns": 74,
+        "max_turns": 4,
+        "sample_games": [
+          [
+            "112",
+            "123",
+            "213"
+          ]
+        ],
+        "desc": "Knuth 3p3c"
+      },
+      "4": {
+        "total_turns": 209,
+        "max_turns": 4,
+        "sample_games": [
+          [
+            "112",
+            "233"
+          ]
+        ],
+        "desc": "Knuth 3p4c"
+      },
+      "5": {
+        "total_turns": 455,
+        "max_turns": 5,
+        "sample_games": [
+          [
+            "112",
+            "134",
+            "415",
+            "313"
+          ]
+        ],
+        "desc": "Knuth 3p5c"
+      },
+      "6": {
+        "total_turns": 874,
+        "max_turns": 5,
+        "sample_games": [
+          [
+            "123",
+            "245",
+            "236",
+            "315",
+            "341"
+          ]
+        ],
+        "desc": "Knuth 3p6c"
+      },
+      "7": {
+        "total_turns": 1514,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "123",
+            "234",
+            "256",
+            "367",
+            "375"
+          ]
+        ],
+        "desc": "Knuth 3p7c"
+      },
+      "8": {
+        "total_turns": 2451,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "123",
+            "234",
+            "354",
+            "367",
+            "438"
+          ]
+        ],
+        "desc": "Knuth 3p8c"
+      },
+      "9": {
+        "total_turns": 3778,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "123",
+            "234",
+            "325",
+            "416",
+            "147",
+            "481"
+          ]
+        ],
+        "desc": "Knuth 3p9c"
+      },
+      "10": {
+        "total_turns": 5505,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "123",
+            "245",
+            "362",
+            "431",
+            "531"
+          ]
+        ],
+        "desc": "Knuth 3p10c"
+      },
+      "11": {
+        "total_turns": 7734,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "123",
+            "456",
+            "567",
+            "687",
+            "195",
+            "57a"
+          ]
+        ],
+        "desc": "Knuth 3p11c"
+      },
+      "12": {
+        "total_turns": 10591,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "123",
+            "234",
+            "516",
+            "557",
+            "689",
+            "616"
+          ]
+        ],
+        "desc": "Knuth 3p12c"
+      },
+      "13": {
+        "total_turns": 14133,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "123",
+            "456",
+            "567",
+            "589",
+            "a6b",
+            "6cc",
+            "66d"
+          ]
+        ],
+        "desc": "Knuth 3p13c"
+      },
+      "14": {
+        "total_turns": 18408,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "123",
+            "456",
+            "578",
+            "695",
+            "a6b",
+            "1cd",
+            "6d5"
+          ]
+        ],
+        "desc": "Knuth 3p14c"
+      },
+      "15": {
+        "total_turns": 23627,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "123",
+            "456",
+            "445",
+            "789",
+            "758"
+          ]
+        ],
+        "desc": "Knuth 3p15c"
+      }
+    },
+    "4": {
+      "2": {
+        "total_turns": 44,
+        "max_turns": 4,
+        "sample_games": [
+          [
+            "1112",
+            "1221"
+          ]
+        ],
+        "desc": "Knuth 4p2c"
+      },
+      "3": {
+        "total_turns": 249,
+        "max_turns": 4,
+        "sample_games": [
+          [
+            "1123",
+            "1232",
+            "2132"
+          ]
+        ],
+        "desc": "Knuth 4p3c"
+      },
+      "4": {
+        "total_turns": 919,
+        "max_turns": 4,
+        "sample_games": [
+          [
+            "1123",
+            "4412",
+            "2334"
+          ]
+        ],
+        "desc": "Knuth 4p4c"
+      },
+      "5": {
+        "total_turns": 2521,
+        "max_turns": 5,
+        "sample_games": [
+          [
+            "1123",
+            "2324",
+            "1533",
+            "3133"
+          ]
+        ],
+        "desc": "Knuth 4p5c"
+      },
+      "6": {
+        "total_turns": 5801,
+        "max_turns": 5,
+        "sample_games": [
+          [
+            "1122",
+            "2344",
+            "3235",
+            "1336",
+            "3415"
+          ],
+          [
+            "1122",
+            "1344",
+            "3526",
+            "1462",
+            "3632"
+          ]
+        ],
+        "desc": "Knuth 4p6c"
+      },
+      "7": {
+        "total_turns": 11613,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "1234",
+            "2353",
+            "3315",
+            "3556",
+            "3157",
+            "3751"
+          ]
+        ],
+        "desc": "Knuth 4p7c"
+      },
+      "8": {
+        "total_turns": 21230,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "1234",
+            "2353",
+            "4361",
+            "1117",
+            "4341",
+            "4381"
+          ]
+        ],
+        "desc": "Knuth 4p8c"
+      },
+      "9": {
+        "total_turns": 36120,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "1234",
+            "2353",
+            "4142",
+            "1167",
+            "4812"
+          ]
+        ],
+        "desc": "Knuth 4p9c"
+      },
+      "10": {
+        "total_turns": 58103,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "1234",
+            "2145",
+            "4617",
+            "4892",
+            "351a",
+            "5311"
+          ]
+        ],
+        "desc": "Knuth 4p10c"
+      },
+      "11": {
+        "total_turns": 89907,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "1234",
+            "2556",
+            "3461",
+            "4475",
+            "1189",
+            "57a1"
+          ]
+        ],
+        "desc": "Knuth 4p11c"
+      },
+      "12": {
+        "total_turns": 133078,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "1234",
+            "2156",
+            "2345",
+            "7168",
+            "699a",
+            "616a"
+          ]
+        ],
+        "desc": "Knuth 4p12c"
+      },
+      "13": {
+        "total_turns": 191995,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "1234",
+            "5678",
+            "569a",
+            "5bac",
+            "19db",
+            "61aa",
+            "66da"
+          ]
+        ],
+        "desc": "Knuth 4p13c"
+      },
+      "14": {
+        "total_turns": 268966,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "1234",
+            "5678",
+            "6797",
+            "a78b",
+            "55cd",
+            "6c57",
+            "6d57"
+          ]
+        ],
+        "desc": "Knuth 4p14c"
+      },
+      "15": {
+        "total_turns": 368605,
+        "max_turns": 10,
+        "sample_games": [
+          [
+            "1234",
+            "5567",
+            "5859",
+            "69a5",
+            "7bcd",
+            "758e",
+            "7588"
+          ]
+        ],
+        "desc": "Knuth 4p15c"
+      }
+    },
+    "5": {
+      "2": {
+        "total_turns": 97,
+        "max_turns": 4,
+        "sample_games": [
+          [
+            "11122",
+            "12212"
+          ]
+        ],
+        "desc": "Knuth 5p2c"
+      },
+      "3": {
+        "total_turns": 828,
+        "max_turns": 4,
+        "sample_games": [
+          [
+            "11122",
+            "12212",
+            "21321"
+          ]
+        ],
+        "desc": "Knuth 5p3c"
+      },
+      "4": {
+        "total_turns": 4078,
+        "max_turns": 5,
+        "sample_games": [
+          [
+            "11223",
+            "23334",
+            "21343",
+            "23343"
+          ]
+        ],
+        "desc": "Knuth 5p4c"
+      },
+      "5": {
+        "total_turns": 13867,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "11223",
+            "11442",
+            "55135",
+            "13333",
+            "31333"
+          ]
+        ],
+        "desc": "Knuth 5p5c"
+      },
+      "6": {
+        "total_turns": 37925,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "11223",
+            "23442",
+            "44152",
+            "34152"
+          ]
+        ],
+        "desc": "Knuth 5p6c"
+      },
+      "7": {
+        "total_turns": 87936,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "11223",
+            "11445",
+            "24264",
+            "37157",
+            "75153",
+            "37513"
+          ]
+        ],
+        "desc": "Knuth 5p7c"
+      },
+      "8": {
+        "total_turns": 183775,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "11223",
+            "11456",
+            "45262",
+            "78165",
+            "13347",
+            "43813"
+          ]
+        ],
+        "desc": "Knuth 5p8c"
+      },
+      "9": {
+        "total_turns": 351385,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "11234",
+            "25643",
+            "67315",
+            "82461",
+            "46182",
+            "48126"
+          ]
+        ],
+        "desc": "Knuth 5p9c"
+      },
+      "10": {
+        "total_turns": 626555,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "12345",
+            "26257",
+            "44582",
+            "51933",
+            "47911",
+            "3a921",
+            "53111"
+          ]
+        ],
+        "desc": "Knuth 5p10c"
+      },
+      "11": {
+        "total_turns": 1055639,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "12345",
+            "26257",
+            "53683",
+            "73519",
+            "1a712",
+            "537a1",
+            "57a13"
+          ]
+        ],
+        "desc": "Knuth 5p11c"
+      },
+      "12": {
+        "total_turns": 1706673,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "12345",
+            "26478",
+            "4429a",
+            "7592b",
+            "ac632",
+            "a38b2",
+            "616a2"
+          ]
+        ],
+        "desc": "Knuth 5p12c"
+      },
+      "13": {
+        "total_turns": 2659004,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "12345",
+            "66789",
+            "6a66b",
+            "77bc9",
+            "119ad",
+            "66da9"
+          ]
+        ],
+        "desc": "Knuth 5p13c"
+      },
+      "14": {
+        "total_turns": 4012280,
+        "max_turns": 10,
+        "sample_games": [
+          [
+            "12345",
+            "6789a",
+            "679bc",
+            "6d7e7",
+            "2bbd7",
+            "1147b",
+            "6d57b"
+          ]
+        ],
+        "desc": "Knuth 5p14c"
+      },
+      "15": {
+        "total_turns": 5856117,
+        "max_turns": 10,
+        "sample_games": [
+          [
+            "11234",
+            "56789",
+            "55669",
+            "5787a",
+            "88ab9",
+            "7a6c8",
+            "75888"
+          ]
+        ],
+        "desc": "Knuth 5p15c"
+      }
+    },
+    "6": {
+      "2": {
+        "total_turns": 225,
+        "max_turns": 5,
+        "sample_games": [
+          [
+            "111222",
+            "122112",
+            "122121"
+          ]
+        ],
+        "desc": "Knuth 6p2c"
+      },
+      "3": {
+        "total_turns": 2729,
+        "max_turns": 5,
+        "sample_games": [
+          [
+            "111223",
+            "133221",
+            "112121",
+            "213211"
+          ]
+        ],
+        "desc": "Knuth 6p3c"
+      },
+      "4": {
+        "total_turns": 17935,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "112233",
+            "121414",
+            "442324",
+            "233431"
+          ]
+        ],
+        "desc": "Knuth 6p4c"
+      },
+      "5": {
+        "total_turns": 76087,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "112233",
+            "111344",
+            "155245",
+            "313333"
+          ]
+        ],
+        "desc": "Knuth 6p5c"
+      },
+      "6": {
+        "total_turns": 248146,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "111234",
+            "223413",
+            "154352",
+            "335246",
+            "431526",
+            "341526"
+          ]
+        ],
+        "desc": "Knuth 6p6c"
+      },
+      "7": {
+        "total_turns": 672380,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "112234",
+            "333565",
+            "347735",
+            "244637",
+            "375137"
+          ]
+        ],
+        "desc": "Knuth 6p7c"
+      },
+      "8": {
+        "total_turns": 1595582,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "112234",
+            "134431",
+            "145643",
+            "423737",
+            "431836",
+            "438135"
+          ]
+        ],
+        "desc": "Knuth 6p8c"
+      },
+      "9": {
+        "total_turns": 3416564,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "112234",
+            "133414",
+            "552263",
+            "472156",
+            "542188",
+            "481266"
+          ]
+        ],
+        "desc": "Knuth 6p9c"
+      },
+      "10": {
+        "total_turns": 6737187,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "112345",
+            "223464",
+            "451557",
+            "531138",
+            "131191",
+            "531111"
+          ]
+        ],
+        "desc": "Knuth 6p10c"
+      },
+      "11": {
+        "total_turns": 12500711,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "112234",
+            "115637",
+            "158195",
+            "153a5b",
+            "56a135",
+            "56b135",
+            "57a135"
+          ]
+        ],
+        "desc": "Knuth 6p11c"
+      },
+      "12": {
+        "total_turns": 21946721,
+        "max_turns": 10,
+        "sample_games": [
+          [
+            "112345",
+            "162378",
+            "419a27",
+            "658a96",
+            "114b2c",
+            "616a26"
+          ]
+        ],
+        "desc": "Knuth 6p12c"
+      },
+      "13": {
+        "total_turns": 36803570,
+        "max_turns": 10,
+        "sample_games": [
+          [
+            "123456",
+            "274899",
+            "576a9b",
+            "5ca39d",
+            "57b3bc",
+            "a6dad1",
+            "66da91"
+          ]
+        ],
+        "desc": "Knuth 6p13c"
+      },
+      "14": {
+        "total_turns": 59547500,
+        "max_turns": 10,
+        "sample_games": [
+          [
+            "123456",
+            "211267",
+            "352772",
+            "582571",
+            "657924",
+            "756ab2",
+            "1611cd",
+            "6c57b2",
+            "6d57b2"
+          ]
+        ],
+        "desc": "Knuth 6p14c"
+      }
+    },
+    "7": {
+      "2": {
+        "total_turns": 512,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "1111222",
+            "1112112",
+            "1112121",
+            "1221212"
+          ]
+        ],
+        "desc": "Knuth 7p2c"
+      },
+      "3": {
+        "total_turns": 9047,
+        "max_turns": 5,
+        "sample_games": [
+          [
+            "1112233",
+            "1221223",
+            "2133132",
+            "2132111"
+          ]
+        ],
+        "desc": "Knuth 7p3c"
+      },
+      "4": {
+        "total_turns": 78639,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "1112233",
+            "2233312",
+            "1233434",
+            "2334312"
+          ]
+        ],
+        "desc": "Knuth 7p4c"
+      },
+      "5": {
+        "total_turns": 417198,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "1112234",
+            "1353331",
+            "4333534",
+            "3153535",
+            "3133333"
+          ]
+        ],
+        "desc": "Knuth 7p5c"
+      },
+      "6": {
+        "total_turns": 1624868,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "1122334",
+            "1255226",
+            "1533255",
+            "1456263",
+            "3155264",
+            "3415264"
+          ]
+        ],
+        "desc": "Knuth 7p6c"
+      },
+      "7": {
+        "total_turns": 5124234,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "1122334",
+            "1444555",
+            "2525336",
+            "5751337",
+            "1373357",
+            "3751375"
+          ]
+        ],
+        "desc": "Knuth 7p7c"
+      },
+      "8": {
+        "total_turns": 13862218,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "1122345",
+            "1667117",
+            "2286245",
+            "8811445",
+            "3358851",
+            "1185853",
+            "3481354",
+            "4381354"
+          ]
+        ],
+        "desc": "Knuth 7p8c"
+      },
+      "9": {
+        "total_turns": 33288965,
+        "max_turns": 10,
+        "sample_games": [
+          [
+            "1122345",
+            "2236327",
+            "3882992",
+            "4773942",
+            "2216569",
+            "4682562",
+            "4812662"
+          ]
+        ],
+        "desc": "Knuth 7p9c"
+      },
+      "10": {
+        "total_turns": 72907957,
+        "max_turns": 10,
+        "sample_games": [
+          [
+            "1122345",
+            "6677112",
+            "3534411",
+            "8583161",
+            "491a811",
+            "5311111"
+          ]
+        ],
+        "desc": "Knuth 7p10c"
+      }
+    },
+    "8": {
+      "2": {
+        "total_turns": 1126,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "11111222",
+            "11122122",
+            "11211122",
+            "12212122"
+          ]
+        ],
+        "desc": "Knuth 8p2c"
+      },
+      "3": {
+        "total_turns": 29615,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "11122233",
+            "11233311",
+            "22312313",
+            "12111322",
+            "21321112"
+          ]
+        ],
+        "desc": "Knuth 8p3c"
+      },
+      "4": {
+        "total_turns": 343450,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "11122334",
+            "24411143",
+            "32211223",
+            "11313121",
+            "23343122"
+          ]
+        ],
+        "desc": "Knuth 8p4c"
+      },
+      "5": {
+        "total_turns": 2281524,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "11122334",
+            "44422555",
+            "12311111",
+            "31333333"
+          ]
+        ],
+        "desc": "Knuth 8p5c"
+      },
+      "6": {
+        "total_turns": 10658126,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "11122334",
+            "22444332",
+            "13233255",
+            "41125443",
+            "45326114",
+            "34112546",
+            "34152641"
+          ]
+        ],
+        "desc": "Knuth 8p6c"
+      },
+      "7": {
+        "total_turns": 39086516,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "11223344",
+            "12552256",
+            "13662633",
+            "32553777",
+            "12577374",
+            "37513157",
+            "37513751"
+          ]
+        ],
+        "desc": "Knuth 8p7c"
+      },
+      "8": {
+        "total_turns": 120477136,
+        "max_turns": 10,
+        "sample_games": [
+          [
+            "11223344",
+            "12552266",
+            "45463434",
+            "35727334",
+            "23476147",
+            "43173548",
+            "43813547"
+          ]
+        ],
+        "desc": "Knuth 8p8c"
+      }
+    }
+  },
+  "Most Parts": {
+    "2": {
+      "2": {
+        "total_turns": 8,
+        "max_turns": 3,
+        "sample_games": [
+          [
+            "12"
+          ]
+        ],
+        "desc": "Most Parts 2p2c"
+      },
+      "3": {
+        "total_turns": 21,
+        "max_turns": 3,
+        "sample_games": [
+          [
+            "12",
+            "21"
+          ]
+        ],
+        "desc": "Most Parts 2p3c"
+      },
+      "4": {
+        "total_turns": 45,
+        "max_turns": 4,
+        "sample_games": [
+          [
+            "12",
+            "23"
+          ]
+        ],
+        "desc": "Most Parts 2p4c"
+      },
+      "5": {
+        "total_turns": 81,
+        "max_turns": 4,
+        "sample_games": [
+          [
+            "12",
+            "23",
+            "31"
+          ]
+        ],
+        "desc": "Most Parts 2p5c"
+      },
+      "6": {
+        "total_turns": 132,
+        "max_turns": 5,
+        "sample_games": [
+          [
+            "12",
+            "34"
+          ]
+        ],
+        "desc": "Most Parts 2p6c"
+      },
+      "7": {
+        "total_turns": 199,
+        "max_turns": 5,
+        "sample_games": [
+          [
+            "12",
+            "34",
+            "35",
+            "63",
+            "37"
+          ]
+        ],
+        "desc": "Most Parts 2p7c"
+      },
+      "8": {
+        "total_turns": 285,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "12",
+            "34",
+            "43"
+          ]
+        ],
+        "desc": "Most Parts 2p8c"
+      },
+      "9": {
+        "total_turns": 391,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "12",
+            "34",
+            "45",
+            "67",
+            "48"
+          ]
+        ],
+        "desc": "Most Parts 2p9c"
+      },
+      "10": {
+        "total_turns": 520,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "12",
+            "34",
+            "45",
+            "53"
+          ]
+        ],
+        "desc": "Most Parts 2p10c"
+      },
+      "11": {
+        "total_turns": 673,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "12",
+            "34",
+            "56",
+            "57"
+          ]
+        ],
+        "desc": "Most Parts 2p11c"
+      },
+      "12": {
+        "total_turns": 853,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "12",
+            "23",
+            "45",
+            "67",
+            "61"
+          ]
+        ],
+        "desc": "Most Parts 2p12c"
+      },
+      "13": {
+        "total_turns": 1061,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "12",
+            "34",
+            "56",
+            "57",
+            "68",
+            "66"
+          ]
+        ],
+        "desc": "Most Parts 2p13c"
+      },
+      "14": {
+        "total_turns": 1300,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "12",
+            "34",
+            "56",
+            "67",
+            "89",
+            "ab",
+            "cd",
+            "6d"
+          ]
+        ],
+        "desc": "Most Parts 2p14c"
+      },
+      "15": {
+        "total_turns": 1571,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "12",
+            "34",
+            "56",
+            "67",
+            "75"
+          ]
+        ],
+        "desc": "Most Parts 2p15c"
+      }
+    },
+    "3": {
+      "2": {
+        "total_turns": 18,
+        "max_turns": 3,
+        "sample_games": [
+          [
+            "112",
+            "122"
+          ]
+        ],
+        "desc": "Most Parts 3p2c"
+      },
+      "3": {
+        "total_turns": 73,
+        "max_turns": 4,
+        "sample_games": [
+          [
+            "112",
+            "123",
+            "213"
+          ]
+        ],
+        "desc": "Most Parts 3p3c"
+      },
+      "4": {
+        "total_turns": 206,
+        "max_turns": 4,
+        "sample_games": [
+          [
+            "112",
+            "233"
+          ]
+        ],
+        "desc": "Most Parts 3p4c"
+      },
+      "5": {
+        "total_turns": 453,
+        "max_turns": 5,
+        "sample_games": [
+          [
+            "123",
+            "134",
+            "313"
+          ]
+        ],
+        "desc": "Most Parts 3p5c"
+      },
+      "6": {
+        "total_turns": 859,
+        "max_turns": 5,
+        "sample_games": [
+          [
+            "123",
+            "234",
+            "145",
+            "341"
+          ]
+        ],
+        "desc": "Most Parts 3p6c"
+      },
+      "7": {
+        "total_turns": 1492,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "123",
+            "245",
+            "635",
+            "355",
+            "375"
+          ]
+        ],
+        "desc": "Most Parts 3p7c"
+      },
+      "8": {
+        "total_turns": 2407,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "123",
+            "245",
+            "364",
+            "147",
+            "438"
+          ]
+        ],
+        "desc": "Most Parts 3p8c"
+      },
+      "9": {
+        "total_turns": 3668,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "123",
+            "245",
+            "364",
+            "417",
+            "481"
+          ]
+        ],
+        "desc": "Most Parts 3p9c"
+      },
+      "10": {
+        "total_turns": 5377,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "123",
+            "234",
+            "215",
+            "531"
+          ]
+        ],
+        "desc": "Most Parts 3p10c"
+      },
+      "11": {
+        "total_turns": 7597,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "123",
+            "456",
+            "578",
+            "975",
+            "1a7",
+            "57a"
+          ]
+        ],
+        "desc": "Most Parts 3p11c"
+      },
+      "12": {
+        "total_turns": 10428,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "123",
+            "245",
+            "367",
+            "681",
+            "196",
+            "616"
+          ]
+        ],
+        "desc": "Most Parts 3p12c"
+      },
+      "13": {
+        "total_turns": 13989,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "123",
+            "456",
+            "578",
+            "69a",
+            "b6c",
+            "b4a",
+            "66d"
+          ]
+        ],
+        "desc": "Most Parts 3p13c"
+      },
+      "14": {
+        "total_turns": 18365,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "123",
+            "456",
+            "567",
+            "478",
+            "19a",
+            "1bc",
+            "6d5"
+          ]
+        ],
+        "desc": "Most Parts 3p14c"
+      },
+      "15": {
+        "total_turns": 23682,
+        "max_turns": 10,
+        "sample_games": [
+          [
+            "123",
+            "456",
+            "478",
+            "447",
+            "758"
+          ]
+        ],
+        "desc": "Most Parts 3p15c"
+      }
+    },
+    "4": {
+      "2": {
+        "total_turns": 44,
+        "max_turns": 4,
+        "sample_games": [
+          [
+            "1112",
+            "1221"
+          ]
+        ],
+        "desc": "Most Parts 4p2c"
+      },
+      "3": {
+        "total_turns": 246,
+        "max_turns": 4,
+        "sample_games": [
+          [
+            "1123",
+            "1232",
+            "2132"
+          ]
+        ],
+        "desc": "Most Parts 4p3c"
+      },
+      "4": {
+        "total_turns": 910,
+        "max_turns": 5,
+        "sample_games": [
+          [
+            "1123",
+            "2441",
+            "2234",
+            "2334"
+          ]
+        ],
+        "desc": "Most Parts 4p4c"
+      },
+      "5": {
+        "total_turns": 2473,
+        "max_turns": 5,
+        "sample_games": [
+          [
+            "1123",
+            "1425",
+            "3133"
+          ]
+        ],
+        "desc": "Most Parts 4p5c"
+      },
+      "6": {
+        "total_turns": 5668,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "1123",
+            "2344",
+            "3255",
+            "1135",
+            "3415"
+          ]
+        ],
+        "desc": "Most Parts 4p6c"
+      },
+      "7": {
+        "total_turns": 11388,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "1123",
+            "2344",
+            "3516",
+            "3617",
+            "3751"
+          ]
+        ],
+        "desc": "Most Parts 4p7c"
+      },
+      "8": {
+        "total_turns": 20838,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "1234",
+            "2145",
+            "3416",
+            "1372",
+            "4381"
+          ]
+        ],
+        "desc": "Most Parts 4p8c"
+      },
+      "9": {
+        "total_turns": 35429,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "1234",
+            "2145",
+            "3451",
+            "1617",
+            "4812"
+          ]
+        ],
+        "desc": "Most Parts 4p9c"
+      },
+      "10": {
+        "total_turns": 57320,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "1234",
+            "2156",
+            "3517",
+            "5813",
+            "1115",
+            "5311"
+          ]
+        ],
+        "desc": "Most Parts 4p10c"
+      },
+      "11": {
+        "total_turns": 88645,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "1234",
+            "2556",
+            "3677",
+            "4869",
+            "571a",
+            "57a1"
+          ]
+        ],
+        "desc": "Most Parts 4p11c"
+      },
+      "12": {
+        "total_turns": 132247,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "1234",
+            "2556",
+            "3677",
+            "4869",
+            "61ab",
+            "b16b",
+            "616a"
+          ]
+        ],
+        "desc": "Most Parts 4p12c"
+      },
+      "13": {
+        "total_turns": 191436,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "1234",
+            "5567",
+            "6889",
+            "78ab",
+            "97cd",
+            "66bc",
+            "66da"
+          ]
+        ],
+        "desc": "Most Parts 4p13c"
+      },
+      "14": {
+        "total_turns": 270043,
+        "max_turns": 10,
+        "sample_games": [
+          [
+            "1234",
+            "5567",
+            "5658",
+            "5795",
+            "1a1b",
+            "1c1d",
+            "6d57"
+          ]
+        ],
+        "desc": "Most Parts 4p14c"
+      },
+      "15": {
+        "total_turns": 372411,
+        "max_turns": 10,
+        "sample_games": [
+          [
+            "1234",
+            "5567",
+            "5859",
+            "9a65",
+            "77b8",
+            "118c",
+            "7588"
+          ]
+        ],
+        "desc": "Most Parts 4p15c"
+      }
+    },
+    "5": {
+      "2": {
+        "total_turns": 97,
+        "max_turns": 4,
+        "sample_games": [
+          [
+            "11122",
+            "12212"
+          ]
+        ],
+        "desc": "Most Parts 5p2c"
+      },
+      "3": {
+        "total_turns": 816,
+        "max_turns": 4,
+        "sample_games": [
+          [
+            "11123",
+            "12213",
+            "21321"
+          ]
+        ],
+        "desc": "Most Parts 5p3c"
+      },
+      "4": {
+        "total_turns": 3973,
+        "max_turns": 5,
+        "sample_games": [
+          [
+            "11223",
+            "13344",
+            "23343"
+          ]
+        ],
+        "desc": "Most Parts 5p4c"
+      },
+      "5": {
+        "total_turns": 13598,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "11223",
+            "14245",
+            "31333"
+          ]
+        ],
+        "desc": "Most Parts 5p5c"
+      },
+      "6": {
+        "total_turns": 37127,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "11223",
+            "22145",
+            "23451",
+            "11112",
+            "34152"
+          ]
+        ],
+        "desc": "Most Parts 5p6c"
+      },
+      "7": {
+        "total_turns": 86869,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "11223",
+            "13344",
+            "31536",
+            "14637",
+            "37513"
+          ]
+        ],
+        "desc": "Most Parts 5p7c"
+      },
+      "8": {
+        "total_turns": 181834,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "11223",
+            "13344",
+            "31454",
+            "43136",
+            "43713",
+            "43813"
+          ]
+        ],
+        "desc": "Most Parts 5p8c"
+      },
+      "9": {
+        "total_turns": 348597,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "11234",
+            "22315",
+            "34426",
+            "34782",
+            "47126",
+            "48126"
+          ]
+        ],
+        "desc": "Most Parts 5p9c"
+      },
+      "10": {
+        "total_turns": 625020,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "11234",
+            "22315",
+            "23426",
+            "25571",
+            "11118",
+            "53111"
+          ]
+        ],
+        "desc": "Most Parts 5p10c"
+      },
+      "11": {
+        "total_turns": 1061986,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "11234",
+            "22353",
+            "24426",
+            "35157",
+            "57381",
+            "11793",
+            "57a13"
+          ]
+        ],
+        "desc": "Most Parts 5p11c"
+      },
+      "12": {
+        "total_turns": 1726424,
+        "max_turns": 10,
+        "sample_games": [
+          [
+            "11234",
+            "12525",
+            "21667",
+            "77682",
+            "1119a",
+            "616a2"
+          ]
+        ],
+        "desc": "Most Parts 5p12c"
+      },
+      "13": {
+        "total_turns": 2699887,
+        "max_turns": 10,
+        "sample_games": [
+          [
+            "12345",
+            "66778",
+            "6979a",
+            "6ab7c",
+            "a66d9",
+            "66da9"
+          ]
+        ],
+        "desc": "Most Parts 5p13c"
+      },
+      "14": {
+        "total_turns": 4088208,
+        "max_turns": 11,
+        "sample_games": [
+          [
+            "12345",
+            "26267",
+            "33678",
+            "77928",
+            "44a76",
+            "61b7c",
+            "1d11e",
+            "65c7e",
+            "6d57b"
+          ]
+        ],
+        "desc": "Most Parts 5p14c"
+      },
+      "15": {
+        "total_turns": 6023213,
+        "max_turns": 11,
+        "sample_games": [
+          [
+            "12345",
+            "26267",
+            "33688",
+            "37789",
+            "36a9b",
+            "1181c",
+            "74888",
+            "75888"
+          ]
+        ],
+        "desc": "Most Parts 5p15c"
+      }
+    },
+    "6": {
+      "2": {
+        "total_turns": 224,
+        "max_turns": 5,
+        "sample_games": [
+          [
+            "111122",
+            "112212",
+            "121221",
+            "122121"
+          ]
+        ],
+        "desc": "Most Parts 6p2c"
+      },
+      "3": {
+        "total_turns": 2672,
+        "max_turns": 5,
+        "sample_games": [
+          [
+            "111223",
+            "112132",
+            "231121",
+            "213211"
+          ]
+        ],
+        "desc": "Most Parts 6p3c"
+      },
+      "4": {
+        "total_turns": 17480,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "111223",
+            "224344",
+            "342312",
+            "233431"
+          ]
+        ],
+        "desc": "Most Parts 6p4c"
+      },
+      "5": {
+        "total_turns": 74698,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "111223",
+            "114455",
+            "122324",
+            "313333"
+          ]
+        ],
+        "desc": "Most Parts 6p5c"
+      },
+      "6": {
+        "total_turns": 244179,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "112233",
+            "221445",
+            "234164",
+            "563423",
+            "441326",
+            "341526"
+          ]
+        ],
+        "desc": "Most Parts 6p6c"
+      },
+      "7": {
+        "total_turns": 663885,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "112233",
+            "121144",
+            "133556",
+            "366137",
+            "357137",
+            "375137"
+          ]
+        ],
+        "desc": "Most Parts 6p7c"
+      },
+      "8": {
+        "total_turns": 1580082,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "112233",
+            "121144",
+            "133456",
+            "313547",
+            "435118",
+            "438135"
+          ]
+        ],
+        "desc": "Most Parts 6p8c"
+      },
+      "9": {
+        "total_turns": 3396961,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "112234",
+            "131153",
+            "124446",
+            "641276",
+            "481267",
+            "481266"
+          ]
+        ],
+        "desc": "Most Parts 6p9c"
+      },
+      "10": {
+        "total_turns": 6743303,
+        "max_turns": 10,
+        "sample_games": [
+          [
+            "112234",
+            "223355",
+            "351166",
+            "361627",
+            "385191",
+            "35aa11",
+            "531111"
+          ]
+        ],
+        "desc": "Most Parts 6p10c"
+      },
+      "11": {
+        "total_turns": 12566476,
+        "max_turns": 10,
+        "sample_games": [
+          [
+            "112234",
+            "125556",
+            "216677",
+            "442865",
+            "351719",
+            "13711a",
+            "57a135"
+          ]
+        ],
+        "desc": "Most Parts 6p11c"
+      },
+      "12": {
+        "total_turns": 22223299,
+        "max_turns": 11,
+        "sample_games": [
+          [
+            "112234",
+            "125556",
+            "166627",
+            "716826",
+            "11191a",
+            "616a26"
+          ]
+        ],
+        "desc": "Most Parts 6p12c"
+      },
+      "13": {
+        "total_turns": 37593625,
+        "max_turns": 12,
+        "sample_games": [
+          [
+            "112345",
+            "226667",
+            "337786",
+            "79929a",
+            "7bbb2c",
+            "1149aa",
+            "66a19d",
+            "669a1d",
+            "66da91"
+          ]
+        ],
+        "desc": "Most Parts 6p13c"
+      },
+      "14": {
+        "total_turns": 61208193,
+        "max_turns": 12,
+        "sample_games": [
+          [
+            "112345",
+            "221667",
+            "336186",
+            "464729",
+            "779921",
+            "56527a",
+            "b675bc",
+            "6d57b2"
+          ]
+        ],
+        "desc": "Most Parts 6p14c"
+      }
+    },
+    "7": {
+      "2": {
+        "total_turns": 506,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "1111222",
+            "1122122",
+            "1212212",
+            "1112121",
+            "1221212"
+          ]
+        ],
+        "desc": "Most Parts 7p2c"
+      },
+      "3": {
+        "total_turns": 8794,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "1111223",
+            "1223111",
+            "2132111"
+          ]
+        ],
+        "desc": "Most Parts 7p3c"
+      },
+      "4": {
+        "total_turns": 76616,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "1112223",
+            "2241344",
+            "2321331",
+            "2233431",
+            "2334312"
+          ]
+        ],
+        "desc": "Most Parts 7p4c"
+      },
+      "5": {
+        "total_turns": 409443,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "1112233",
+            "1142445",
+            "1213112",
+            "3133333"
+          ]
+        ],
+        "desc": "Most Parts 7p5c"
+      },
+      "6": {
+        "total_turns": 1602722,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "1112233",
+            "2242434",
+            "1124445",
+            "1452513",
+            "3415264"
+          ]
+        ],
+        "desc": "Most Parts 7p6c"
+      },
+      "7": {
+        "total_turns": 5073674,
+        "max_turns": 10,
+        "sample_games": [
+          [
+            "1112233",
+            "2234445",
+            "2363667",
+            "5626115",
+            "5533771",
+            "3751375"
+          ]
+        ],
+        "desc": "Most Parts 7p7c"
+      },
+      "8": {
+        "total_turns": 13741851,
+        "max_turns": 10,
+        "sample_games": [
+          [
+            "1122334",
+            "1114245",
+            "2343354",
+            "5442362",
+            "1151117",
+            "4381354"
+          ]
+        ],
+        "desc": "Most Parts 7p8c"
+      },
+      "9": {
+        "total_turns": 33135765,
+        "max_turns": 11,
+        "sample_games": [
+          [
+            "1122334",
+            "1211255",
+            "1333516",
+            "2114447",
+            "2227173",
+            "4186262",
+            "4612862",
+            "4812662"
+          ]
+        ],
+        "desc": "Most Parts 7p9c"
+      },
+      "10": {
+        "total_turns": 72910123,
+        "max_turns": 11,
+        "sample_games": [
+          [
+            "1122334",
+            "2215556",
+            "2336667",
+            "5311889",
+            "44518a7",
+            "5311111"
+          ]
+        ],
+        "desc": "Most Parts 7p10c"
+      }
+    },
+    "8": {
+      "2": {
+        "total_turns": 1123,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "11112222",
+            "11121122",
+            "11222212",
+            "12122221",
+            "12211222",
+            "12212122"
+          ]
+        ],
+        "desc": "Most Parts 8p2c"
+      },
+      "3": {
+        "total_turns": 28853,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "11112223",
+            "11221231",
+            "13231112",
+            "21321112"
+          ]
+        ],
+        "desc": "Most Parts 8p3c"
+      },
+      "4": {
+        "total_turns": 336330,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "11122233",
+            "22213344",
+            "23441312",
+            "23233111",
+            "23343122"
+          ]
+        ],
+        "desc": "Most Parts 8p4c"
+      },
+      "5": {
+        "total_turns": 2247192,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "11122233",
+            "11444535",
+            "12413311",
+            "31333333"
+          ]
+        ],
+        "desc": "Most Parts 8p5c"
+      },
+      "6": {
+        "total_turns": 10540468,
+        "max_turns": 10,
+        "sample_games": [
+          [
+            "11122233",
+            "11211444",
+            "12444225",
+            "26156412",
+            "34125461",
+            "34152154",
+            "34152641"
+          ]
+        ],
+        "desc": "Most Parts 8p6c"
+      },
+      "7": {
+        "total_turns": 38827800,
+        "max_turns": 11,
+        "sample_games": [
+          [
+            "11122334",
+            "22233553",
+            "22344246",
+            "33711573",
+            "37513751"
+          ]
+        ],
+        "desc": "Most Parts 8p7c"
+      },
+      "8": {
+        "total_turns": 120031735,
+        "max_turns": 12,
+        "sample_games": [
+          [
+            "11122334",
+            "22233553",
+            "22344467",
+            "23438848",
+            "26883128",
+            "34733418",
+            "73843541",
+            "43813547"
+          ]
+        ],
+        "desc": "Most Parts 8p8c"
+      }
+    }
+  },
+  "Expected Size": {
+    "2": {
+      "2": {
+        "total_turns": 8,
+        "max_turns": 3,
+        "sample_games": [
+          [
+            "12"
+          ]
+        ],
+        "desc": "Expected Size 2p2c"
+      },
+      "3": {
+        "total_turns": 21,
+        "max_turns": 3,
+        "sample_games": [
+          [
+            "12",
+            "21"
+          ]
+        ],
+        "desc": "Expected Size 2p3c"
+      },
+      "4": {
+        "total_turns": 45,
+        "max_turns": 4,
+        "sample_games": [
+          [
+            "12",
+            "23"
+          ]
+        ],
+        "desc": "Expected Size 2p4c"
+      },
+      "5": {
+        "total_turns": 81,
+        "max_turns": 4,
+        "sample_games": [
+          [
+            "12",
+            "23",
+            "31"
+          ]
+        ],
+        "desc": "Expected Size 2p5c"
+      },
+      "6": {
+        "total_turns": 132,
+        "max_turns": 5,
+        "sample_games": [
+          [
+            "12",
+            "34"
+          ]
+        ],
+        "desc": "Expected Size 2p6c"
+      },
+      "7": {
+        "total_turns": 198,
+        "max_turns": 5,
+        "sample_games": [
+          [
+            "12",
+            "34",
+            "45",
+            "63",
+            "37"
+          ]
+        ],
+        "desc": "Expected Size 2p7c"
+      },
+      "8": {
+        "total_turns": 284,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "12",
+            "34",
+            "43"
+          ]
+        ],
+        "desc": "Expected Size 2p8c"
+      },
+      "9": {
+        "total_turns": 388,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "12",
+            "34",
+            "45",
+            "67",
+            "48"
+          ]
+        ],
+        "desc": "Expected Size 2p9c"
+      },
+      "10": {
+        "total_turns": 517,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "12",
+            "34",
+            "45",
+            "53"
+          ]
+        ],
+        "desc": "Expected Size 2p10c"
+      },
+      "11": {
+        "total_turns": 667,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "12",
+            "34",
+            "56",
+            "67",
+            "57"
+          ]
+        ],
+        "desc": "Expected Size 2p11c"
+      },
+      "12": {
+        "total_turns": 847,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "12",
+            "23",
+            "45",
+            "67",
+            "61"
+          ]
+        ],
+        "desc": "Expected Size 2p12c"
+      },
+      "13": {
+        "total_turns": 1051,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "12",
+            "34",
+            "56",
+            "67",
+            "57",
+            "66"
+          ]
+        ],
+        "desc": "Expected Size 2p13c"
+      },
+      "14": {
+        "total_turns": 1290,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "12",
+            "34",
+            "56",
+            "67",
+            "89",
+            "ab",
+            "cd",
+            "6d"
+          ]
+        ],
+        "desc": "Expected Size 2p14c"
+      },
+      "15": {
+        "total_turns": 1556,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "12",
+            "34",
+            "56",
+            "67",
+            "75"
+          ]
+        ],
+        "desc": "Expected Size 2p15c"
+      }
+    },
+    "3": {
+      "2": {
+        "total_turns": 18,
+        "max_turns": 3,
+        "sample_games": [
+          [
+            "112",
+            "122"
+          ]
+        ],
+        "desc": "Expected Size 3p2c"
+      },
+      "3": {
+        "total_turns": 73,
+        "max_turns": 4,
+        "sample_games": [
+          [
+            "112",
+            "123",
+            "213"
+          ]
+        ],
+        "desc": "Expected Size 3p3c"
+      },
+      "4": {
+        "total_turns": 207,
+        "max_turns": 4,
+        "sample_games": [
+          [
+            "112",
+            "233"
+          ]
+        ],
+        "desc": "Expected Size 3p4c"
+      },
+      "5": {
+        "total_turns": 454,
+        "max_turns": 5,
+        "sample_games": [
+          [
+            "112",
+            "134",
+            "415",
+            "313"
+          ]
+        ],
+        "desc": "Expected Size 3p5c"
+      },
+      "6": {
+        "total_turns": 859,
+        "max_turns": 5,
+        "sample_games": [
+          [
+            "123",
+            "234",
+            "145",
+            "341"
+          ]
+        ],
+        "desc": "Expected Size 3p6c"
+      },
+      "7": {
+        "total_turns": 1489,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "123",
+            "245",
+            "356",
+            "335",
+            "375"
+          ]
+        ],
+        "desc": "Expected Size 3p7c"
+      },
+      "8": {
+        "total_turns": 2403,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "123",
+            "245",
+            "314",
+            "167",
+            "438"
+          ]
+        ],
+        "desc": "Expected Size 3p8c"
+      },
+      "9": {
+        "total_turns": 3649,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "123",
+            "245",
+            "314",
+            "637",
+            "481"
+          ]
+        ],
+        "desc": "Expected Size 3p9c"
+      },
+      "10": {
+        "total_turns": 5392,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "123",
+            "234",
+            "351",
+            "531"
+          ]
+        ],
+        "desc": "Expected Size 3p10c"
+      },
+      "11": {
+        "total_turns": 7586,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "123",
+            "456",
+            "578",
+            "975",
+            "1a7",
+            "57a"
+          ]
+        ],
+        "desc": "Expected Size 3p11c"
+      },
+      "12": {
+        "total_turns": 10339,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "123",
+            "234",
+            "516",
+            "578",
+            "69a",
+            "616"
+          ]
+        ],
+        "desc": "Expected Size 3p12c"
+      },
+      "13": {
+        "total_turns": 13858,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "123",
+            "456",
+            "567",
+            "589",
+            "6ab",
+            "66c",
+            "66d"
+          ]
+        ],
+        "desc": "Expected Size 3p13c"
+      },
+      "14": {
+        "total_turns": 18115,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "123",
+            "456",
+            "567",
+            "789",
+            "abc",
+            "6d5"
+          ]
+        ],
+        "desc": "Expected Size 3p14c"
+      },
+      "15": {
+        "total_turns": 23199,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "123",
+            "456",
+            "467",
+            "689",
+            "abc",
+            "ded",
+            "758"
+          ]
+        ],
+        "desc": "Expected Size 3p15c"
+      }
+    },
+    "4": {
+      "2": {
+        "total_turns": 44,
+        "max_turns": 4,
+        "sample_games": [
+          [
+            "1112",
+            "1221"
+          ]
+        ],
+        "desc": "Expected Size 4p2c"
+      },
+      "3": {
+        "total_turns": 246,
+        "max_turns": 4,
+        "sample_games": [
+          [
+            "1123",
+            "1232",
+            "2132"
+          ]
+        ],
+        "desc": "Expected Size 4p3c"
+      },
+      "4": {
+        "total_turns": 916,
+        "max_turns": 4,
+        "sample_games": [
+          [
+            "1123",
+            "4412",
+            "2334"
+          ]
+        ],
+        "desc": "Expected Size 4p4c"
+      },
+      "5": {
+        "total_turns": 2485,
+        "max_turns": 5,
+        "sample_games": [
+          [
+            "1123",
+            "1415",
+            "2533",
+            "3133"
+          ]
+        ],
+        "desc": "Expected Size 4p5c"
+      },
+      "6": {
+        "total_turns": 5696,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "1123",
+            "4532",
+            "2346",
+            "3415"
+          ]
+        ],
+        "desc": "Expected Size 4p6c"
+      },
+      "7": {
+        "total_turns": 11412,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "1234",
+            "2546",
+            "3153",
+            "3175",
+            "3751"
+          ]
+        ],
+        "desc": "Expected Size 4p7c"
+      },
+      "8": {
+        "total_turns": 20725,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "1234",
+            "2353",
+            "6413",
+            "4371",
+            "4341",
+            "4381"
+          ]
+        ],
+        "desc": "Expected Size 4p8c"
+      },
+      "9": {
+        "total_turns": 35033,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "1234",
+            "2353",
+            "6142",
+            "4728",
+            "4812"
+          ]
+        ],
+        "desc": "Expected Size 4p9c"
+      },
+      "10": {
+        "total_turns": 56453,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "1234",
+            "2546",
+            "4178",
+            "3792",
+            "5a13",
+            "5311"
+          ]
+        ],
+        "desc": "Expected Size 4p10c"
+      },
+      "11": {
+        "total_turns": 86903,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "1234",
+            "2567",
+            "5641",
+            "5718",
+            "195a",
+            "5791",
+            "57a1"
+          ]
+        ],
+        "desc": "Expected Size 4p11c"
+      },
+      "12": {
+        "total_turns": 129070,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "1234",
+            "2567",
+            "3869",
+            "4a6b",
+            "61ac",
+            "616a"
+          ]
+        ],
+        "desc": "Expected Size 4p12c"
+      },
+      "13": {
+        "total_turns": 185338,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "1234",
+            "5678",
+            "59ab",
+            "c69d",
+            "6d6a",
+            "66da"
+          ]
+        ],
+        "desc": "Expected Size 4p13c"
+      },
+      "14": {
+        "total_turns": 259846,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "1234",
+            "5678",
+            "6797",
+            "a75b",
+            "5c65",
+            "6d57"
+          ]
+        ],
+        "desc": "Expected Size 4p14c"
+      },
+      "15": {
+        "total_turns": 355516,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "1234",
+            "5678",
+            "5569",
+            "578a",
+            "5bcd",
+            "7588"
+          ]
+        ],
+        "desc": "Expected Size 4p15c"
+      }
+    },
+    "5": {
+      "2": {
+        "total_turns": 97,
+        "max_turns": 4,
+        "sample_games": [
+          [
+            "11122",
+            "12212"
+          ]
+        ],
+        "desc": "Expected Size 5p2c"
+      },
+      "3": {
+        "total_turns": 816,
+        "max_turns": 4,
+        "sample_games": [
+          [
+            "11123",
+            "12213",
+            "21321"
+          ]
+        ],
+        "desc": "Expected Size 5p3c"
+      },
+      "4": {
+        "total_turns": 4000,
+        "max_turns": 5,
+        "sample_games": [
+          [
+            "11223",
+            "13334",
+            "23144",
+            "23343"
+          ]
+        ],
+        "desc": "Expected Size 5p4c"
+      },
+      "5": {
+        "total_turns": 13654,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "11223",
+            "13344",
+            "45242",
+            "31333"
+          ]
+        ],
+        "desc": "Expected Size 5p5c"
+      },
+      "6": {
+        "total_turns": 37137,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "11223",
+            "23452",
+            "32155",
+            "22355",
+            "34152"
+          ]
+        ],
+        "desc": "Expected Size 5p6c"
+      },
+      "7": {
+        "total_turns": 86592,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "11223",
+            "14156",
+            "25267",
+            "32643",
+            "67613",
+            "37513"
+          ]
+        ],
+        "desc": "Expected Size 5p7c"
+      },
+      "8": {
+        "total_turns": 180215,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "11223",
+            "14156",
+            "26724",
+            "41338",
+            "43813"
+          ]
+        ],
+        "desc": "Expected Size 5p8c"
+      },
+      "9": {
+        "total_turns": 343476,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "11234",
+            "23453",
+            "36172",
+            "34861",
+            "48626",
+            "48126"
+          ]
+        ],
+        "desc": "Expected Size 5p9c"
+      },
+      "10": {
+        "total_turns": 611522,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "11234",
+            "23453",
+            "63147",
+            "83912",
+            "51251",
+            "53111"
+          ]
+        ],
+        "desc": "Expected Size 5p10c"
+      },
+      "11": {
+        "total_turns": 1053205,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "11223",
+            "14153",
+            "13536",
+            "51357",
+            "17879",
+            "57a13"
+          ]
+        ],
+        "desc": "Expected Size 5p11c"
+      },
+      "12": {
+        "total_turns": 1707376,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "11234",
+            "12522",
+            "61537",
+            "48519",
+            "a6b26",
+            "616a2"
+          ]
+        ],
+        "desc": "Expected Size 5p12c"
+      },
+      "13": {
+        "total_turns": 2692012,
+        "max_turns": 10,
+        "sample_games": [
+          [
+            "12345",
+            "66789",
+            "67a7b",
+            "96b9c",
+            "669ad",
+            "66da9"
+          ]
+        ],
+        "desc": "Expected Size 5p13c"
+      },
+      "14": {
+        "total_turns": 4163015,
+        "max_turns": 10,
+        "sample_games": [
+          [
+            "11234",
+            "55555",
+            "56666",
+            "75589",
+            "757ab",
+            "c5d7a",
+            "65bc7",
+            "6d57b"
+          ]
+        ],
+        "desc": "Expected Size 5p14c"
+      },
+      "15": {
+        "total_turns": 6195709,
+        "max_turns": 11,
+        "sample_games": [
+          [
+            "11234",
+            "55555",
+            "56666",
+            "75589",
+            "75a7b",
+            "78cd8",
+            "118e8",
+            "75888"
+          ]
+        ],
+        "desc": "Expected Size 5p15c"
+      }
+    },
+    "6": {
+      "2": {
+        "total_turns": 224,
+        "max_turns": 5,
+        "sample_games": [
+          [
+            "111122",
+            "112212",
+            "121221",
+            "122121"
+          ]
+        ],
+        "desc": "Expected Size 6p2c"
+      },
+      "3": {
+        "total_turns": 2676,
+        "max_turns": 5,
+        "sample_games": [
+          [
+            "111223",
+            "133221",
+            "112121",
+            "213211"
+          ]
+        ],
+        "desc": "Expected Size 6p3c"
+      },
+      "4": {
+        "total_turns": 17580,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "111234",
+            "122342",
+            "413424",
+            "111121",
+            "233431"
+          ]
+        ],
+        "desc": "Expected Size 6p4c"
+      },
+      "5": {
+        "total_turns": 74647,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "112233",
+            "141155",
+            "242324",
+            "313333"
+          ]
+        ],
+        "desc": "Expected Size 6p5c"
+      },
+      "6": {
+        "total_turns": 243157,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "112233",
+            "241514",
+            "431644",
+            "341561",
+            "341526"
+          ]
+        ],
+        "desc": "Expected Size 6p6c"
+      },
+      "7": {
+        "total_turns": 659304,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "112234",
+            "353564",
+            "515774",
+            "156716",
+            "475267",
+            "375137"
+          ]
+        ],
+        "desc": "Expected Size 6p7c"
+      },
+      "8": {
+        "total_turns": 1562640,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "112234",
+            "135613",
+            "313743",
+            "454136",
+            "634138",
+            "438135"
+          ]
+        ],
+        "desc": "Expected Size 6p8c"
+      },
+      "9": {
+        "total_turns": 3435784,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "112233",
+            "124444",
+            "542616",
+            "462575",
+            "116128",
+            "481266"
+          ]
+        ],
+        "desc": "Expected Size 6p9c"
+      },
+      "10": {
+        "total_turns": 6871245,
+        "max_turns": 10,
+        "sample_games": [
+          [
+            "123456",
+            "211113",
+            "378112",
+            "431135",
+            "531111"
+          ]
+        ],
+        "desc": "Expected Size 6p10c"
+      },
+      "11": {
+        "total_turns": 12993463,
+        "max_turns": 11,
+        "sample_games": [
+          [
+            "123456",
+            "211113",
+            "232224",
+            "315578",
+            "598317",
+            "85138a",
+            "57a135"
+          ]
+        ],
+        "desc": "Expected Size 6p11c"
+      },
+      "12": {
+        "total_turns": 23282635,
+        "max_turns": 12,
+        "sample_games": [
+          [
+            "123456",
+            "111123",
+            "156718",
+            "195a63",
+            "1bc52a",
+            "25c393",
+            "616a26"
+          ]
+        ],
+        "desc": "Expected Size 6p12c"
+      },
+      "13": {
+        "total_turns": 39691117,
+        "max_turns": 13,
+        "sample_games": [
+          [
+            "123456",
+            "211111",
+            "232222",
+            "414744",
+            "551585",
+            "699aa1",
+            "69b99c",
+            "196add",
+            "116961",
+            "66da91"
+          ]
+        ],
+        "desc": "Expected Size 6p13c"
+      },
+      "14": {
+        "total_turns": 65082924,
+        "max_turns": 14,
+        "sample_games": [
+          [
+            "123456",
+            "211113",
+            "334335",
+            "442262",
+            "576682",
+            "695a72",
+            "765bcd",
+            "6b57d2",
+            "6d57b2"
+          ]
+        ],
+        "desc": "Expected Size 6p14c"
+      }
+    },
+    "7": {
+      "2": {
+        "total_turns": 506,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "1111222",
+            "1122122",
+            "1212212",
+            "1112121",
+            "1221212"
+          ]
+        ],
+        "desc": "Expected Size 7p2c"
+      },
+      "3": {
+        "total_turns": 8822,
+        "max_turns": 5,
+        "sample_games": [
+          [
+            "1112223",
+            "1121332",
+            "2313232",
+            "2132111"
+          ]
+        ],
+        "desc": "Expected Size 7p3c"
+      },
+      "4": {
+        "total_turns": 76953,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "1112233",
+            "2233312",
+            "2323413",
+            "2334312"
+          ]
+        ],
+        "desc": "Expected Size 7p4c"
+      },
+      "5": {
+        "total_turns": 408548,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "1112233",
+            "1222444",
+            "3153555",
+            "3133333"
+          ]
+        ],
+        "desc": "Expected Size 7p5c"
+      },
+      "6": {
+        "total_turns": 1593267,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "1112233",
+            "2242534",
+            "1452445",
+            "3165244",
+            "3414161",
+            "3415264"
+          ]
+        ],
+        "desc": "Expected Size 7p6c"
+      },
+      "7": {
+        "total_turns": 5104162,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "1112233",
+            "2221422",
+            "3355526",
+            "3777362",
+            "6363662",
+            "3751357",
+            "3751375"
+          ]
+        ],
+        "desc": "Expected Size 7p7c"
+      },
+      "8": {
+        "total_turns": 13972113,
+        "max_turns": 10,
+        "sample_games": [
+          [
+            "1112234",
+            "1225522",
+            "5134443",
+            "3341654",
+            "1313157",
+            "4381354"
+          ]
+        ],
+        "desc": "Expected Size 7p8c"
+      },
+      "9": {
+        "total_turns": 33997879,
+        "max_turns": 10,
+        "sample_games": [
+          [
+            "1234567",
+            "1111234",
+            "1322325",
+            "8232344",
+            "4294355",
+            "3181378",
+            "4812662"
+          ]
+        ],
+        "desc": "Expected Size 7p9c"
+      },
+      "10": {
+        "total_turns": 75438716,
+        "max_turns": 11,
+        "sample_games": [
+          [
+            "1234567",
+            "2111113",
+            "3321182",
+            "3141145",
+            "4311111",
+            "5311111"
+          ]
+        ],
+        "desc": "Expected Size 7p10c"
+      }
+    },
+    "8": {
+      "2": {
+        "total_turns": 1121,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "11111222",
+            "11222122",
+            "12111122",
+            "12122122",
+            "12212122"
+          ]
+        ],
+        "desc": "Expected Size 8p2c"
+      },
+      "3": {
+        "total_turns": 28932,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "11122233",
+            "11233311",
+            "13322312",
+            "21312112",
+            "21321112"
+          ]
+        ],
+        "desc": "Expected Size 8p3c"
+      },
+      "4": {
+        "total_turns": 336536,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "11122233",
+            "23413411",
+            "32313323",
+            "32233412",
+            "23343122"
+          ]
+        ],
+        "desc": "Expected Size 8p4c"
+      },
+      "5": {
+        "total_turns": 2235681,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "11122334",
+            "45522445",
+            "12311111",
+            "31333333"
+          ]
+        ],
+        "desc": "Expected Size 8p5c"
+      },
+      "6": {
+        "total_turns": 10644968,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "11112223",
+            "11224444",
+            "33441123",
+            "34132552",
+            "31612411",
+            "34152614",
+            "34152641"
+          ]
+        ],
+        "desc": "Expected Size 8p6c"
+      },
+      "7": {
+        "total_turns": 39605536,
+        "max_turns": 10,
+        "sample_games": [
+          [
+            "11234567",
+            "22111134",
+            "23322675",
+            "42666443",
+            "75173733",
+            "15513717",
+            "37513751"
+          ]
+        ],
+        "desc": "Expected Size 8p7c"
+      },
+      "8": {
+        "total_turns": 122344925,
+        "max_turns": 10,
+        "sample_games": [
+          [
+            "12345678",
+            "21113456",
+            "21224387",
+            "27278866",
+            "51583547",
+            "51484734",
+            "34813547",
+            "43813547"
+          ]
+        ],
+        "desc": "Expected Size 8p8c"
+      }
+    }
+  },
+  "Entropy": {
+    "2": {
+      "2": {
+        "total_turns": 8,
+        "max_turns": 3,
+        "sample_games": [
+          [
+            "12"
+          ]
+        ],
+        "desc": "Entropy 2p2c"
+      },
+      "3": {
+        "total_turns": 21,
+        "max_turns": 3,
+        "sample_games": [
+          [
+            "12",
+            "21"
+          ]
+        ],
+        "desc": "Entropy 2p3c"
+      },
+      "4": {
+        "total_turns": 45,
+        "max_turns": 4,
+        "sample_games": [
+          [
+            "12",
+            "23"
+          ]
+        ],
+        "desc": "Entropy 2p4c"
+      },
+      "5": {
+        "total_turns": 81,
+        "max_turns": 4,
+        "sample_games": [
+          [
+            "12",
+            "23",
+            "31"
+          ]
+        ],
+        "desc": "Entropy 2p5c"
+      },
+      "6": {
+        "total_turns": 132,
+        "max_turns": 5,
+        "sample_games": [
+          [
+            "12",
+            "34"
+          ]
+        ],
+        "desc": "Entropy 2p6c"
+      },
+      "7": {
+        "total_turns": 198,
+        "max_turns": 5,
+        "sample_games": [
+          [
+            "12",
+            "34",
+            "45",
+            "63",
+            "37"
+          ]
+        ],
+        "desc": "Entropy 2p7c"
+      },
+      "8": {
+        "total_turns": 284,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "12",
+            "34",
+            "43"
+          ]
+        ],
+        "desc": "Entropy 2p8c"
+      },
+      "9": {
+        "total_turns": 388,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "12",
+            "34",
+            "45",
+            "67",
+            "48"
+          ]
+        ],
+        "desc": "Entropy 2p9c"
+      },
+      "10": {
+        "total_turns": 517,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "12",
+            "34",
+            "45",
+            "53"
+          ]
+        ],
+        "desc": "Entropy 2p10c"
+      },
+      "11": {
+        "total_turns": 667,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "12",
+            "34",
+            "56",
+            "67",
+            "57"
+          ]
+        ],
+        "desc": "Entropy 2p11c"
+      },
+      "12": {
+        "total_turns": 847,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "12",
+            "23",
+            "45",
+            "67",
+            "61"
+          ]
+        ],
+        "desc": "Entropy 2p12c"
+      },
+      "13": {
+        "total_turns": 1051,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "12",
+            "34",
+            "56",
+            "67",
+            "57",
+            "66"
+          ]
+        ],
+        "desc": "Entropy 2p13c"
+      },
+      "14": {
+        "total_turns": 1291,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "12",
+            "34",
+            "56",
+            "67",
+            "89",
+            "ab",
+            "cd",
+            "6d"
+          ]
+        ],
+        "desc": "Entropy 2p14c"
+      },
+      "15": {
+        "total_turns": 1557,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "12",
+            "34",
+            "56",
+            "67",
+            "75"
+          ]
+        ],
+        "desc": "Entropy 2p15c"
+      }
+    },
+    "3": {
+      "2": {
+        "total_turns": 18,
+        "max_turns": 3,
+        "sample_games": [
+          [
+            "112",
+            "122"
+          ]
+        ],
+        "desc": "Entropy 3p2c"
+      },
+      "3": {
+        "total_turns": 73,
+        "max_turns": 4,
+        "sample_games": [
+          [
+            "112",
+            "123",
+            "213"
+          ]
+        ],
+        "desc": "Entropy 3p3c"
+      },
+      "4": {
+        "total_turns": 207,
+        "max_turns": 4,
+        "sample_games": [
+          [
+            "112",
+            "233"
+          ]
+        ],
+        "desc": "Entropy 3p4c"
+      },
+      "5": {
+        "total_turns": 453,
+        "max_turns": 5,
+        "sample_games": [
+          [
+            "123",
+            "134",
+            "313"
+          ]
+        ],
+        "desc": "Entropy 3p5c"
+      },
+      "6": {
+        "total_turns": 861,
+        "max_turns": 5,
+        "sample_games": [
+          [
+            "123",
+            "234",
+            "145",
+            "341"
+          ]
+        ],
+        "desc": "Entropy 3p6c"
+      },
+      "7": {
+        "total_turns": 1487,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "123",
+            "245",
+            "356",
+            "335",
+            "375"
+          ]
+        ],
+        "desc": "Entropy 3p7c"
+      },
+      "8": {
+        "total_turns": 2395,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "123",
+            "245",
+            "461",
+            "517",
+            "438"
+          ]
+        ],
+        "desc": "Entropy 3p8c"
+      },
+      "9": {
+        "total_turns": 3646,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "123",
+            "245",
+            "461",
+            "417",
+            "481"
+          ]
+        ],
+        "desc": "Entropy 3p9c"
+      },
+      "10": {
+        "total_turns": 5309,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "123",
+            "234",
+            "351",
+            "531"
+          ]
+        ],
+        "desc": "Entropy 3p10c"
+      },
+      "11": {
+        "total_turns": 7512,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "123",
+            "456",
+            "578",
+            "975",
+            "1a7",
+            "57a"
+          ]
+        ],
+        "desc": "Entropy 3p11c"
+      },
+      "12": {
+        "total_turns": 10254,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "123",
+            "245",
+            "617",
+            "681",
+            "9a6",
+            "616"
+          ]
+        ],
+        "desc": "Entropy 3p12c"
+      },
+      "13": {
+        "total_turns": 13800,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "123",
+            "456",
+            "578",
+            "94a",
+            "6bc",
+            "66d"
+          ]
+        ],
+        "desc": "Entropy 3p13c"
+      },
+      "14": {
+        "total_turns": 18044,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "123",
+            "456",
+            "567",
+            "478",
+            "9ab",
+            "1cd",
+            "6d5"
+          ]
+        ],
+        "desc": "Entropy 3p14c"
+      },
+      "15": {
+        "total_turns": 23117,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "123",
+            "456",
+            "467",
+            "689",
+            "abc",
+            "ded",
+            "758"
+          ]
+        ],
+        "desc": "Entropy 3p15c"
+      }
+    },
+    "4": {
+      "2": {
+        "total_turns": 44,
+        "max_turns": 4,
+        "sample_games": [
+          [
+            "1112",
+            "1221"
+          ]
+        ],
+        "desc": "Entropy 4p2c"
+      },
+      "3": {
+        "total_turns": 246,
+        "max_turns": 4,
+        "sample_games": [
+          [
+            "1123",
+            "1232",
+            "2132"
+          ]
+        ],
+        "desc": "Entropy 4p3c"
+      },
+      "4": {
+        "total_turns": 911,
+        "max_turns": 4,
+        "sample_games": [
+          [
+            "1123",
+            "2441",
+            "2234",
+            "2334"
+          ]
+        ],
+        "desc": "Entropy 4p4c"
+      },
+      "5": {
+        "total_turns": 2476,
+        "max_turns": 5,
+        "sample_games": [
+          [
+            "1123",
+            "1415",
+            "2533",
+            "3133"
+          ]
+        ],
+        "desc": "Entropy 4p5c"
+      },
+      "6": {
+        "total_turns": 5683,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "1123",
+            "4532",
+            "2346",
+            "3415"
+          ]
+        ],
+        "desc": "Entropy 4p6c"
+      },
+      "7": {
+        "total_turns": 11374,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "1123",
+            "4532",
+            "2615",
+            "3157",
+            "3751"
+          ]
+        ],
+        "desc": "Entropy 4p7c"
+      },
+      "8": {
+        "total_turns": 20695,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "1234",
+            "2546",
+            "4173",
+            "4318",
+            "4381"
+          ]
+        ],
+        "desc": "Entropy 4p8c"
+      },
+      "9": {
+        "total_turns": 34940,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "1234",
+            "2546",
+            "4782",
+            "4172",
+            "4812"
+          ]
+        ],
+        "desc": "Entropy 4p9c"
+      },
+      "10": {
+        "total_turns": 56225,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "1234",
+            "2546",
+            "4178",
+            "3792",
+            "5a13",
+            "5311"
+          ]
+        ],
+        "desc": "Entropy 4p10c"
+      },
+      "11": {
+        "total_turns": 86550,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "1234",
+            "2567",
+            "6451",
+            "8671",
+            "79a1",
+            "57a1"
+          ]
+        ],
+        "desc": "Entropy 4p11c"
+      },
+      "12": {
+        "total_turns": 128188,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "1234",
+            "2567",
+            "3869",
+            "4ab6",
+            "b6c1",
+            "616a"
+          ]
+        ],
+        "desc": "Entropy 4p12c"
+      },
+      "13": {
+        "total_turns": 184094,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "1234",
+            "5678",
+            "59ab",
+            "c69d",
+            "6c6a",
+            "66da"
+          ]
+        ],
+        "desc": "Entropy 4p13c"
+      },
+      "14": {
+        "total_turns": 257897,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "1234",
+            "5678",
+            "698a",
+            "67b5",
+            "556c",
+            "6d57"
+          ]
+        ],
+        "desc": "Entropy 4p14c"
+      },
+      "15": {
+        "total_turns": 353108,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "1234",
+            "5678",
+            "5569",
+            "578a",
+            "5bcd",
+            "7588"
+          ]
+        ],
+        "desc": "Entropy 4p15c"
+      }
+    },
+    "5": {
+      "2": {
+        "total_turns": 97,
+        "max_turns": 4,
+        "sample_games": [
+          [
+            "11122",
+            "12212"
+          ]
+        ],
+        "desc": "Entropy 5p2c"
+      },
+      "3": {
+        "total_turns": 816,
+        "max_turns": 4,
+        "sample_games": [
+          [
+            "11123",
+            "12213",
+            "21321"
+          ]
+        ],
+        "desc": "Entropy 5p3c"
+      },
+      "4": {
+        "total_turns": 3978,
+        "max_turns": 5,
+        "sample_games": [
+          [
+            "11223",
+            "13334",
+            "23144",
+            "23343"
+          ]
+        ],
+        "desc": "Entropy 5p4c"
+      },
+      "5": {
+        "total_turns": 13598,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "11223",
+            "13344",
+            "45242",
+            "31333"
+          ]
+        ],
+        "desc": "Entropy 5p5c"
+      },
+      "6": {
+        "total_turns": 37104,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "11223",
+            "23452",
+            "24341",
+            "53142",
+            "34152"
+          ]
+        ],
+        "desc": "Entropy 5p6c"
+      },
+      "7": {
+        "total_turns": 86412,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "11223",
+            "14156",
+            "52267",
+            "23643",
+            "67424",
+            "37513"
+          ]
+        ],
+        "desc": "Entropy 5p7c"
+      },
+      "8": {
+        "total_turns": 179751,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "11223",
+            "14156",
+            "26724",
+            "41338",
+            "43813"
+          ]
+        ],
+        "desc": "Entropy 5p8c"
+      },
+      "9": {
+        "total_turns": 342916,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "11234",
+            "23453",
+            "36172",
+            "84712",
+            "72149",
+            "37841",
+            "48126"
+          ]
+        ],
+        "desc": "Entropy 5p9c"
+      },
+      "10": {
+        "total_turns": 610748,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "11234",
+            "23453",
+            "63147",
+            "83912",
+            "51251",
+            "53111"
+          ]
+        ],
+        "desc": "Entropy 5p10c"
+      },
+      "11": {
+        "total_turns": 1027877,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "11234",
+            "56347",
+            "89543",
+            "2574a",
+            "b3527",
+            "57a13"
+          ]
+        ],
+        "desc": "Entropy 5p11c"
+      },
+      "12": {
+        "total_turns": 1654412,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "11234",
+            "15267",
+            "31876",
+            "7192a",
+            "2b6ac",
+            "1b669",
+            "616a2"
+          ]
+        ],
+        "desc": "Entropy 5p12c"
+      },
+      "13": {
+        "total_turns": 2563941,
+        "max_turns": 10,
+        "sample_games": [
+          [
+            "12345",
+            "66789",
+            "67a7b",
+            "96b6c",
+            "69bda",
+            "66da9"
+          ]
+        ],
+        "desc": "Entropy 5p13c"
+      },
+      "14": {
+        "total_turns": 3846773,
+        "max_turns": 10,
+        "sample_games": [
+          [
+            "12345",
+            "26789",
+            "ab167",
+            "9861b",
+            "cd671",
+            "b4c76",
+            "6d57b"
+          ]
+        ],
+        "desc": "Entropy 5p14c"
+      },
+      "15": {
+        "total_turns": 5617055,
+        "max_turns": 11,
+        "sample_games": [
+          [
+            "12345",
+            "26789",
+            "73a89",
+            "b1c79",
+            "7d4e8",
+            "1755f",
+            "75888"
+          ]
+        ],
+        "desc": "Entropy 5p15c"
+      }
+    },
+    "6": {
+      "2": {
+        "total_turns": 226,
+        "max_turns": 5,
+        "sample_games": [
+          [
+            "111122",
+            "112212",
+            "111221",
+            "122121"
+          ]
+        ],
+        "desc": "Entropy 6p2c"
+      },
+      "3": {
+        "total_turns": 2667,
+        "max_turns": 5,
+        "sample_games": [
+          [
+            "111223",
+            "233121",
+            "213211"
+          ]
+        ],
+        "desc": "Entropy 6p3c"
+      },
+      "4": {
+        "total_turns": 17444,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "111223",
+            "234144",
+            "332343",
+            "233431"
+          ]
+        ],
+        "desc": "Entropy 6p4c"
+      },
+      "5": {
+        "total_turns": 74506,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "112233",
+            "122455",
+            "313333"
+          ]
+        ],
+        "desc": "Entropy 6p5c"
+      },
+      "6": {
+        "total_turns": 242481,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "111223",
+            "224253",
+            "143435",
+            "431525",
+            "416515",
+            "341526"
+          ]
+        ],
+        "desc": "Entropy 6p6c"
+      },
+      "7": {
+        "total_turns": 658296,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "112234",
+            "152656",
+            "535374",
+            "531737",
+            "375137"
+          ]
+        ],
+        "desc": "Entropy 6p7c"
+      },
+      "8": {
+        "total_turns": 1560667,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "112233",
+            "121425",
+            "311567",
+            "562322",
+            "724138",
+            "438135"
+          ]
+        ],
+        "desc": "Entropy 6p8c"
+      },
+      "9": {
+        "total_turns": 3339961,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "112234",
+            "135613",
+            "253227",
+            "266184",
+            "848261",
+            "481266"
+          ]
+        ],
+        "desc": "Entropy 6p9c"
+      },
+      "10": {
+        "total_turns": 6597143,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "112234",
+            "235672",
+            "734418",
+            "93115a",
+            "396191",
+            "331115",
+            "531111"
+          ]
+        ],
+        "desc": "Entropy 6p10c"
+      },
+      "11": {
+        "total_turns": 12206753,
+        "max_turns": 10,
+        "sample_games": [
+          [
+            "112234",
+            "156738",
+            "13389a",
+            "96b136",
+            "485a36",
+            "5a7157",
+            "57a135"
+          ]
+        ],
+        "desc": "Entropy 6p11c"
+      },
+      "12": {
+        "total_turns": 21400365,
+        "max_turns": 10,
+        "sample_games": [
+          [
+            "112234",
+            "156738",
+            "149a3b",
+            "3b5c32",
+            "1c197c",
+            "a42766",
+            "74a24a",
+            "616a26"
+          ]
+        ],
+        "desc": "Entropy 6p12c"
+      },
+      "13": {
+        "total_turns": 35841167,
+        "max_turns": 10,
+        "sample_games": [
+          [
+            "112345",
+            "266789",
+            "26a6bc",
+            "368c6d",
+            "46ca78",
+            "d2c196",
+            "66da91"
+          ]
+        ],
+        "desc": "Entropy 6p13c"
+      },
+      "14": {
+        "total_turns": 57815792,
+        "max_turns": 11,
+        "sample_games": [
+          [
+            "112345",
+            "673859",
+            "23a839",
+            "8b6654",
+            "65cdb3",
+            "659bc1",
+            "ec3566",
+            "6d52b7",
+            "6d57b2"
+          ]
+        ],
+        "desc": "Entropy 6p14c"
+      }
+    },
+    "7": {
+      "2": {
+        "total_turns": 504,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "1111222",
+            "1122122",
+            "1212212",
+            "1112121",
+            "1221212"
+          ]
+        ],
+        "desc": "Entropy 7p2c"
+      },
+      "3": {
+        "total_turns": 8807,
+        "max_turns": 5,
+        "sample_games": [
+          [
+            "1112223",
+            "1121332",
+            "2313232",
+            "2132111"
+          ]
+        ],
+        "desc": "Entropy 7p3c"
+      },
+      "4": {
+        "total_turns": 76576,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "1112233",
+            "2441311",
+            "2234214",
+            "2334312"
+          ]
+        ],
+        "desc": "Entropy 7p4c"
+      },
+      "5": {
+        "total_turns": 407251,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "1112233",
+            "1142455",
+            "1213112",
+            "3133333"
+          ]
+        ],
+        "desc": "Entropy 7p5c"
+      },
+      "6": {
+        "total_turns": 1589047,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "1112233",
+            "2242435",
+            "4435523",
+            "4615246",
+            "3134154",
+            "3415264"
+          ]
+        ],
+        "desc": "Entropy 7p6c"
+      },
+      "7": {
+        "total_turns": 5013700,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "1122334",
+            "1225665",
+            "5173375",
+            "7711355",
+            "7531375",
+            "3751375"
+          ]
+        ],
+        "desc": "Entropy 7p7c"
+      },
+      "8": {
+        "total_turns": 13560292,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "1122334",
+            "1212556",
+            "1471347",
+            "1486433",
+            "1343544",
+            "4381354"
+          ]
+        ],
+        "desc": "Entropy 7p8c"
+      },
+      "9": {
+        "total_turns": 32559985,
+        "max_turns": 10,
+        "sample_games": [
+          [
+            "1122334",
+            "1215672",
+            "1248191",
+            "9412375",
+            "4111686",
+            "4812662"
+          ]
+        ],
+        "desc": "Entropy 7p9c"
+      },
+      "10": {
+        "total_turns": 71290798,
+        "max_turns": 10,
+        "sample_games": [
+          [
+            "1122334",
+            "2567442",
+            "6311881",
+            "9481898",
+            "56a61a1",
+            "5311111"
+          ]
+        ],
+        "desc": "Entropy 7p10c"
+      }
+    },
+    "8": {
+      "2": {
+        "total_turns": 1119,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "11112222",
+            "11121122",
+            "11222211",
+            "12211222",
+            "12212122"
+          ]
+        ],
+        "desc": "Entropy 8p2c"
+      },
+      "3": {
+        "total_turns": 28774,
+        "max_turns": 6,
+        "sample_games": [
+          [
+            "11122233",
+            "12323311",
+            "12112312",
+            "21213211",
+            "21321112"
+          ]
+        ],
+        "desc": "Entropy 8p3c"
+      },
+      "4": {
+        "total_turns": 334959,
+        "max_turns": 7,
+        "sample_games": [
+          [
+            "11122233",
+            "23413411",
+            "32313323",
+            "32233412",
+            "23343122"
+          ]
+        ],
+        "desc": "Entropy 8p4c"
+      },
+      "5": {
+        "total_turns": 2224143,
+        "max_turns": 8,
+        "sample_games": [
+          [
+            "11122334",
+            "14424555",
+            "11213111",
+            "31333333"
+          ]
+        ],
+        "desc": "Entropy 8p5c"
+      },
+      "6": {
+        "total_turns": 10405318,
+        "max_turns": 9,
+        "sample_games": [
+          [
+            "11122334",
+            "23523235",
+            "66132643",
+            "12435442",
+            "56142413",
+            "34152641"
+          ]
+        ],
+        "desc": "Entropy 8p6c"
+      },
+      "7": {
+        "total_turns": 38221315,
+        "max_turns": 10,
+        "sample_games": [
+          [
+            "11122334",
+            "55633262",
+            "66317173",
+            "47436616",
+            "53371717",
+            "37513751"
+          ]
+        ],
+        "desc": "Entropy 8p7c"
+      },
+      "8": {
+        "total_turns": 117893499,
+        "max_turns": 11,
+        "sample_games": [
+          [
+            "11122334",
+            "22356563",
+            "25774412",
+            "47537173",
+            "34341857",
+            "43315743",
+            "43813547"
+          ]
+        ],
+        "desc": "Entropy 8p8c"
+      }
+    }
+  }
+}

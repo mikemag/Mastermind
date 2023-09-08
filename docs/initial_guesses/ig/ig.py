@@ -114,6 +114,11 @@ def generate_cxx(filename, results):
             f.write("}\n")
 
 
+def generate_json(filename, results):
+    with open(filename, "w") as f:
+        json.dump(results, f, indent=2)
+
+
 def process_results():
     results = OrderedDict()
     result_files = []
@@ -153,6 +158,7 @@ def process_results():
 
     generate_md("../Initial_Guesses.md", results_md)
     generate_cxx("../../../preset_initial_guesses.h", results)
+    generate_json("../preset_initial_guesses.json", results)
 
 
 if __name__ == "__main__":

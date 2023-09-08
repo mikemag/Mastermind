@@ -6,7 +6,6 @@
 #include <chrono>
 #include <filesystem>
 #include <set>
-#include <typeindex>
 #include <unordered_set>
 
 #include "codeword.hpp"
@@ -54,9 +53,12 @@ static constexpr bool shouldPlayMultipleGames = false;
 static constexpr bool shouldPlayMultipleSpecificGames = false;
 template <typename T>
 using MultiGameSolver = DefaultSolver<T>;
-using MultiGameAlgos = ss::algo_list<Algos::Knuth, Algos::MostParts, Algos::ExpectedSize, Algos::Entropy>;
-using MultiGamePins = ss::pin_counts<6>;
-using MultiGameColors = ss::color_counts<2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12>;
+using MultiGameAlgos = ss::algo_list<Algos::Knuth>;
+using MultiGamePins = ss::pin_counts<4>;
+using MultiGameColors = ss::color_counts<6>;
+// using MultiGameAlgos = ss::algo_list<Algos::Knuth, Algos::MostParts, Algos::ExpectedSize, Algos::Entropy>;
+// using MultiGamePins = ss::pin_counts<2, 3, 4>;
+// using MultiGameColors = ss::color_counts<2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12>;
 static constexpr bool multiGameLog = false;
 // static constexpr const char* fileTag = "_aa_7p_2-9c_8p_2-7c";
 static constexpr const char* fileTag = "";
@@ -68,6 +70,7 @@ static constexpr bool shouldFindBestFirstSpecificGuesses = false;
 // Misc config
 static constexpr bool shouldRunTests = true;  // Run unit tests and play Knuth's game
 static constexpr bool shouldWriteStratFiles = false;
+static constexpr bool shouldSkipCompletedGames = false;  // Load stats in current dir and skip completed games
 
 static constexpr auto statsFilenamePrefix = "mastermind_run_stats_";
 static constexpr auto pinCountTag = "Pin Count";
@@ -79,7 +82,7 @@ static constexpr auto initialGuessTag = "Initial Guess";
 // Previous runs visible in the current dir
 static std::unordered_set<string> previousRuns;
 
-string buildRunKey(int pc, int cc, string strategy, string solver, string initialGuess) {
+string buildRunKey(int pc, int cc, const string& strategy, const string& solver, const string& initialGuess) {
   stringstream k;
   k << pc << cc << strategy << solver << initialGuess;
   return k.str();
@@ -117,114 +120,79 @@ void runUnitTests() {
   }
 }
 
-// A little struct to hold info about a valid result from a solver.
-struct ValidSolution {
-  uint maxTurns;
-  unsigned long long int totalTurns;
-
-  struct SingleGame {
-    uint32_t secret;
-    vector<uint32_t> correctGuesses;
-  };
-
-  vector<SingleGame> games;
-};
-
-// List of known solutions to verify our runs
-template <uint8_t PIN_COUNT, uint8_t COLOR_COUNT, typename ALGO>
-struct ValidSolutionsKey {};
-
-static std::map<std::type_index, ValidSolution> validSolutions = {
-    {typeid(ValidSolutionsKey<4, 6, Algos::Knuth>),
-     {5,
-      5801,
-      {
-          {0x3632, {0x1122, 0x1344, 0x3526, 0x1462, 0x3632}},
-          {0x1111, {0x1122, 0x1234, 0x1315, 0x1111}},
-      }}},
-    {typeid(ValidSolutionsKey<4, 6, Algos::MostParts>),
-     {6,
-      5668,
-      {
-          {0x3632, {0x1123, 0x2344, 0x3255, 0x3632}},
-          {0x1111, {0x1123, 0x1425, 0x2326, 0x1111}},
-      }}},
-    {typeid(ValidSolutionsKey<5, 8, Algos::Knuth>),
-     {7,
-      183775,
-      {
-          {0x34567, {0x11223, 0x34455, 0x53657, 0x35856, 0x34567}},
-      }}},
-    {typeid(ValidSolutionsKey<7, 7, Algos::Knuth>),
-     {8,
-      5124234,
-      {
-          {0x4422334, {0x1122334, 0x1225445, 0x1512361, 0x4322334, 0x4422334}},
-      }}},
-    {typeid(ValidSolutionsKey<7, 7, Algos::MostParts>),
-     {10,
-      5073674,
-      {
-          {0x4422334, {0x1112233, 0x1121444, 0x1215156, 0x2342434, 0x2432443, 0x4422334}},
-      }}},
-    {typeid(ValidSolutionsKey<8, 5, Algos::Knuth>),
-     {8,
-      2281524,
-      {
-          {0x11223344, {0x11122334, 0x14412131, 0x11223521, 0x11223344}},
-      }}},
-};
-
 template <typename Solver>
-void validateSolutions(Solver& solver) {
+void validateSolutions(Solver& solver, json& validSolutions) {
   using SolverConfig = typename Solver::SolverConfig;
   using CodewordT = typename SolverConfig::CodewordT;
-  using vsKey = ValidSolutionsKey<SolverConfig::PIN_COUNT, SolverConfig::COLOR_COUNT, typename SolverConfig::ALGO>;
-  auto vsIter = validSolutions.find(typeid(vsKey));
-  if (vsIter != validSolutions.end()) {
-    const ValidSolution& vs = vsIter->second;
 
-    if (solver.getTotalTurns() != vs.totalTurns) {
-      printf("ERROR: Total turns doesn't match, expect %llu (%.4f), actual %llu (%.4f)\n", vs.totalTurns,
-             (double)vs.totalTurns / CodewordT::TOTAL_CODEWORDS, solver.getTotalTurns(),
-             (double)solver.getTotalTurns() / CodewordT::TOTAL_CODEWORDS);
-    }
+  if (validSolutions.contains(SolverConfig::ALGO::name)) {
+    auto s = validSolutions[SolverConfig::ALGO::name];
+    if (s.contains(to_string(SolverConfig::PIN_COUNT))) {
+      auto p = s[to_string(SolverConfig::PIN_COUNT)];
+      if (p.contains(to_string(SolverConfig::COLOR_COUNT))) {
+        auto vs = p[to_string(SolverConfig::COLOR_COUNT)];
+        bool valid = true;
 
-    if (solver.getMaxDepth() != vs.maxTurns) {
-      printf("ERROR: Max turns doesn't match, expect %u, actual %u\n", vs.maxTurns, solver.getMaxDepth());
-    }
+        unsigned long long int totalTurns = vs["total_turns"];
+        if (solver.getTotalTurns() != totalTurns) {
+          printf("ERROR: Total turns doesn't match, expect %llu (%.4f), actual %llu (%.4f)\n", totalTurns,
+                 (double)totalTurns / CodewordT::TOTAL_CODEWORDS, solver.getTotalTurns(),
+                 (double)solver.getTotalTurns() / CodewordT::TOTAL_CODEWORDS);
+          valid = false;
+        }
 
-    auto printGuesses = [](const vector<uint32_t>& guesses) {
-      printf("%x", guesses[0]);
-      for (int i = 1; i < guesses.size(); i++) printf(", %x", guesses[i]);
-    };
+        uint maxTurns = vs["max_turns"];
+        if (solver.getMaxDepth() != maxTurns) {
+          printf("ERROR: Max turns doesn't match, expect %u, actual %u\n", maxTurns, solver.getMaxDepth());
+          valid = false;
+        }
 
-    for (auto& g : vs.games) {
-      auto guesses = solver.getGuessesForGame(g.secret);
-      if (guesses != g.correctGuesses) {
-        printf("ERROR: Solution for secret %x, %dp%dc game, algo '%s', solver '%s', %ld moves: ", g.secret,
-               SolverConfig::PIN_COUNT, SolverConfig::COLOR_COUNT, SolverConfig::ALGO::name, Solver::name,
-               guesses.size());
-        printGuesses(guesses);
-        printf(" <-- **WRONG ANSWER**, should be ");
-        printGuesses(g.correctGuesses);
-        printf("\n");
+        auto printGuesses = [](const vector<uint32_t>& guesses) {
+          printf("%x", guesses[0]);
+          for (int i = 1; i < guesses.size(); i++) printf(", %x", guesses[i]);
+        };
+
+        vector<vector<string>> sampleGames = vs["sample_games"];
+        for (vector<string>& g : sampleGames) {
+          vector<uint32_t> gi(g.size());
+          std::transform(g.begin(), g.end(), gi.begin(), [&](const string& s) { return stoi(s, 0, 16); });
+          auto guesses = solver.getGuessesForGame(gi.back());
+          if (guesses != gi) {
+            printf("ERROR: Solution for secret %x, %dp%dc game, algo '%s', solver '%s', %ld moves: ", gi.back(),
+                   SolverConfig::PIN_COUNT, SolverConfig::COLOR_COUNT, SolverConfig::ALGO::name, Solver::name,
+                   guesses.size());
+            printGuesses(guesses);
+            printf(" <-- **WRONG ANSWER**, should be ");
+            printGuesses(gi);
+            printf("\n");
+            valid = false;
+          }
+        }
+        if (valid) {
+          printf("Verified solution.\n");
+        }
+        return;
       }
     }
   }
+
+  printf("Note: no saved solution to verify against.\n");
 }
 
 template <typename Solver>
-void runSingleSolver(StatsRecorder& statsRecorder, uint32_t packedInitialGuess) {
+void runSingleSolver(StatsRecorder& statsRecorder, json& validSolutions, uint32_t packedInitialGuess) {
   using SolverConfig = typename Solver::SolverConfig;
   using CodewordT = typename SolverConfig::CodewordT;
 
-  auto runKey = buildRunKey(SolverConfig::PIN_COUNT, SolverConfig::COLOR_COUNT, SolverConfig::ALGO::name, Solver::name,
-                            hexString(packedInitialGuess));
-  if (auto iter = previousRuns.find(runKey); iter != previousRuns.end()) {
-    printf("Skipping completed run for %dp%dc '%s', initial guess '%s', and solver '%s'.\n\n", SolverConfig::PIN_COUNT,
-           SolverConfig::COLOR_COUNT, SolverConfig::ALGO::name, hexString(packedInitialGuess).c_str(), Solver::name);
-    return;
+  if constexpr (shouldSkipCompletedGames) {
+    auto runKey = buildRunKey(SolverConfig::PIN_COUNT, SolverConfig::COLOR_COUNT, SolverConfig::ALGO::name,
+                              Solver::name, hexString(packedInitialGuess));
+    if (auto iter = previousRuns.find(runKey); iter != previousRuns.end()) {
+      printf("Skipping completed run for %dp%dc '%s', initial guess '%s', and solver '%s'.\n\n",
+             SolverConfig::PIN_COUNT, SolverConfig::COLOR_COUNT, SolverConfig::ALGO::name,
+             hexString(packedInitialGuess).c_str(), Solver::name);
+      return;
+    }
   }
 
   Solver solver;
@@ -278,7 +246,7 @@ void runSingleSolver(StatsRecorder& statsRecorder, uint32_t packedInitialGuess) 
   solver.printStats();
   solver.recordStats(statsRecorder);
 
-  validateSolutions(solver);
+  validateSolutions(solver, validSolutions);
 
   if (shouldWriteStratFiles) {
     solver.dump();
@@ -345,22 +313,24 @@ set<uint32_t> buildInitialGuessSet() {
 
 struct PlayAllGames {
   StatsRecorder& statsRecorder;
+  json& validSolutions;
 
-  explicit PlayAllGames(StatsRecorder& sr) : statsRecorder(sr) {}
+  explicit PlayAllGames(StatsRecorder& sr, json& vs) : statsRecorder(sr), validSolutions(vs) {}
 
   template <typename Solver>
   void runSolver() {
     using SolverConfig = typename Solver::SolverConfig;
     runSingleSolver<Solver>(
-        statsRecorder,
+        statsRecorder, validSolutions,
         SolverConfig::ALGO::template presetInitialGuess<SolverConfig::PIN_COUNT, SolverConfig::COLOR_COUNT>());
   }
 };
 
 struct PlayAllGamesWithAllInitialGuesses {
   StatsRecorder& statsRecorder;
+  json& validSolutions;
 
-  explicit PlayAllGamesWithAllInitialGuesses(StatsRecorder& sr) : statsRecorder(sr) {}
+  explicit PlayAllGamesWithAllInitialGuesses(StatsRecorder& sr, json& vs) : statsRecorder(sr), validSolutions(vs) {}
 
   template <typename Solver>
   void runSolver() {
@@ -368,82 +338,68 @@ struct PlayAllGamesWithAllInitialGuesses {
     set<uint32_t> igs = buildInitialGuessSet<SolverConfig::PIN_COUNT, SolverConfig::COLOR_COUNT>();
 
     for (auto ig : igs) {
-      runSingleSolver<Solver>(statsRecorder, ig);
+      runSingleSolver<Solver>(statsRecorder, validSolutions, ig);
     }
   }
 };
 
 template <bool shouldRun>
-void playSingleGame(StatsRecorder& statsRecorder) {
+void playSingleGame(StatsRecorder& statsRecorder, json& validSolutions) {
   if constexpr (shouldRun) {
     using gameSolver =
         SingleGameSolver<SolverConfig<singleGamePinCount, singleGameColorCount, singleGameLog, SingleGameAlgo>>;
-    PlayAllGames{statsRecorder}.template runSolver<gameSolver>();
+    PlayAllGames{statsRecorder, validSolutions}.template runSolver<gameSolver>();
   }
 }
 
 template <bool shouldRun>
-void playMultipleGames(StatsRecorder& statsRecorder) {
+void playMultipleGames(StatsRecorder& statsRecorder, json& validSolutions) {
   if constexpr (shouldRun) {
     using namespace ss;
     using gameConfigs = solver_config_list<MultiGamePins, MultiGameColors, MultiGameAlgos, multiGameLog>;
     using gameSolvers = build_solvers<MultiGameSolver, gameConfigs::type>;
-    run_multiple_solvers(gameSolvers::type{}, PlayAllGames(statsRecorder));
+    run_multiple_solvers(gameSolvers::type{}, PlayAllGames(statsRecorder, validSolutions));
   }
 }
 
 template <bool shouldRun>
-void playMultipleSpecificGames(StatsRecorder& statsRecorder) {
+void playMultipleSpecificGames(StatsRecorder& statsRecorder, json& validSolutions) {
   if constexpr (shouldRun) {
     using namespace ss;
     {
       using gameConfigs =
           solver_config_list<ss::pin_counts<7>, ss::color_counts<2, 3, 4, 5, 6, 7, 8, 9>, MultiGameAlgos, multiGameLog>;
       using gameSolvers = build_solvers<MultiGameSolver, gameConfigs::type>;
-      run_multiple_solvers(gameSolvers::type{}, PlayAllGames(statsRecorder));
+      run_multiple_solvers(gameSolvers::type{}, PlayAllGames(statsRecorder, validSolutions));
     }
     {
       using gameConfigs =
           solver_config_list<ss::pin_counts<8>, ss::color_counts<2, 3, 4, 5, 6, 7>, MultiGameAlgos, multiGameLog>;
       using gameSolvers = build_solvers<MultiGameSolver, gameConfigs::type>;
-      run_multiple_solvers(gameSolvers::type{}, PlayAllGames(statsRecorder));
+      run_multiple_solvers(gameSolvers::type{}, PlayAllGames(statsRecorder, validSolutions));
     }
   }
 }
 
 template <bool shouldRun>
-void playMultipleGamesWithInitialGuesses(StatsRecorder& statsRecorder) {
+void playMultipleGamesWithInitialGuesses(StatsRecorder& statsRecorder, json& validSolutions) {
   if constexpr (shouldRun) {
     using namespace ss;
     using gameConfigs = solver_config_list<MultiGamePins, MultiGameColors, MultiGameAlgos, multiGameLog>;
     using gameSolvers = build_solvers<MultiGameSolver, gameConfigs::type>;
-    run_multiple_solvers(gameSolvers::type{}, PlayAllGamesWithAllInitialGuesses(statsRecorder));
+    run_multiple_solvers(gameSolvers::type{}, PlayAllGamesWithAllInitialGuesses(statsRecorder, validSolutions));
   }
 }
 
 template <bool shouldRun>
-void playMultipleSpecificGamesWithInitialGuesses(StatsRecorder& statsRecorder) {
+void playMultipleSpecificGamesWithInitialGuesses(StatsRecorder& statsRecorder, json& validSolutions) {
   if constexpr (shouldRun) {
     using namespace ss;
-    //    {
-    //      using gameConfigs = solver_config_list<ss::pin_counts<6>, ss::color_counts<2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
-    //      12>,
-    //                                             MultiGameAlgos, multiGameLog>;
-    //      using gameSolvers = build_solvers<MultiGameSolver, gameConfigs::type>;
-    //      run_multiple_solvers(gameSolvers::type{}, PlayAllGamesWithAllInitialGuesses(statsRecorder));
-    //    }
-    //    {
-    //      using gameConfigs =
-    //          solver_config_list<ss::pin_counts<7>, ss::color_counts<2, 3, 4, 5, 6, 7, 8, 9>, MultiGameAlgos,
-    //          multiGameLog>;
-    //      using gameSolvers = build_solvers<MultiGameSolver, gameConfigs::type>;
-    //      run_multiple_solvers(gameSolvers::type{}, PlayAllGamesWithAllInitialGuesses(statsRecorder));
-    //    }
     {
       using gameConfigs =
           solver_config_list<ss::pin_counts<8>, ss::color_counts<2, 3, 4, 5, 6>, MultiGameAlgos, multiGameLog>;
       using gameSolvers = build_solvers<MultiGameSolver, gameConfigs::type>;
-      run_multiple_solvers(gameSolvers::type{}, PlayAllGamesWithAllInitialGuesses(statsRecorder));
+      run_multiple_solvers(gameSolvers::type{}, PlayAllGamesWithAllInitialGuesses(statsRecorder, validSolutions));
     }
   }
 }
@@ -485,7 +441,9 @@ void readAllStats() {
 int main(int argc, const char* argv[]) {
   runUnitTests<shouldRunTests>();
 
-  readAllStats();
+  if constexpr (shouldSkipCompletedGames) {
+    readAllStats();
+  }
 
   auto now = std::chrono::system_clock::now();
   std::time_t now_time = std::chrono::system_clock::to_time_t(now);
@@ -499,13 +457,16 @@ int main(int argc, const char* argv[]) {
   cout << "Will write stats to: " << fs.str() << endl << endl;
   StatsRecorder statsRecorder(fs.str());
 
-  playSingleGame<shouldPlaySingleGame>(statsRecorder);
+  std::ifstream vsf("valid_solutions.json");
+  json validSolutions = json::parse(vsf);
 
-  playMultipleGames<shouldPlayMultipleGames>(statsRecorder);
-  playMultipleSpecificGames<shouldPlayMultipleSpecificGames>(statsRecorder);
+  playSingleGame<shouldPlaySingleGame>(statsRecorder, validSolutions);
 
-  playMultipleGamesWithInitialGuesses<shouldFindBestFirstGuesses>(statsRecorder);
-  playMultipleSpecificGamesWithInitialGuesses<shouldFindBestFirstSpecificGuesses>(statsRecorder);
+  playMultipleGames<shouldPlayMultipleGames>(statsRecorder, validSolutions);
+  playMultipleSpecificGames<shouldPlayMultipleSpecificGames>(statsRecorder, validSolutions);
+
+  playMultipleGamesWithInitialGuesses<shouldFindBestFirstGuesses>(statsRecorder, validSolutions);
+  playMultipleSpecificGamesWithInitialGuesses<shouldFindBestFirstSpecificGuesses>(statsRecorder, validSolutions);
 
   cout << "Complete." << endl;
   return 0;
