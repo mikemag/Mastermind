@@ -20,7 +20,7 @@ It is common for algorithms to want to record, say, the total number of guesses 
 example, Knuth's algorithm in [1]. One could use a 2D array and index with `[b][w]`, resulting in 25 cells for a 4 pin
 game, half of them wasted. One could instead use a 1D array and index with the packed decimal scores shown above,
 resulting in 41 cells and more waste, or use the packed hex score with 65 cells and even more waste. Even representing
-the scores as base-$p$ numbers results in 30% waste.
+the scores as base- $p$ numbers results in 30% waste.
 
 It's worth noting that the total number of distinct score values is given by[2]:
 
@@ -32,15 +32,14 @@ against the cost of anything more complex.
 
 However, certain kinds of GPU memory are quite limited, and parallelizing interesting gameplay algorithms on the GPU
 requires careful use of shared memory. Wasting half of it or more is unacceptable since it's on the order of 48-100KiB
-and ever thread in a block needs a portion.
+and every thread in a block needs a portion.
 
 Some implementations may choose to use a sparse lookup table to translate scores to a dense range, and others employ
-(possibly large) switch statements. Neither of these are particularly good on the GPU either.
+(possibly large) switch statements. Neither of these are particularly good on the GPU either due to warp divergence.
 
 ## Dense Packing
 
-To form a dense index for Mastermind scores, note first that all valid scores sum to the number of pins $p$, i.e.,
-$b + w = p$. Grouping scores by $b$, the number of scores with $b = 0$ is $p + 1$, with $b = 1$ is $p$, and with
+Grouping scores by $b$, the number of scores with $b = 0$ is $p + 1$, with $b = 1$ is $p$, and with
 $b = 2$ is $p - 1$, and so on until $b = p$ with just a single score.
 
 At this point you may note that the score $b = p - 1$, $w = 1$, is not possible. That would say that all colors in the
