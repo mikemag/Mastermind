@@ -18,12 +18,13 @@
 // compilation for the game at hand.
 struct SolverConfigBase {};
 
-template <uint8_t PIN_COUNT_, uint8_t COLOR_COUNT_, bool LOG_, typename ALGO_>
+template <uint8_t PIN_COUNT_, uint8_t COLOR_COUNT_, bool LOG_, typename ALGO_, bool SYMOPT_=false>
 struct SolverConfig : public SolverConfigBase {
   constexpr static uint8_t PIN_COUNT = PIN_COUNT_;
   constexpr static uint8_t COLOR_COUNT = COLOR_COUNT_;
   constexpr static bool LOG = LOG_;
   using ALGO = ALGO_;
+  constexpr static bool SYMOPT = SYMOPT_;
 
   using CodewordT = Codeword<PIN_COUNT, COLOR_COUNT>;
   using SubsetSizeT = typename ALGO::MaxSubsetSizeT;

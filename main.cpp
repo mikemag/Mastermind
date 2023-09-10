@@ -44,8 +44,8 @@ static constexpr bool shouldPlaySingleGame = true;
 template <typename T>
 using SingleGameSolver = DefaultSolver<T>;
 using SingleGameAlgo = Algos::Knuth;
-static constexpr uint8_t singleGamePinCount = 5;    // 1-8, 4 is classic
-static constexpr uint8_t singleGameColorCount = 10;  // 1-15, 6 is classic
+static constexpr uint8_t singleGamePinCount = 4;     // 1-8, 4 is classic
+static constexpr uint8_t singleGameColorCount = 6;  // 1-15, 6 is classic
 static constexpr bool singleGameLog = true;
 
 // Config for playing a set of games
@@ -71,6 +71,7 @@ static constexpr bool shouldFindBestFirstSpecificGuesses = false;
 static constexpr bool shouldRunTests = true;  // Run unit tests and play Knuth's game
 static constexpr bool shouldWriteStratFiles = false;
 static constexpr bool shouldSkipCompletedGames = false;  // Load stats in current dir and skip completed games
+static constexpr bool shouldUseSymOpt = true;            // Use the optimization for symmetry
 
 static constexpr auto statsFilenamePrefix = "mastermind_run_stats_";
 static constexpr auto pinCountTag = "Pin Count";
@@ -155,7 +156,7 @@ void validateSolutions(Solver& solver, json& validSolutions) {
         vector<vector<string>> sampleGames = vs["sample_games"];
         for (vector<string>& g : sampleGames) {
           vector<uint32_t> gi(g.size());
-          std::transform(g.begin(), g.end(), gi.begin(), [&](const string& s) { return stoi(s, 0, 16); });
+          std::transform(g.begin(), g.end(), gi.begin(), [&](const string& s) { return stoi(s, nullptr, 16); });
           auto guesses = solver.getGuessesForGame(gi.back());
           if (guesses != gi) {
             printf("ERROR: Solution for secret %x, %dp%dc game, algo '%s', solver '%s', %ld moves: ", gi.back(),
@@ -346,8 +347,8 @@ struct PlayAllGamesWithAllInitialGuesses {
 template <bool shouldRun>
 void playSingleGame(StatsRecorder& statsRecorder, json& validSolutions) {
   if constexpr (shouldRun) {
-    using gameSolver =
-        SingleGameSolver<SolverConfig<singleGamePinCount, singleGameColorCount, singleGameLog, SingleGameAlgo>>;
+    using gameSolver = SingleGameSolver<
+        SolverConfig<singleGamePinCount, singleGameColorCount, singleGameLog, SingleGameAlgo, shouldUseSymOpt>>;
     PlayAllGames{statsRecorder, validSolutions}.template runSolver<gameSolver>();
   }
 }
@@ -356,7 +357,8 @@ template <bool shouldRun>
 void playMultipleGames(StatsRecorder& statsRecorder, json& validSolutions) {
   if constexpr (shouldRun) {
     using namespace ss;
-    using gameConfigs = solver_config_list<MultiGamePins, MultiGameColors, MultiGameAlgos, multiGameLog>;
+    using gameConfigs =
+        solver_config_list<MultiGamePins, MultiGameColors, MultiGameAlgos, multiGameLog, shouldUseSymOpt>;
     using gameSolvers = build_solvers<MultiGameSolver, gameConfigs::type>;
     run_multiple_solvers(gameSolvers::type{}, PlayAllGames(statsRecorder, validSolutions));
   }
@@ -367,14 +369,14 @@ void playMultipleSpecificGames(StatsRecorder& statsRecorder, json& validSolution
   if constexpr (shouldRun) {
     using namespace ss;
     {
-      using gameConfigs =
-          solver_config_list<ss::pin_counts<7>, ss::color_counts<2, 3, 4, 5, 6, 7, 8, 9>, MultiGameAlgos, multiGameLog>;
+      using gameConfigs = solver_config_list<ss::pin_counts<7>, ss::color_counts<2, 3, 4, 5, 6, 7, 8, 9>,
+                                             MultiGameAlgos, multiGameLog, shouldUseSymOpt>;
       using gameSolvers = build_solvers<MultiGameSolver, gameConfigs::type>;
       run_multiple_solvers(gameSolvers::type{}, PlayAllGames(statsRecorder, validSolutions));
     }
     {
-      using gameConfigs =
-          solver_config_list<ss::pin_counts<8>, ss::color_counts<2, 3, 4, 5, 6, 7>, MultiGameAlgos, multiGameLog>;
+      using gameConfigs = solver_config_list<ss::pin_counts<8>, ss::color_counts<2, 3, 4, 5, 6, 7>, MultiGameAlgos,
+                                             multiGameLog, shouldUseSymOpt>;
       using gameSolvers = build_solvers<MultiGameSolver, gameConfigs::type>;
       run_multiple_solvers(gameSolvers::type{}, PlayAllGames(statsRecorder, validSolutions));
     }
@@ -385,7 +387,8 @@ template <bool shouldRun>
 void playMultipleGamesWithInitialGuesses(StatsRecorder& statsRecorder, json& validSolutions) {
   if constexpr (shouldRun) {
     using namespace ss;
-    using gameConfigs = solver_config_list<MultiGamePins, MultiGameColors, MultiGameAlgos, multiGameLog>;
+    using gameConfigs =
+        solver_config_list<MultiGamePins, MultiGameColors, MultiGameAlgos, multiGameLog, shouldUseSymOpt>;
     using gameSolvers = build_solvers<MultiGameSolver, gameConfigs::type>;
     run_multiple_solvers(gameSolvers::type{}, PlayAllGamesWithAllInitialGuesses(statsRecorder, validSolutions));
   }
@@ -395,9 +398,23 @@ template <bool shouldRun>
 void playMultipleSpecificGamesWithInitialGuesses(StatsRecorder& statsRecorder, json& validSolutions) {
   if constexpr (shouldRun) {
     using namespace ss;
+    //    {
+    //      using gameConfigs = solver_config_list<ss::pin_counts<6>, ss::color_counts<2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
+    //      12>,
+    //                                             MultiGameAlgos, multiGameLog>;
+    //      using gameSolvers = build_solvers<MultiGameSolver, gameConfigs::type>;
+    //      run_multiple_solvers(gameSolvers::type{}, PlayAllGamesWithAllInitialGuesses(statsRecorder));
+    //    }
+    //    {
+    //      using gameConfigs =
+    //          solver_config_list<ss::pin_counts<7>, ss::color_counts<2, 3, 4, 5, 6, 7, 8, 9>, MultiGameAlgos,
+    //          multiGameLog>;
+    //      using gameSolvers = build_solvers<MultiGameSolver, gameConfigs::type>;
+    //      run_multiple_solvers(gameSolvers::type{}, PlayAllGamesWithAllInitialGuesses(statsRecorder));
+    //    }
     {
-      using gameConfigs =
-          solver_config_list<ss::pin_counts<8>, ss::color_counts<2, 3, 4, 5, 6>, MultiGameAlgos, multiGameLog>;
+      using gameConfigs = solver_config_list<ss::pin_counts<8>, ss::color_counts<2, 3, 4, 5, 6>, MultiGameAlgos,
+                                             multiGameLog, shouldUseSymOpt>;
       using gameSolvers = build_solvers<MultiGameSolver, gameConfigs::type>;
       run_multiple_solvers(gameSolvers::type{}, PlayAllGamesWithAllInitialGuesses(statsRecorder, validSolutions));
     }

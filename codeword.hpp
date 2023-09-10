@@ -95,10 +95,8 @@ class Codeword {
   Score scoreCountingAutoVec(const Codeword &guess) const;
   Score scoreCountingHandVec(const Codeword &guess) const;
 
-  // mmmfixme: stale comment
-  // Pre-compute color counts for all Codewords. Building this two ways right now for experimentation. The packed
-  // 4-bit counters are good for the scalar versions and overall memory usage, while the 8-bit counters are needed for
-  // SSE/AVX vectorization, both auto and by-hand. https://godbolt.org/z/bfM86K
+  // Pre-compute color counts for all Codewords. The 8-bit counters are needed for SSE/AVX vectorization, both auto and
+  // by-hand. https://godbolt.org/z/bfM86K
   constexpr static CT computeColorCounts(uint32_t word) {
     CT cc8 = 0;
     for (int i = 0; i < PIN_COUNT; i++) {

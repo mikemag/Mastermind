@@ -40,27 +40,27 @@ using algo_list = std::tuple<Ts...>;
 // Build combos of solver configs given pins, colors, and algos. Makes a tree of tuples with SolverConfigs at the
 // leaves.
 
-template <typename PIs, typename CIs, typename AT, bool LOG>
+template <typename PIs, typename CIs, typename AT, bool LOG, bool SYMOPT>
 struct solver_config_list;
 
 // First, apply pins
-template <std::size_t... Ps, typename CIs, typename AT, bool LOG>
-struct solver_config_list<std::index_sequence<Ps...>, CIs, AT, LOG> {
-  using type = std::tuple<solver_config_list<std::integral_constant<std::size_t, Ps>, CIs, AT, LOG>...>;
+template <std::size_t... Ps, typename CIs, typename AT, bool LOG, bool SYMOPT>
+struct solver_config_list<std::index_sequence<Ps...>, CIs, AT, LOG, SYMOPT> {
+  using type = std::tuple<solver_config_list<std::integral_constant<std::size_t, Ps>, CIs, AT, LOG, SYMOPT>...>;
 };
 
 // Second, apply colors
-template <std::size_t P, std::size_t... Cs, typename AT, bool LOG>
-struct solver_config_list<std::integral_constant<size_t, P>, std::index_sequence<Cs...>, AT, LOG> {
-  using type = std::tuple<
-      solver_config_list<std::integral_constant<std::size_t, P>, std::integral_constant<std::size_t, Cs>, AT, LOG>...>;
+template <std::size_t P, std::size_t... Cs, typename AT, bool LOG, bool SYMOPT>
+struct solver_config_list<std::integral_constant<size_t, P>, std::index_sequence<Cs...>, AT, LOG, SYMOPT> {
+  using type = std::tuple<solver_config_list<std::integral_constant<std::size_t, P>,
+                                             std::integral_constant<std::size_t, Cs>, AT, LOG, SYMOPT>...>;
 };
 
 // Finally, algos and create the SolverConfig leaves
-template <std::size_t P, std::size_t C, typename... As, bool LOG>
+template <std::size_t P, std::size_t C, typename... As, bool LOG, bool SYMOPT>
 struct solver_config_list<std::integral_constant<std::size_t, P>, std::integral_constant<std::size_t, C>,
-                          std::tuple<As...>, LOG> {
-  using type = std::tuple<SolverConfig<P, C, LOG, As>...>;
+                          std::tuple<As...>, LOG, SYMOPT> {
+  using type = std::tuple<SolverConfig<P, C, LOG, As, SYMOPT>...>;
 };
 
 // ------------------------------------------------------------------------------------------------------------------

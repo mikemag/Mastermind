@@ -5,9 +5,9 @@
 
 #pragma once
 
+#include <array>
 #include <string_view>
 #include <tuple>
-#include <array>
 
 // Sets up counters with names, descriptions, and most importantly a zero-based index. Used to have arrays of counters
 // on CPU and GPU which match, can be used on either size, and added together at the end.
@@ -28,22 +28,10 @@ struct CounterDescriptors {
   }
 };
 
-// nb: stuck on C++17 right now w/ CUDA, so copy in the constexpr std::find_if.
-//template <class InputIt, class UnaryPredicate>
-//constexpr InputIt constexpr_find_if(InputIt first, InputIt last, UnaryPredicate p) {
-//  for (; first != last; ++first) {
-//    if (p(*first)) {
-//      return first;
-//    }
-//  }
-//  return last;
-//}
-
 template <std::size_t S>
 constexpr static auto find_counter(const CounterDescriptors<S>& a, const char* counterName) {
-  return std::find_if(
-             a.descs.begin(), a.descs.end(),
-             [counterName](const CounterDescriptor& c) { return std::string_view(c.name) == counterName; })
+  return std::find_if(a.descs.begin(), a.descs.end(),
+                      [counterName](const CounterDescriptor& c) { return std::string_view(c.name) == counterName; })
       ->index;
 };
 
