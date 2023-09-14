@@ -159,13 +159,13 @@ std::chrono::nanoseconds SolverCPUFaster<SolverConfig>::playAllGames(uint32_t pa
   }
 
   // TODO: tmp stats dumping
-  cout << "Depth, Hits, HitsFromBelow, Size, PSSize, Zeros, Frees, ZeroCnt, FreeCnt" << endl;
-  for (auto const& [key, val] : symACCache) {
-    cout << val.depth << ", " << val.hitCount << ", " << val.hitFromBelow << ", " << val.reducedAC.size() << ", "
-         << val.psSize << ", " << key.isZero << ", " << key.isFree << ", " << std::popcount(key.isZero) << ", "
-         << std::popcount(key.isFree) << endl;
-  }
-  cout << "Set count: " << symACCache.size() << endl;
+  //  cout << "Depth, Hits, HitsFromBelow, Size, PSSize, Zeros, Frees, ZeroCnt, FreeCnt" << endl;
+  //  for (auto const& [key, val] : symACCache) {
+  //    cout << val.depth << ", " << val.hitCount << ", " << val.hitFromBelow << ", " << val.reducedAC.size() << ", "
+  //         << val.psSize << ", " << key.isZero << ", " << key.isFree << ", " << std::popcount(key.isZero) << ", "
+  //         << std::popcount(key.isFree) << endl;
+  //  }
+  //  cout << "Set count: " << symACCache.size() << endl;
 
   return endTime - startTime;
 }
@@ -334,6 +334,12 @@ bool SolverCPUFaster<SolverConfig>::isSymmetricRepresentitive(uint32_t cw, const
   return true;
 }
 
+// mmmfixme: tmp
+int factorial(int n) {
+  if (n == 0) return 1;
+  return n * factorial(n - 1);
+}
+
 // Produce a reduced AC which only contains representative codewords given the zero and free colors in PS.
 template <typename SolverConfig>
 vector<typename SolverConfig::CodewordT> SolverCPUFaster<SolverConfig>::getReducedAC(
@@ -407,6 +413,55 @@ vector<typename SolverConfig::CodewordT> SolverCPUFaster<SolverConfig>::getReduc
   vector<CodewordT> reducedAC;
   std::copy_if(allCodewords.begin(), allCodewords.end(), std::back_inserter(reducedAC),
                [&](auto cw) { return isSymmetricRepresentitive(cw.packedCodeword(), zeros, frees, isFree); });
+
+  // mmmfixme:
+  //  - Figuring out how many representative codewords exist without actually forming them.
+  //  - Math works, these match for all cases for 4p12c, 4p15c, 4p6c, 5p8c, 2p15c, 8p2c, and a bunch more I've tested.
+  //  - Math seems sound. Need to verify a smidge more, then write it up well.
+  //  - The goal is to know ahead of time, given Frees and Zeros, how many codewords will be in reducedAC.
+  //    - With this, for the GPU version, I can effecitvely allocate regions of memory, sort regions togehter based
+  //      not only on their size, but on their size x their reducedAC.
+  //      - May also be reasonable to run a different kernel for small reducedAC x small PS.
+  int a[16][16] = {};
+  int g[16] = {};
+  a[2][1] = 1;
+  g[1] = 1;
+  for (int n = 2; n <= SolverConfig::PIN_COUNT; n++) {
+    for (int x = 2; x <= n + 1; x++) {
+      auto px = x;
+      if (px < frees.size()) {
+        a[x][n] = a[x - 1][n - 1] + (px - 1) * a[x][n - 1];
+      } else if (px == frees.size()) {
+        a[x][n] = a[x - 1][n - 1] + px * a[x][n - 1];
+      }
+      g[n] += a[x][n];
+    }
+  }
+
+  int availableColors = 0;
+  if (!frees.empty() && !zeros.empty()) {
+    availableColors = SolverConfig::COLOR_COUNT - frees.size() - zeros.size() + 1;
+  } else {
+    availableColors = std::max<int>(1, SolverConfig::COLOR_COUNT - frees.size() - zeros.size());
+  }
+
+  int FS = 0;
+  for (int p = 1; p <= SolverConfig::PIN_COUNT; p++) {
+    int Cpx = factorial(SolverConfig::PIN_COUNT) / (factorial(SolverConfig::PIN_COUNT - p) * factorial(p));
+    int yp = Cpx * g[p];
+    int pw = pow(availableColors, SolverConfig::PIN_COUNT - p);
+    FS += yp * pw;
+  }
+
+  int total = 0;
+  if (!frees.empty()) {
+    total = pow(availableColors, SolverConfig::PIN_COUNT) + FS;
+  } else {
+    total = pow(SolverConfig::COLOR_COUNT - zeros.size() + 1, SolverConfig::PIN_COUNT);
+  }
+  if (total != reducedAC.size()) {
+    cout << "OOPS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << endl;
+  }
 
   // TODO: tmp stats added to key.
   symACCache[key] = {reducedAC, depth, possibleSolutions.size()};
