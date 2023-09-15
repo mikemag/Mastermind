@@ -55,12 +55,12 @@ def load_json(filename, results, initial_guesses):
 
 
 def process_results():
-    with open("../preset_initial_guesses.json", "r") as f:
+    with open("../docs/initial_guesses/preset_initial_guesses.json", "r") as f:
         initial_guesses = json.load(f)
 
     results = OrderedDict()
     result_files = []
-    result_files.extend(glob.glob("../../../results/**/*.json", recursive=True))
+    result_files.extend(glob.glob("../results/**/*.json", recursive=True))
     # result_files.extend(glob.glob("../*_ig_*.json", recursive=True))
 
     for f in result_files:
@@ -72,7 +72,7 @@ def process_results():
     if sgs:
         sgs.append(["1122", "1344", "3526", "1462", "3632"])
 
-    with open("../../../valid_solutions.json", "w") as f:
+    with open("../valid_solutions.json", "w") as f:
         json.dump(results, f, indent=2)
 
 

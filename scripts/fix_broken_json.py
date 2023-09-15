@@ -7,18 +7,17 @@ import glob
 
 
 def fixup_broken_files():
-    result_files = glob.glob(
-        '/Users/mike/dev/Mastermind/results/2023_GCE_Various/*.json')
+    result_files = glob.glob("../results/2023_GCE_Various/*.json")
 
     for filename in result_files:
         print(filename)
-        with open(filename, 'r') as f:
+        with open(filename, "r") as f:
             lines = f.readlines()
         ll = lines[-1].strip()
-        if len(ll) == 0 or ll[-1] != ']':
-            with open(filename, 'a') as f:
-                f.write(']\n')
+        if len(ll) == 0 or ll[-1] != "]":
+            with open(filename, "a") as f:
+                f.write("]\n")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     fixup_broken_files()
