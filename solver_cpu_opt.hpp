@@ -48,28 +48,20 @@ class SolverCPUFaster : public Solver {
   }};
 
  private:
-  struct SymACKey {
+  struct ACrCacheKey {
     uint32_t isZero;
     uint32_t isFree;
 
-    bool operator==(const SymACKey& other) const { return isZero == other.isZero && isFree == other.isFree; }
+    bool operator==(const ACrCacheKey& other) const { return isZero == other.isZero && isFree == other.isFree; }
   };
 
-  struct SymACKeyHash {
-    size_t operator()(const SymACKey& key) const {
+  struct ACrCacheKeyHash {
+    size_t operator()(const ACrCacheKey& key) const {
       return std::hash<uint32_t>{}(key.isZero) ^ std::hash<uint32_t>{}(key.isFree);
     }
   };
 
-  struct tmp {
-    vector<CodewordT> reducedAC;
-    uint depth;
-    size_t psSize;
-    uint hitCount = 0;
-    uint hitFromBelow = 0;
-  };
-
-  std::unordered_map<SymACKey, tmp, SymACKeyHash> symACCache;
+  std::unordered_map<ACrCacheKey, vector<CodewordT>, ACrCacheKeyHash> symACCache;
 
   vector<vector<CodewordT>> nextMovesList;
   vector<RegionIDT> regionIDs;
@@ -81,8 +73,8 @@ class SolverCPUFaster : public Solver {
   vector<typename SolverConfig::CodewordT> getReducedAC(const vector<CodewordT>& allCodewords,
                                                         const vector<CodewordT>& possibleSolutions,
                                                         const vector<CodewordT>& usedCodewords, uint depth);
-  bool isSymmetricRepresentitive(uint32_t cw, const vector<uint32_t>& zeros, const vector<uint8_t>& frees,
-                                 uint32_t isFree) const;
+  bool isClassRepresentative(uint32_t cw, const vector<uint8_t>& zero, const vector<uint8_t>& free,
+                             uint32_t isFree) const;
 
   uint32_t getPackedCodewordForRegion(int level, uint32_t regionIndex) const override {
     return nextMovesList[level][regionIndex].packedCodeword();

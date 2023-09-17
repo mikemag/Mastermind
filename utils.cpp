@@ -407,3 +407,25 @@ void GPUInfo::loadDeviceInfo() {
 
 #endif
 }
+
+std::map<int, int> &getACrCache() {
+  static std::map<int, int> ACrCache;
+  static bool isACrCacheLoaded = false;
+
+  if (!isACrCacheLoaded) {
+    try {
+      std::ifstream f("ACReduced.json");
+      auto j = json::parse(f);
+      for (const auto &[key, value] : j.items()) {
+        int ki = std::stoi(key);
+        ACrCache[ki] = value.get<int>();
+      }
+      cout << "Loaded ACrCache, " << ACrCache.size() << " entries." << endl;
+    } catch (json::parse_error &ex) {
+      cout << "Unable to load ACrCache." << endl;
+    }
+    isACrCacheLoaded = true;
+  }
+
+  return ACrCache;
+}

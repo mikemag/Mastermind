@@ -72,8 +72,9 @@ static constexpr bool shouldRunTests = true;  // Run unit tests and play Knuth's
 static constexpr bool shouldWriteStratFiles = false;
 static constexpr bool shouldSkipCompletedGames = false;  // Load stats in current dir and skip completed games
 static constexpr bool shouldUseSymOpt = true;            // Use the optimization for symmetry
+static constexpr bool shouldTimestampResults = true;
 
-static constexpr auto statsFilenamePrefix = "mastermind_run_stats_";
+static constexpr auto statsFilenamePrefix = "mastermind_run_stats";
 static constexpr auto pinCountTag = "Pin Count";
 static constexpr auto colorCountTag = "Color Count";
 static constexpr auto strategyTag = "Strategy";
@@ -465,7 +466,10 @@ int main(int argc, const char* argv[]) {
   auto now = std::chrono::system_clock::now();
   std::time_t now_time = std::chrono::system_clock::to_time_t(now);
   stringstream fs;
-  fs << statsFilenamePrefix << put_time(std::localtime(&now_time), "%Y%m%d_%H%M%S");
+  fs << statsFilenamePrefix;
+  if (shouldTimestampResults) {
+    fs << "_" << put_time(std::localtime(&now_time), "%Y%m%d_%H%M%S");
+  }
   auto st = std::getenv("MASTERMIND_STATS_TAG");
   if (st) {
     fs << "_" << st;

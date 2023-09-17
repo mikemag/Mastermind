@@ -176,3 +176,5 @@ template <bool enabled>
 std::ostream &operator<<(std::ostream &stream, const ExperimentCounter<enabled> &r) {
   return r.dump(stream);
 }
+
+std::map<int,int> &getACrCache();

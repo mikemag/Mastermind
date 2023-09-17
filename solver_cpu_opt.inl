@@ -11,6 +11,8 @@
 #include <ranges>
 #include <span>
 
+#include "utils.hpp"
+
 // CPU Implementation w/ Some Optimizations
 //
 // This is a version that runs on the CPU and is structured very close to the CUDA version. It's much faster than the
@@ -277,51 +279,39 @@ bool SolverCPUFaster<SolverConfig>::shortcutSmallSets(const vector<CodewordT>& p
   return false;
 }
 
-// Optimization from Ville[2], section 5.4: Symmetry.
+// Optimization for Symmetry and Case Equivalence
 //
-// I've adopted his terminology of "free" and "zero" colors. Free colors are those which have never been played.
-// Zero colors are those which we know cannot be part of the secret. Zero colors add no new information when played,
-// and thus they're all equal. So we can replace all of them with the lexically first one. I.e., if we know that colors
-// 1, 2, and 3 can't be part of the secret, then we can replace any 2 or 3 with 1, and play that codeword to get the
-// same result.
-//
-// Likewise, free colors provide the same information when played, no matter their order. If we know 1, 2, and 3 are
-// free, then 1123, 1132, 2213, 2231, 3312, and 3321 all give the same information. So we would wish to replace free
-// colors as we see them with the lexically ordered free colors, i.e., transform every codeword in the example to 1123.
-//
-// Free colors are easy to identify for any region: simply look at the used codewords set and collect the colors from
-// each codeword played.
-//
-// Zero colors are, conceptually, discovered as guesses are played and the scores are understood. Practically, the PS
-// set holds all codewords which are consistent with every guess played so far, and we can simply look at the entire
-// set and collect all colors present. Any color not present in PS is a zero color.
+// Adapted from Ville[2], section 5.4. See docs/Symmetry_and_Case_Equivalence.ipynb for full details.
 
-// Rather tha actually transform codewords into their symmetric representative, simply determine if a given word is
+// Rather tha actually transform codewords into their class representative, simply determine if a given word is
 // in fact that representative. It's always in the set already.
 template <typename SolverConfig>
-bool SolverCPUFaster<SolverConfig>::isSymmetricRepresentitive(uint32_t cw, const vector<uint32_t>& zeros,
-                                                              const vector<uint8_t>& frees, uint32_t isFree) const {
+bool SolverCPUFaster<SolverConfig>::isClassRepresentative(uint32_t cw, const vector<uint8_t>& zero,
+                                                          const vector<uint8_t>& free, uint32_t isFree) const {
   // Any color beyond the first would be switched to the first, to be symmetric, so stop early if we find one.
-  for (int i = 1; i < zeros.size(); i++) {
+  for (int j = 1; j < zero.size(); j++) {
     uint32_t mask = 0xF << ((SolverConfig::PIN_COUNT - 1) * 4);
+    int i = SolverConfig::PIN_COUNT - 1;
     while (mask != 0) {
-      if ((cw & mask) == (zeros[i] & mask)) {
+      auto p = (cw & mask) >> (i * 4);
+      if (p == zero[j]) {
         return false;
       }
       mask >>= 4;
+      i--;
     }
   }
 
-  if (!frees.empty()) {
+  if (!free.empty()) {
     // We want to replace all free colors, in random order, with the free colors in order. Thus, anything out of place
-    // isn't the lexically first of the symmetric set, so we can stop early.
+    // isn't the lexically first class representative, so we can stop early.
     uint32_t nextSub = 0;
     uint32_t mask = 0xF << ((SolverConfig::PIN_COUNT - 1) * 4);
     int i = SolverConfig::PIN_COUNT - 1;
     while (mask != 0) {
       auto p = (cw & mask) >> (i * 4);
       if (isFree & (1 << p)) {
-        if (p != frees[nextSub++]) {
+        if (p != free[nextSub++]) {
           return false;
         }
         isFree &= ~(1 << p);
@@ -332,12 +322,6 @@ bool SolverCPUFaster<SolverConfig>::isSymmetricRepresentitive(uint32_t cw, const
   }
 
   return true;
-}
-
-// mmmfixme: tmp
-int factorial(int n) {
-  if (n == 0) return 1;
-  return n * factorial(n - 1);
 }
 
 // Produce a reduced AC which only contains representative codewords given the zero and free colors in PS.
@@ -359,51 +343,42 @@ vector<typename SolverConfig::CodewordT> SolverCPUFaster<SolverConfig>::getReduc
     playedColors |= cw.packedColors();
   }
 
-  // The subsetting algorithms expect the Zeros set to be in lexicographical order, so transformed codewords are as
-  // well.
+  // The subsetting algorithms expect the Zero and Free sets to be in lexicographical order, so transformed codewords
+  // are as well.
   // TODO: I'm not really a fan of how I've chosen to represent these. I feel like there's improvements to be had here.
-  vector<uint32_t> zeros = {};
+  vector<uint8_t> zero = {};
   uint32_t isZero = 0;
-  vector<uint8_t> frees = {};
+  vector<uint8_t> free = {};
   uint32_t isFree = 0;
-  int color = 1;
-  while (color <= SolverConfig::COLOR_COUNT) {
+  for (uint8_t color = 1; color <= SolverConfig::COLOR_COUNT; color++) {
     if ((usedColors & 0xFF) == 0) {
-      zeros.push_back(0x11111111 * color);
+      zero.push_back(color);
       isZero |= (1 << color);
     } else if ((playedColors & 0xFF) == 0) {
-      frees.push_back(color);
+      free.push_back(color);
       isFree |= (1 << color);
     }
     usedColors >>= 8;
     playedColors >>= 8;
-    color++;
   }
 
   // Sets of size one are useless, as any transformation does nothing.
-  if (zeros.size() == 1) {
-    zeros = {};
+  if (zero.size() == 1) {
+    zero = {};
     isZero = 0;
   }
-  if (frees.size() == 1) {
-    frees = {};
+  if (free.size() == 1) {
+    free = {};
     isFree = 0;
   }
-  if (zeros.empty() && frees.empty()) {
+  if (zero.empty() && free.empty()) {
     return allCodewords;
   }
 
   // Caching these on playedColors and usedColors. Hit rate is reasonable, but not as high as you'd initially guess.
-  SymACKey key{isZero, isFree};
+  ACrCacheKey key{isZero, isFree};
   if (symACCache.contains(key)) {
-    // TODO: tmp stats collections
-    auto& t = symACCache[key];
-    if (t.depth != depth) {
-      t.hitFromBelow += 1;
-    } else {
-      t.hitCount += 1;
-    }
-    return t.reducedAC;
+    return symACCache[key];
   }
 
   // The representative codeword we'll use is the lexically first one in each set of equal transformed codewords. That's
@@ -412,59 +387,20 @@ vector<typename SolverConfig::CodewordT> SolverCPUFaster<SolverConfig>::getReduc
   // idea.)
   vector<CodewordT> reducedAC;
   std::copy_if(allCodewords.begin(), allCodewords.end(), std::back_inserter(reducedAC),
-               [&](auto cw) { return isSymmetricRepresentitive(cw.packedCodeword(), zeros, frees, isFree); });
+               [&](auto cw) { return isClassRepresentative(cw.packedCodeword(), zero, free, isFree); });
 
-  // mmmfixme:
-  //  - Figuring out how many representative codewords exist without actually forming them.
-  //  - Math works, these match for all cases for 4p12c, 4p15c, 4p6c, 5p8c, 2p15c, 8p2c, and a bunch more I've tested.
-  //  - Math seems sound. Need to verify a smidge more, then write it up well.
-  //  - The goal is to know ahead of time, given Frees and Zeros, how many codewords will be in reducedAC.
-  //    - With this, for the GPU version, I can effecitvely allocate regions of memory, sort regions togehter based
-  //      not only on their size, but on their size x their reducedAC.
-  //      - May also be reasonable to run a different kernel for small reducedAC x small PS.
-  int a[16][16] = {};
-  int g[16] = {};
-  a[2][1] = 1;
-  g[1] = 1;
-  for (int n = 2; n <= SolverConfig::PIN_COUNT; n++) {
-    for (int x = 2; x <= n + 1; x++) {
-      auto px = x;
-      if (px < frees.size()) {
-        a[x][n] = a[x - 1][n - 1] + (px - 1) * a[x][n - 1];
-      } else if (px == frees.size()) {
-        a[x][n] = a[x - 1][n - 1] + px * a[x][n - 1];
-      }
-      g[n] += a[x][n];
+  // Verify AC_r size with the cache.
+  auto& ACrCache = getACrCache();
+  int k = SolverConfig::PIN_COUNT * 1000000 + SolverConfig::COLOR_COUNT * 10000 + zero.size() * 100 + free.size();
+  if (ACrCache.contains(k)) {
+    if (ACrCache[k] != reducedAC.size()) {
+      cout << "ACrCache: incorrect entry, " << k << "=" << ACrCache[k] << " vs actual=" << reducedAC.size() << endl;
     }
-  }
-
-  int availableColors = 0;
-  if (!frees.empty() && !zeros.empty()) {
-    availableColors = SolverConfig::COLOR_COUNT - frees.size() - zeros.size() + 1;
   } else {
-    availableColors = std::max<int>(1, SolverConfig::COLOR_COUNT - frees.size() - zeros.size());
+    cout << "ACrCache: missing entry for key " << k << endl;
   }
 
-  int FS = 0;
-  for (int p = 1; p <= SolverConfig::PIN_COUNT; p++) {
-    int Cpx = factorial(SolverConfig::PIN_COUNT) / (factorial(SolverConfig::PIN_COUNT - p) * factorial(p));
-    int yp = Cpx * g[p];
-    int pw = pow(availableColors, SolverConfig::PIN_COUNT - p);
-    FS += yp * pw;
-  }
-
-  int total = 0;
-  if (!frees.empty()) {
-    total = pow(availableColors, SolverConfig::PIN_COUNT) + FS;
-  } else {
-    total = pow(SolverConfig::COLOR_COUNT - zeros.size() + 1, SolverConfig::PIN_COUNT);
-  }
-  if (total != reducedAC.size()) {
-    cout << "OOPS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << endl;
-  }
-
-  // TODO: tmp stats added to key.
-  symACCache[key] = {reducedAC, depth, possibleSolutions.size()};
+  symACCache[key] = reducedAC;
   return reducedAC;
 }
 
