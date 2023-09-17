@@ -28,6 +28,7 @@ This repo holds most of my work on playing all games of various sizes quickly:
 ## Docs
 
 * [Mastermind on the GPU](docs/Mastermind_on_the_GPU.md)
+* [Symmetry and Case Equivalence](docs/Symmetry_and_Case_Equivalence.ipynb)
 * [Efficient Scoring Functions](docs/Scoring_Functions.md)
 * [Packed Indices for Mastermind Scores](docs/Score_Ordinals.md)
 * [Score Caching Considered Harmful](docs/Score_Cache.md)
