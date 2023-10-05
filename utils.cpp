@@ -421,7 +421,7 @@ std::map<int, int> &getACrCache() {
         int ki = std::stoi(key);
         ACrCache[ki] = value.get<int>();
       }
-      cout << "Loaded ACrCache, " << ACrCache.size() << " entries." << endl;
+      cout << "Loaded ACrCache, " << commaString(ACrCache.size()) << " entries." << endl;
     } catch (json::parse_error &ex) {
       cout << "Unable to load ACrCache." << endl;
     }

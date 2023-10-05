@@ -34,7 +34,7 @@ class Codeword {
   CUDA_HOST_AND_DEVICE bool operator==(const Codeword other) const { return codeword == other.codeword; }
 
   CUDA_HOST_AND_DEVICE uint32_t packedCodeword() const { return codeword; }
-  CT packedColors() const { return colorCounts; }
+  CUDA_HOST_AND_DEVICE CT packedColors() const { return colorCounts; }
 #if defined(__CUDACC__)
   CUDA_HOST_AND_DEVICE uint4 packedColorsCUDA() const {
     if constexpr (isSize2()) {
@@ -69,6 +69,8 @@ class Codeword {
 
   CUDA_HOST_AND_DEVICE constexpr static bool isSize2() { return sizeof(CT) == 8; }
   CUDA_HOST_AND_DEVICE constexpr static bool isSize4() { return sizeof(CT) == 16; }
+
+  CUDA_HOST_AND_DEVICE bool isClassRepresentative(uint32_t isZero, uint32_t isFree) const;
 
  private:
   struct UInt128Overlay {

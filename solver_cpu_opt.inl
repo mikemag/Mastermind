@@ -283,6 +283,7 @@ bool SolverCPUFaster<SolverConfig>::shortcutSmallSets(const vector<CodewordT>& p
 //
 // Adapted from Ville[2], section 5.4. See docs/Symmetry_and_Case_Equivalence.ipynb for full details.
 
+// TODO: switch to the new version in Codeword I added for the GPU impl. It should work here.
 // Rather tha actually transform codewords into their class representative, simply determine if a given word is
 // in fact that representative. It's always in the set already.
 template <typename SolverConfig>

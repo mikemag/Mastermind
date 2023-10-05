@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <thrust/device_vector.h>
+
 #include <vector>
 
 #include "solver.hpp"
@@ -95,6 +97,34 @@ class SolverCUDA : public Solver {
     }
     return packedToStandardScore[score];
   }
+
+ public:
+  // The only reason these are public is due to limitations w/ CUDA __device__ functions
+  struct ZFColors {
+    uint32_t zero;
+    uint32_t free;
+
+    CUDA_HOST_AND_DEVICE bool operator<(const ZFColors& other) const {
+      if (zero == other.zero) {
+        return free < other.free;
+      }
+      return zero < other.zero;
+    }
+
+    CUDA_HOST_AND_DEVICE bool operator==(const ZFColors& other) const {
+      return zero == other.zero && free == other.free;
+    }
+  };
+
+  void buildZerosAndFrees(const CodewordT* pdAllCodewords, thrust::device_vector<RegionID>& dRegionIDs,
+                          thrust::device_vector<RegionID>::iterator& dRegionIDsEnd, uint32_t regionCount,
+                          thrust::device_vector<uint32_t>& dRegionStarts, uint32_t** pdNextMovesVecs,
+                          uint32_t nextMovesVecsSize, thrust::device_vector<ZFColors>& dZFColors);
+
+  void buildAllACr(thrust::device_vector<ZFColors>& dZFColors, thrust::device_vector<CodewordT>& dAllCodewords,
+                   thrust::device_vector<uint32_t>& dRegionStarts, thrust::device_vector<uint32_t>& dRegionLengths,
+                   uint32_t regionCount, uint32_t tinyRegionCount, thrust::device_vector<uint32_t>& dACrBuffer,
+                   thrust::device_vector<uint32_t>& dACrStarts, thrust::device_vector<uint32_t>& dACrLengths);
 };
 
 #include "solver_cuda.inl"

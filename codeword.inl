@@ -195,3 +195,43 @@ std::ostream &Codeword<PIN_COUNT, COLOR_COUNT>::dump(std::ostream &stream) const
   return stream;
 }
 
+// Rather than actually transform codewords into their class representative, simply determine if a given word is in fact
+// that representative. It's always in the set already.
+template <uint8_t PIN_COUNT, uint8_t COLOR_COUNT>
+bool Codeword<PIN_COUNT, COLOR_COUNT>::isClassRepresentative(uint32_t isZero, uint32_t isFree) const {
+  // Any zero color beyond the first would be switched to the first, to be symmetric, so stop early if we find one.
+  if (isZero != 0) {
+    isZero = isZero & (isZero - 1);  // Strip out the first color
+    uint32_t zcw = packedCodeword();
+    while (zcw != 0) {
+      auto p = zcw & 0xF;
+      if ((1 << p) & isZero) {
+        return false;
+      }
+      zcw >>= 4;
+    }
+  }
+
+  if (isFree != 0) {
+    // We want to replace all free colors, in random order, with the free colors in order. Thus, anything out of place
+    // isn't the lexically first class representative, so we can stop early.
+    uint32_t fcw = packedCodeword();
+    int nextSub = __builtin_ffs(isFree) - 1;
+    uint32_t mask = 0xFu << ((PIN_COUNT - 1u) * 4u);
+    int i = PIN_COUNT - 1;
+    while (mask != 0) {
+      auto p = (fcw & mask) >> (i * 4);
+      if (isFree & (1 << p)) {
+        if (p != nextSub) {
+          return false;
+        }
+        isFree &= ~(1 << p);
+        nextSub = __builtin_ffs(isFree) - 1;
+      }
+      mask >>= 4;
+      i--;
+    }
+  }
+
+  return true;
+}

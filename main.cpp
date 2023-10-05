@@ -44,8 +44,8 @@ static constexpr bool shouldPlaySingleGame = true;
 template <typename T>
 using SingleGameSolver = DefaultSolver<T>;
 using SingleGameAlgo = Algos::Knuth;
-static constexpr uint8_t singleGamePinCount = 4;     // 1-8, 4 is classic
-static constexpr uint8_t singleGameColorCount = 6;  // 1-15, 6 is classic
+static constexpr uint8_t singleGamePinCount = 7;    // 1-8, 4 is classic
+static constexpr uint8_t singleGameColorCount = 7;  // 1-15, 6 is classic
 static constexpr bool singleGameLog = true;
 
 // Config for playing a set of games

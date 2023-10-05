@@ -14,6 +14,31 @@
           </excludedPaths>
         </serverdata>
       </paths>
+      <paths name="Mooncake WSL (889fc1ba-8b58-4dcf-83d2-c3c83362b2b6)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/tmp.zmKCqx4qWP" local="$PROJECT_DIR$" />
+          </mappings>
+          <excludedPaths>
+            <excludedPath local="true" path="$PROJECT_DIR$/cmake-build-release-mooncake-wsl" />
+            <excludedPath local="true" path="$PROJECT_DIR$/cmake-build-debug" />
+            <excludedPath local="true" path="$PROJECT_DIR$/cmake-build-release" />
+            <excludedPath local="true" path="$PROJECT_DIR$/cmake-build-debug-mooncake-wsl" />
+          </excludedPaths>
+        </serverdata>
+      </paths>
+      <paths name="Mooncake-WSL (c5d2905e-27b2-49ec-9404-075d864cc933)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/tmp.ncYzzymAHl" local="$PROJECT_DIR$" />
+          </mappings>
+          <excludedPaths>
+            <excludedPath local="true" path="$PROJECT_DIR$/cmake-build-release-mooncake-wsl" />
+            <excludedPath local="true" path="$PROJECT_DIR$/cmake-build-debug" />
+            <excludedPath local="true" path="$PROJECT_DIR$/cmake-build-release" />
+          </excludedPaths>
+        </serverdata>
+      </paths>
     </serverData>
   </component>
 </project>

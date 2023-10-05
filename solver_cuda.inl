@@ -9,17 +9,21 @@
 #include <thrust/device_vector.h>
 #include <thrust/for_each.h>
 #include <thrust/host_vector.h>
+#include <thrust/iterator/constant_iterator.h>
 #include <thrust/iterator/discard_iterator.h>
+#include <thrust/iterator/transform_output_iterator.h>
 #include <thrust/iterator/zip_iterator.h>
 #include <thrust/logical.h>
-#include <thrust/zip_function.h>
+#include <thrust/memory.h>
 #include <thrust/partition.h>
-#include <thrust/iterator/constant_iterator.h>
+#include <thrust/unique.h>
+#include <thrust/zip_function.h>
 
 #include <algorithm>
 #include <cassert>
 #include <cub/cub.cuh>
 #include <cuda/barrier>
+#include <cuda/functional>
 #include <new>
 #include <vector>
 
@@ -242,38 +246,53 @@ __global__ void subsettingAlgosKernel(const CodewordT* __restrict__ allCodewords
                                       const CodewordT* __restrict__ regionIDsAsCodeword,
                                       const uint32_t* __restrict__ regionIDsAsIndex, uint32_t regionStart,
                                       uint32_t regionLength, uint32_t** __restrict__ nextMovesVecs,
-                                      uint32_t nextMovesVecsSize, IndexAndRank* __restrict__ perBlockSolutions) {
+                                      uint32_t nextMovesVecsSize, IndexAndRank* __restrict__ perBlockSolutions,
+                                      const uint32_t* __restrict__ acr, uint32_t acrLength) {
   __shared__ typename SubsettingAlgosKernelConfig::SharedMemLayout sharedMem;
 
   const uint tidGrid = blockDim.x * blockIdx.x + threadIdx.x;
-  auto subsetSizes = &sharedMem.subsetSizes[threadIdx.x * SubsettingAlgosKernelConfig::TOTAL_PACKED_SCORES];
-  for (int i = 0; i < SubsettingAlgosKernelConfig::TOTAL_PACKED_SCORES; i++) subsetSizes[i] = 0;
+  bool isPossibleSolution = false;
+  uint32_t rank = 0;  // A rank of 0 will prevent used or invalid codewords from being chosen.
 
-  computeSubsetSizes<SubsettingAlgosKernelConfig::SolverConfig>(subsetSizes, allCodewords[tidGrid].packedCodeword(),
-                                                                allCodewords[tidGrid].packedColorsCUDA(),
-                                                                regionIDsAsCodeword, regionStart, regionLength);
+  // Initially assume we're working on the full AC
+  auto totalCodewords = SubsettingAlgosKernelConfig::CodewordT::TOTAL_CODEWORDS;
+  uint32_t acIndex = tidGrid;
 
-  auto possibleSolutionsCount = regionLength;
-  bool isPossibleSolution = subsetSizes[SubsettingAlgosKernelConfig::TOTAL_PACKED_SCORES - 1] > 0;
-
-  using ALGO = typename SubsettingAlgosKernelConfig::SolverConfig::ALGO;
-  typename ALGO::RankingAccumulatorType rankingAccumulator{};
-  for (int i = 0; i < SubsettingAlgosKernelConfig::TOTAL_PACKED_SCORES; i++) {
-    if (subsetSizes[i] > 0) {
-      ALGO::accumulateRanking(rankingAccumulator, subsetSizes[i], possibleSolutionsCount);
-    }
+  // If we do have a ACr, then reduce the number of codewords we're working on, and indirect through it to get the
+  // actual codeword from AC.
+  if (acr != nullptr) {
+    totalCodewords = acrLength;
   }
 
-  uint32_t rank = ALGO::computeRank(rankingAccumulator, possibleSolutionsCount);
+  if (tidGrid < totalCodewords) {
+    if (acr != nullptr) {
+      acIndex = acr[tidGrid];
+    }
 
-  // A rank of 0 will prevent used or invalid codewords from being chosen.
-  if (tidGrid >= SubsettingAlgosKernelConfig::CodewordT::TOTAL_CODEWORDS) {
-    rank = 0;
-  } else {
+    auto subsetSizes = &sharedMem.subsetSizes[threadIdx.x * SubsettingAlgosKernelConfig::TOTAL_PACKED_SCORES];
+    for (int i = 0; i < SubsettingAlgosKernelConfig::TOTAL_PACKED_SCORES; i++) subsetSizes[i] = 0;
+
+    computeSubsetSizes<SubsettingAlgosKernelConfig::SolverConfig>(subsetSizes, allCodewords[acIndex].packedCodeword(),
+                                                                  allCodewords[acIndex].packedColorsCUDA(),
+                                                                  regionIDsAsCodeword, regionStart, regionLength);
+
+    auto possibleSolutionsCount = regionLength;
+    isPossibleSolution = subsetSizes[SubsettingAlgosKernelConfig::TOTAL_PACKED_SCORES - 1] > 0;
+
+    using ALGO = typename SubsettingAlgosKernelConfig::SolverConfig::ALGO;
+    typename ALGO::RankingAccumulatorType rankingAccumulator{};
+    for (int i = 0; i < SubsettingAlgosKernelConfig::TOTAL_PACKED_SCORES; i++) {
+      if (subsetSizes[i] > 0) {
+        ALGO::accumulateRanking(rankingAccumulator, subsetSizes[i], possibleSolutionsCount);
+      }
+    }
+
+    rank = ALGO::computeRank(rankingAccumulator, possibleSolutionsCount);
+
     // Use the list of next moves sets to discard used codewords. nb: -1 to skip the new set.
     // TODO: I'd like to improve this. Ideally we wouldn't do this for low ranked guesses that won't be picked anyway.
     for (int i = 0; i < nextMovesVecsSize - 1; i++) {
-      if (tidGrid == nextMovesVecs[i][regionIDsAsIndex[regionStart]]) {
+      if (acIndex == nextMovesVecs[i][regionIDsAsIndex[regionStart]]) {
         rank = 0;
         break;
       }
@@ -283,7 +302,7 @@ __global__ void subsettingAlgosKernel(const CodewordT* __restrict__ allCodewords
   // Reduce to find the best solution we have in this block. This keeps the codeword index, rank, and possible solution
   // indicator together.
   __syncthreads();
-  IndexAndRank iar{tidGrid, rank, isPossibleSolution};
+  IndexAndRank iar{acIndex, rank, isPossibleSolution};
   IndexAndRank bestSolution =
       typename SubsettingAlgosKernelConfig::BlockReduce(sharedMem.reducerTmpStorage).Reduce(iar, IndexAndRankReducer());
 
@@ -329,17 +348,25 @@ __device__ void launchSubsettingKernel(const CodewordT* __restrict__ allCodeword
                                        const uint32_t* __restrict__ regionIDsAsIndex, uint32_t* __restrict__ nextMoves,
                                        const uint32_t regionStart, const uint32_t regionLength,
                                        uint32_t** __restrict__ nextMovesVecs, uint32_t nextMovesVecsSize,
-                                       IndexAndRank* __restrict__ perBlockSolutions) {
+                                       IndexAndRank* __restrict__ perBlockSolutions,
+                                       unsigned long long int* __restrict__ deviceCounters,
+                                       const uint32_t* __restrict__ acr, uint32_t acrLength) {
+  // mmmfixme: with ACr, NUM_BLOCKS and THEADS_PER_BLOCK are no longer correct. They were computed assuming |AC|.
+  //  - |ACr| < |AC|, sometimes by quite a lot, so we'll be launching too many blocks.
+  //  - THREADS_PER_BLOCK is capped at 512.
   subsettingAlgosKernel<SubsettingAlgosKernelConfig>
       <<<SubsettingAlgosKernelConfig::NUM_BLOCKS, SubsettingAlgosKernelConfig::THREADS_PER_BLOCK>>>(
           allCodewords, regionIDsAsCodeword, regionIDsAsIndex, regionStart, regionLength, nextMovesVecs,
-          nextMovesVecsSize, perBlockSolutions);
+          nextMovesVecsSize, perBlockSolutions, acr, acrLength);
   CubDebug(cudaGetLastError());
 
   // nb: block size on this one must be a power of 2
   reduceBestGuess<128><<<1, 128>>>(perBlockSolutions, SubsettingAlgosKernelConfig::NUM_BLOCKS, regionIDsAsIndex,
                                    nextMoves, regionStart, regionLength);
   CubDebug(cudaGetLastError());
+
+  atomicAdd(&deviceCounters[Counters<typename SubsettingAlgosKernelConfig::SolverConfig>::SCORES],
+            static_cast<uint64_t>(acrLength) * regionLength);
 }
 
 // Holds all the constants we need to kick off the CUDA kernel for all the fully discriminating optimization given a
@@ -388,7 +415,8 @@ __global__ void fullyDiscriminatingOpt(const CodewordT* __restrict__ allCodeword
                                        uint32_t regionLength, uint32_t* __restrict__ nextMoves,
                                        uint32_t** __restrict__ nextMovesVecs, uint32_t nextMovesVecsSize,
                                        IndexAndRank* __restrict__ perBlockSolutions,
-                                       unsigned long long int* __restrict__ deviceCounters) {
+                                       unsigned long long int* __restrict__ deviceCounters,
+                                       const uint32_t* __restrict__ acr, uint32_t acrLength) {
   assert(blockIdx.x == 0);   // Single block
   assert(blockDim.x == 32);  // Single warp
 
@@ -421,18 +449,16 @@ __global__ void fullyDiscriminatingOpt(const CodewordT* __restrict__ allCodeword
       typename FDOptKernelConfig::SmallOptsBlockReduce(sharedMem.smallOptsReducerTmpStorage).Reduce(result, cub::Min());
 
   if (threadIdx.x == 0) {
+    atomicAdd(&deviceCounters[Counters<SolverConfig>::SCORES], regionLength * regionLength);
     if (bestSolution < cuda::std::numeric_limits<uint>::max()) {
       for (int i = 0; i < regionLength; i++) {
         nextMoves[regionIDsAsIndex[i + regionStart]] = bestSolution;
       }
-      atomicAdd(&deviceCounters[Counters<SolverConfig>::SCORES], regionLength * regionLength);
     } else {
       // Fallback on the big kernel
-      launchSubsettingKernel<SubsettingAlgosKernelConfig>(allCodewords, regionIDsAsCodeword, regionIDsAsIndex,
-                                                          nextMoves, regionStart, regionLength, nextMovesVecs,
-                                                          nextMovesVecsSize, perBlockSolutions);
-      atomicAdd(&deviceCounters[Counters<SolverConfig>::SCORES],
-                CodewordT::TOTAL_CODEWORDS * regionLength + regionLength * regionLength);
+      launchSubsettingKernel<SubsettingAlgosKernelConfig>(
+          allCodewords, regionIDsAsCodeword, regionIDsAsIndex, nextMoves, regionStart, regionLength, nextMovesVecs,
+          nextMovesVecsSize, perBlockSolutions, deviceCounters, acr, acrLength);
     }
   }
 }
@@ -447,7 +473,9 @@ __global__ void nextGuessForRegions(const CodewordT* __restrict__ allCodewords,
                                     const uint32_t* __restrict__ regionLengths, const uint32_t offset,
                                     const uint32_t regionCount, uint32_t** __restrict__ nextMovesVecs,
                                     uint32_t nextMovesVecsSize, IndexAndRank* __restrict__ perBlockSolutionsPool,
-                                    unsigned long long int* __restrict__ deviceCounters) {
+                                    unsigned long long int* __restrict__ deviceCounters,
+                                    const uint32_t* __restrict__ acrBuffer, const uint32_t* __restrict__ acrStarts,
+                                    const uint32_t* __restrict__ acrLengths) {
   uint tidGrid = blockDim.x * blockIdx.x + threadIdx.x;
 
   if (tidGrid < regionCount) {
@@ -455,6 +483,17 @@ __global__ void nextGuessForRegions(const CodewordT* __restrict__ allCodewords,
     auto regionLength = regionLengths[offset + tidGrid];
     auto perBlockSolutions =
         &perBlockSolutionsPool[SubsettingAlgosKernelConfig<SolverConfig, uint32_t>::LARGEST_NUM_BLOCKS * tidGrid];
+
+    // If we have ACr data then resolve the location of ACr in the buffer and its length.
+    const uint32_t* acr = nullptr;
+    uint32_t acrLength = CodewordT::TOTAL_CODEWORDS;
+    if (acrStarts != nullptr) {
+      auto acrStart = acrStarts[offset + tidGrid];
+      if (acrStart != cuda::std::numeric_limits<uint32_t>::max()) {
+        acr = &acrBuffer[acrStart];
+        acrLength = acrLengths[offset + tidGrid];
+      }
+    }
 
     using config8 = SubsettingAlgosKernelConfig<SolverConfig, uint8_t>;
     using config16 = SubsettingAlgosKernelConfig<SolverConfig, uint16_t>;
@@ -465,20 +504,20 @@ __global__ void nextGuessForRegions(const CodewordT* __restrict__ allCodewords,
         using configFDOpt = FDOptKernelConfig<SolverConfig>;
         fullyDiscriminatingOpt<configFDOpt, config8><<<1, configFDOpt::THREADS_PER_BLOCK>>>(
             allCodewords, regionIDsAsCodeword, regionIDsAsIndex, regionStart, regionLength, nextMoves, nextMovesVecs,
-            nextMovesVecsSize, perBlockSolutions, deviceCounters);
+            nextMovesVecsSize, perBlockSolutions, deviceCounters, acr, acrLength);
       } else {
         launchSubsettingKernel<config8>(allCodewords, regionIDsAsCodeword, regionIDsAsIndex, nextMoves, regionStart,
-                                        regionLength, nextMovesVecs, nextMovesVecsSize, perBlockSolutions);
-        atomicAdd(&deviceCounters[Counters<SolverConfig>::SCORES], CodewordT::TOTAL_CODEWORDS * regionLength);
+                                        regionLength, nextMovesVecs, nextMovesVecsSize, perBlockSolutions,
+                                        deviceCounters, acr, acrLength);
       }
     } else if (config16::shouldUseType(regionLength)) {
       launchSubsettingKernel<config16>(allCodewords, regionIDsAsCodeword, regionIDsAsIndex, nextMoves, regionStart,
-                                       regionLength, nextMovesVecs, nextMovesVecsSize, perBlockSolutions);
-      atomicAdd(&deviceCounters[Counters<SolverConfig>::SCORES], CodewordT::TOTAL_CODEWORDS * regionLength);
+                                       regionLength, nextMovesVecs, nextMovesVecsSize, perBlockSolutions,
+                                       deviceCounters, acr, acrLength);
     } else {
       launchSubsettingKernel<config32>(allCodewords, regionIDsAsCodeword, regionIDsAsIndex, nextMoves, regionStart,
-                                       regionLength, nextMovesVecs, nextMovesVecsSize, perBlockSolutions);
-      atomicAdd(&deviceCounters[Counters<SolverConfig>::SCORES], CodewordT::TOTAL_CODEWORDS * regionLength);
+                                       regionLength, nextMovesVecs, nextMovesVecsSize, perBlockSolutions,
+                                       deviceCounters, acr, acrLength);
     }
   }
 }
@@ -565,6 +604,12 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
   thrust::device_vector<uint32_t> dRegionIDsAsIndex(dRegionIDs.size());
   thrust::device_vector<CodewordT> dRegionIDsAsCodeword(dRegionIDs.size());
 
+  // Space for the Case Equivalence opts
+  thrust::device_vector<uint32_t> dACrBuffer;
+  thrust::device_vector<uint32_t> dACrStarts;
+  thrust::device_vector<uint32_t> dACrLengths;
+  thrust::device_vector<ZFColors> dZFColors(dRegionIDs.size());
+
   // A little space for some counters
   thrust::host_vector<unsigned long long int> hDeviceCounters(counters.size(), 0);
   thrust::device_vector<unsigned long long int> dDeviceCounters = hDeviceCounters;
@@ -596,7 +641,7 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
     dRegionIDsEnd = thrust::partition(dRegionIDs.begin(), dRegionIDsEnd,
                                       [] __device__(const RegionID& r) { return !r.isGameOver(); });
 
-    if (LOG) printf("Number of games left: %ld\n", dRegionIDsEnd - dRegionIDs.begin());
+    if (LOG) cout << "Number of games left: " << commaString(dRegionIDsEnd - dRegionIDs.begin()) << endl;
 
     // If no games need new moves, then we're done
     if (dRegionIDsEnd - dRegionIDs.begin() == 0) break;
@@ -613,17 +658,56 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
                               [] __device__(const RegionID& a, const RegionID& b) { return a.value == b.value; })
             .second -
         dRegionLengths.begin();
-    if (LOG) printf("Number of regions: %lu\n", regionCount);
+    if (LOG) cout << "Number of regions: " << commaString(regionCount) << endl;
 
     // Now build starts for each region
     thrust::exclusive_scan(dRegionLengths.begin(), dRegionLengths.begin() + regionCount, dRegionStarts.begin());
 
-    // Sort the regions by length. Lets us batch up work for regions of different interesting sizes below
-    thrust::sort_by_key(dRegionLengths.begin(), dRegionLengths.begin() + regionCount, dRegionStarts.begin());
+    // Optimization for Symmetry and Case Equivalence
+    //
+    // Adapted from Ville[2], section 5.4. See docs/Symmetry_and_Case_Equivalence.ipynb for full details.
+    // The first step is to gather the Zero and Free info for each region.
+    constexpr bool shouldApplyCEOpt = true;  // mmmfixme: move
+    // mmmfixme:
+    //  - 7p7c score ops:
+    //    - applied: 1,688,549,605,473 -- 65.07%
+    //    - not:     2,594,858,890,338
+    if (shouldApplyCEOpt) {
+      buildZerosAndFrees(pdAllCodewords, dRegionIDs, dRegionIDsEnd, regionCount, dRegionStarts, pdNextMovesVecs,
+                         nextMovesVecsSize, dZFColors);
+
+      // Sort the regions by length. Lets us batch up work for regions of different interesting sizes below. Include the
+      // zero and free data, too.
+      thrust::sort_by_key(dRegionLengths.begin(), dRegionLengths.begin() + regionCount,
+                          thrust::make_zip_iterator(dRegionStarts.begin(), dZFColors.begin()));
+    } else {
+      // Sort the regions by length. Lets us batch up work for regions of different interesting sizes below
+      thrust::sort_by_key(dRegionLengths.begin(), dRegionLengths.begin() + regionCount, dRegionStarts.begin());
+    }
 
     // Have to take the hit and pull the region lengths back, so we can launch different kernels
     // TODO: would be nice to have this async with other work above, not needed until later
     hRegionLengths = dRegionLengths;
+
+    // How many regions are "tiny"? We'll process these separately below, and avoid doing any more CE work for them too.
+    uint32_t tinyRegionCount = 0;
+    uint32_t tinyGameCount = 0;
+    for (uint32_t i = 0; i < regionCount && hRegionLengths[i] <= 2; i++) {
+      tinyGameCount += hRegionLengths[tinyRegionCount];
+      tinyRegionCount++;
+    }
+
+    // The next phase in the Case Equivalence opt is to gather the unique combinations of Zero and Free, and generate
+    // all ACr from them. I'm building these all together for now, and assuming they will fit. When that fails to be
+    // the case we'll have to generate as many as will fit in memory, launch the kernels we can, then loop.
+    if (shouldApplyCEOpt) {
+      buildAllACr(dZFColors, dAllCodewords, dRegionStarts, dRegionLengths, regionCount, tinyRegionCount, dACrBuffer,
+                  dACrStarts, dACrLengths);
+    }
+
+    auto pdACrIBuffer = thrust::raw_pointer_cast(dACrBuffer.data());
+    auto pdACrStarts = thrust::raw_pointer_cast(dACrStarts.data());
+    auto pdACrLengths = thrust::raw_pointer_cast(dACrLengths.data());
 
     // TODO: these could probably be one zipped transform
     // TODO: re-test these. Trades a lot of device space for a small time gain, worth it?
@@ -655,13 +739,6 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
 
     // Process "tiny" regions specially. They need virtually no work, but it all has to act on device memory, so we use
     // a single small kernel to take care of them all very, very quickly.
-    uint32_t tinyRegionCount = 0;
-    uint32_t tinyGameCount = 0;
-    for (uint32_t i = 0; i < regionCount && hRegionLengths[i] <= 2; i++) {
-      tinyGameCount += hRegionLengths[tinyRegionCount];
-      tinyRegionCount++;
-    }
-
     if (tinyRegionCount > 0) {
       nextGuessTiny<<<1, 128>>>(pdRegionsAsIndex, pdNextMoves, pdRegionStarts, pdRegionLengths, tinyRegionCount);
     }
@@ -675,7 +752,8 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
       auto pdPerBlockSolutions = thrust::raw_pointer_cast(dPerBlockSolutions.data());
       nextGuessForRegions<SolverConfig><<<(regionsToDo + threadsPerBlock - 1) / threadsPerBlock, threadsPerBlock>>>(
           pdAllCodewords, pdRegionsAsCodeword, pdRegionsAsIndex, pdNextMoves, pdRegionStarts, pdRegionLengths, offset,
-          regionsToDo, pdNextMovesVecs, nextMovesVecsSize, pdPerBlockSolutions, pdDeviceCounters);
+          regionsToDo, pdNextMovesVecs, nextMovesVecsSize, pdPerBlockSolutions, pdDeviceCounters, pdACrIBuffer,
+          pdACrStarts, pdACrLengths);
     }
 
     // Small regions are amenable to the fully discriminating opt. These are counted here, but really handled by
@@ -754,4 +832,167 @@ void SolverCUDA<SolverConfig>::dump() {
 template <typename SolverConfig>
 vector<uint32_t> SolverCUDA<SolverConfig>::getGuessesForGame(uint32_t packedCodeword) {
   return Solver::getGuessesForGame<SolverCUDA, SolverConfig, CodewordT>(packedCodeword, regionIDs);
+}
+
+// Optimization for Symmetry and Case Equivalence
+//
+// Adapted from Ville[2], section 5.4. See docs/Symmetry_and_Case_Equivalence.ipynb for full details.
+
+// Zero and Free sets for each region.
+template <typename SolverConfig>
+void SolverCUDA<SolverConfig>::buildZerosAndFrees(const CodewordT* pdAllCodewords,
+                                                  thrust::device_vector<RegionID>& dRegionIDs,
+                                                  thrust::device_vector<RegionID>::iterator& dRegionIDsEnd,
+                                                  uint32_t regionCount, thrust::device_vector<uint32_t>& dRegionStarts,
+                                                  uint32_t** pdNextMovesVecs, uint32_t nextMovesVecsSize,
+                                                  thrust::device_vector<ZFColors>& dZFColors) {
+  thrust::device_vector<uint32_t> dZFZero(dRegionIDs.size());
+  thrust::device_vector<uint32_t> dZFFree(dRegionIDs.size());
+
+  // Build Zero for each region, ordered with the current regions. This is a reduction of each region (PS).
+  auto usedColorsToZerosMask = [] __device__(typename CodewordT::CT usedColors) -> uint32_t {
+    uint32_t isZero = 0;
+    for (uint8_t color = 1; color <= SolverConfig::COLOR_COUNT; color++) {
+      if ((usedColors & 0xFF) == 0) {
+        isZero |= (1 << color);
+      }
+      usedColors >>= 8;
+    }
+    if (__popc(isZero) == 1) return 0;
+    return isZero;
+  };
+
+  auto zerosForRegions = thrust::reduce_by_key(
+      dRegionIDs.begin(), dRegionIDsEnd,
+      thrust::make_transform_iterator(
+          dRegionIDs.begin(),
+          [pdAllCodewords] __host__ __device__(const RegionID& v) { return pdAllCodewords[v.index].packedColors(); }),
+      thrust::make_discard_iterator(), thrust::make_transform_output_iterator(dZFZero.begin(), usedColorsToZerosMask),
+      [] __device__(const RegionID& a, const RegionID& b) { return a.value == b.value; },
+      [] __device__(const typename CodewordT::CT a, const typename CodewordT::CT b) { return a | b; });
+  assert(zerosForRegions.second.base() - dZFZero.begin() == regionCount);
+
+  // Build Free for each region, ordered with the current regions. This is a loop over the used set for each region.
+  auto pdRegionIDs = thrust::raw_pointer_cast(dRegionIDs.data());
+  thrust::transform(dRegionStarts.begin(), dRegionStarts.begin() + regionCount, dZFFree.begin(),
+                    [pdAllCodewords, pdNextMovesVecs, nextMovesVecsSize, pdRegionIDs] __device__(uint32_t regionStart) {
+                      auto cwi = pdRegionIDs[regionStart].index;
+                      typename CodewordT::CT playedColors = 0;
+                      for (int i = 0; i < nextMovesVecsSize; i++) {
+                        playedColors |= pdAllCodewords[pdNextMovesVecs[i][cwi]].packedColors();
+                      }
+                      uint32_t isFree = 0;
+                      for (uint8_t color = 1; color <= SolverConfig::COLOR_COUNT; color++) {
+                        if ((playedColors & 0xFF) == 0) {
+                          isFree |= (1 << color);
+                        }
+                        playedColors >>= 8;
+                      }
+                      if (__popc(isFree) == 1) isFree = 0;
+                      return isFree;
+                    });
+
+  // Build combined Zero/Free colors for each region, still in order of current regions & starts
+  thrust::transform(
+      thrust::make_zip_iterator(thrust::make_tuple(dZFZero.begin(), dZFFree.begin())),
+      thrust::make_zip_iterator(thrust::make_tuple(dZFZero.begin() + regionCount, dZFFree.begin() + regionCount)),
+      dZFColors.begin(), thrust::make_zip_function([] __device__(uint32_t z, uint32_t f) {
+        // Zeros can't also be frees
+        f &= ~z;
+        return ZFColors{z, f};
+      }));
+}
+
+// Build all ACr and leave their locations in device memory, associated with each region.
+template <typename SolverConfig>
+void SolverCUDA<SolverConfig>::buildAllACr(thrust::device_vector<ZFColors>& dZFColors,
+                                           thrust::device_vector<CodewordT>& dAllCodewords,
+                                           thrust::device_vector<uint32_t>& dRegionStarts,
+                                           thrust::device_vector<uint32_t>& dRegionLengths, uint32_t regionCount,
+                                           uint32_t tinyRegionCount, thrust::device_vector<uint32_t>& dACrBuffer,
+                                           thrust::device_vector<uint32_t>& dACrStarts,
+                                           thrust::device_vector<uint32_t>& dACrLengths) {
+  // nb: skipping the tiny regions, and keeping region starts and lengths associated with the Zero and Free data.
+  auto begin = thrust::make_zip_iterator(
+      thrust::make_tuple(dRegionStarts.begin() + tinyRegionCount, dRegionLengths.begin() + tinyRegionCount));
+  thrust::sort_by_key(dZFColors.begin() + tinyRegionCount, dZFColors.begin() + regionCount, begin);
+
+  thrust::device_vector<ZFColors> dZFColorsUnique(regionCount);
+  thrust::device_vector<uint32_t> dZFColorsUniqueLens(regionCount);
+  auto dZFColorsUniqueEnd = thrust::reduce_by_key(dZFColors.begin() + tinyRegionCount, dZFColors.begin() + regionCount,
+                                                  dRegionLengths.begin() + tinyRegionCount, dZFColorsUnique.begin(),
+                                                  dZFColorsUniqueLens.begin());
+  dZFColorsUnique.resize(thrust::distance(dZFColorsUnique.begin(), dZFColorsUniqueEnd.first));
+  dZFColorsUniqueLens.resize(thrust::distance(dZFColorsUniqueLens.begin(), dZFColorsUniqueEnd.second));
+  cout << "Unique combinations of Zero and Free colors: " << dZFColorsUnique.size() << endl;
+
+  // How much space will we need for all ACr?
+  thrust::host_vector<ZFColors> hZFColorsUnique(dZFColorsUnique);
+  thrust::host_vector<uint32_t> hZFColorsUniqueLens(dZFColorsUniqueLens);
+  auto& acrCache = getACrCache();
+  int totalACrEntries = 0;
+  for (auto& k : hZFColorsUnique) {
+    int zeroSize = popcount(k.zero);
+    int freeSize = popcount(k.free);
+    if (zeroSize == 0 && freeSize == 0) {
+      continue;
+    }
+    int ck = SolverConfig::PIN_COUNT * 1000000 + SolverConfig::COLOR_COUNT * 10000 + zeroSize * 100 + freeSize;
+    if (acrCache.contains(ck)) {
+      totalACrEntries += acrCache[ck];
+    } else {
+      cout << "WARNING: acrCache[" << ck << "]: missing entry" << endl;
+    }
+  }
+  cout << "Total ACrEntries: " << commaString(totalACrEntries) << endl;
+  dACrBuffer.resize(totalACrEntries);
+
+  // Build every ACr, and a map of color combos to ACr position and length in the buffer.
+  struct ACrLocation {
+    uint32_t start;
+    uint32_t len;
+  };
+
+  map<ZFColors, ACrLocation> zfColorsToACrLocations;
+  uint32_t currentACrStart = 0;
+  for (int i = 0; i < hZFColorsUnique.size(); i++) {
+    auto& k = hZFColorsUnique[i];
+    int zeroSize = popcount(k.zero);
+    int freeSize = popcount(k.free);
+
+    if (zeroSize == 0 && freeSize == 0) {
+      zfColorsToACrLocations[k] = {cuda::std::numeric_limits<uint32_t>::max(),
+                                   cuda::std::numeric_limits<uint32_t>::max()};
+      continue;
+    }
+
+    int ck = SolverConfig::PIN_COUNT * 1000000 + SolverConfig::COLOR_COUNT * 10000 + zeroSize * 100 + freeSize;
+    if (!acrCache.contains(ck)) {
+      zfColorsToACrLocations[k] = {cuda::std::numeric_limits<uint32_t>::max(),
+                                   cuda::std::numeric_limits<uint32_t>::max()};
+      continue;
+    }
+
+    auto acrEnd = thrust::copy_if(
+        thrust::make_counting_iterator((uint32_t)0), thrust::make_counting_iterator((uint32_t)dAllCodewords.size()),
+        dAllCodewords.begin(), dACrBuffer.begin() + currentACrStart,
+        [k] __device__(const CodewordT& cw) { return cw.isClassRepresentative(k.zero, k.free); });
+    uint32_t len = thrust::distance(dACrBuffer.begin() + currentACrStart, acrEnd);
+    assert(len == acrCache[ck]);
+    zfColorsToACrLocations[k] = {currentACrStart, len};
+    currentACrStart += len;
+  }
+  assert(currentACrStart == dACrBuffer.size());
+
+  // Finally, use the map to set the ARc location and length for every region, in device memory.
+  thrust::host_vector<uint32_t> hACrStarts(dZFColors.size());
+  thrust::host_vector<uint32_t> hACrLengths(dZFColors.size());
+  thrust::host_vector<ZFColors> hZFColors(dZFColors);
+  for (int i = tinyRegionCount; i < regionCount; i++) {
+    auto& loc = zfColorsToACrLocations.at(hZFColors[i]);
+    hACrStarts[i] = loc.start;
+    hACrLengths[i] = loc.len;
+  }
+  dACrStarts = hACrStarts;
+  dACrLengths = hACrLengths;
 }
