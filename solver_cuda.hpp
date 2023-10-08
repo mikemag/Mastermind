@@ -67,13 +67,15 @@ class SolverCUDA : public Solver {
     }
   }
 
-  constexpr static CounterDescriptors<6> counterDescs{{
+  constexpr static CounterDescriptors<8> counterDescs{{
       {"Scores", "Codeword comparisons"},
       {"Tiny Regions", "Total tiny regions"},
       {"Tiny Games", "Total tiny games"},
       {"FDOpt Regions", "Total FD Opt regions"},
       {"FDOpt Games", "Total FD Opt games"},
       {"Big Regions", "Total big regions"},
+      {"ACr Count", "Total ACr generated"},
+      {"ACr Size", "Total ACr size"},
   }};
 
  private:

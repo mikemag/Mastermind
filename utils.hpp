@@ -54,9 +54,24 @@ constexpr T constPow(T num, T pow) {
 // Round up to the next power of two
 template <typename T, typename = typename std::enable_if<std::is_integral<T>::value>::type,
           typename = typename std::enable_if<std::is_unsigned<T>::value>::type>
-constexpr T nextPowerOfTwo(T value, unsigned maxb = sizeof(T) * CHAR_BIT, unsigned curb = 1) {
+CUDA_HOST_AND_DEVICE constexpr T nextPowerOfTwo(T value, unsigned maxb = sizeof(T) * CHAR_BIT, unsigned curb = 1) {
   return maxb <= curb ? value : nextPowerOfTwo(((value - 1) | ((value - 1) >> curb)) + 1, maxb, curb << 1);
 }
+
+// Little constexprs which can be used from host and device. These should be in cuda::std, but aren't :(
+namespace cudaExtra::std {
+
+template <class T>
+CUDA_HOST_AND_DEVICE static constexpr const T &min(const T &a, const T &b) {
+  return (b < a) ? b : a;
+}
+
+template <class T>
+CUDA_HOST_AND_DEVICE static constexpr const T &clamp(const T &v, const T &lo, const T &hi) {
+  return v < lo ? lo : hi < v ? hi : v;
+}
+
+}  // namespace cudaExtra::std
 
 // Get basic info about the OS, hardware, machine, etc.
 class OSInfo {
@@ -177,4 +192,4 @@ std::ostream &operator<<(std::ostream &stream, const ExperimentCounter<enabled> 
   return r.dump(stream);
 }
 
-std::map<int,int> &getACrCache();
+std::map<int, int> &getACrCache();

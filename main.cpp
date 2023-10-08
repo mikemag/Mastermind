@@ -72,7 +72,7 @@ static constexpr bool shouldRunTests = true;  // Run unit tests and play Knuth's
 static constexpr bool shouldWriteStratFiles = false;
 static constexpr bool shouldSkipCompletedGames = false;  // Load stats in current dir and skip completed games
 static constexpr bool shouldUseSymOpt = true;            // Use the optimization for symmetry
-static constexpr bool shouldTimestampResults = true;
+static constexpr bool shouldTimestampResults = false;
 
 static constexpr auto statsFilenamePrefix = "mastermind_run_stats";
 static constexpr auto pinCountTag = "Pin Count";
@@ -225,7 +225,19 @@ void runSingleSolver(StatsRecorder& statsRecorder, json& validSolutions, uint32_
   cout << "Initial guess: " << CodewordT{packedInitialGuess} << endl;
   statsRecorder.add(initialGuessTag, hexString(packedInitialGuess));
 
+  statsRecorder.add("Use Sym Opt", shouldUseSymOpt);
+  if constexpr (shouldUseSymOpt) {
+    cout << "Optimization for Symmetry and Case Equivalence enabled" << endl;
+    getACrCache();
+  }
+
   auto elapsed = solver.playAllGames(packedInitialGuess);
+
+  cout << endl;
+
+  solver.printStats();
+  solver.recordStats(statsRecorder);
+  cout << endl;
 
   double averageTurns = (double)solver.getTotalTurns() / CodewordT::TOTAL_CODEWORDS;
   printf("Average number of turns was %.4f\n", averageTurns);
@@ -243,10 +255,6 @@ void runSingleSolver(StatsRecorder& statsRecorder, json& validSolutions, uint32_
   vector<string> sampleMoves;
   std::transform(guesses.begin(), guesses.end(), std::back_inserter(sampleMoves), hexString);
   statsRecorder.add("Sample Game", json(sampleMoves));
-
-  cout << endl;
-  solver.printStats();
-  solver.recordStats(statsRecorder);
 
   validateSolutions(solver, validSolutions);
 

@@ -160,15 +160,6 @@ std::chrono::nanoseconds SolverCPUFaster<SolverConfig>::playAllGames(uint32_t pa
     this->totalTurns += c;
   }
 
-  // TODO: tmp stats dumping
-  //  cout << "Depth, Hits, HitsFromBelow, Size, PSSize, Zeros, Frees, ZeroCnt, FreeCnt" << endl;
-  //  for (auto const& [key, val] : symACCache) {
-  //    cout << val.depth << ", " << val.hitCount << ", " << val.hitFromBelow << ", " << val.reducedAC.size() << ", "
-  //         << val.psSize << ", " << key.isZero << ", " << key.isFree << ", " << std::popcount(key.isZero) << ", "
-  //         << std::popcount(key.isFree) << endl;
-  //  }
-  //  cout << "Set count: " << symACCache.size() << endl;
-
   return endTime - startTime;
 }
 
@@ -283,48 +274,6 @@ bool SolverCPUFaster<SolverConfig>::shortcutSmallSets(const vector<CodewordT>& p
 //
 // Adapted from Ville[2], section 5.4. See docs/Symmetry_and_Case_Equivalence.ipynb for full details.
 
-// TODO: switch to the new version in Codeword I added for the GPU impl. It should work here.
-// Rather tha actually transform codewords into their class representative, simply determine if a given word is
-// in fact that representative. It's always in the set already.
-template <typename SolverConfig>
-bool SolverCPUFaster<SolverConfig>::isClassRepresentative(uint32_t cw, const vector<uint8_t>& zero,
-                                                          const vector<uint8_t>& free, uint32_t isFree) const {
-  // Any color beyond the first would be switched to the first, to be symmetric, so stop early if we find one.
-  for (int j = 1; j < zero.size(); j++) {
-    uint32_t mask = 0xF << ((SolverConfig::PIN_COUNT - 1) * 4);
-    int i = SolverConfig::PIN_COUNT - 1;
-    while (mask != 0) {
-      auto p = (cw & mask) >> (i * 4);
-      if (p == zero[j]) {
-        return false;
-      }
-      mask >>= 4;
-      i--;
-    }
-  }
-
-  if (!free.empty()) {
-    // We want to replace all free colors, in random order, with the free colors in order. Thus, anything out of place
-    // isn't the lexically first class representative, so we can stop early.
-    uint32_t nextSub = 0;
-    uint32_t mask = 0xF << ((SolverConfig::PIN_COUNT - 1) * 4);
-    int i = SolverConfig::PIN_COUNT - 1;
-    while (mask != 0) {
-      auto p = (cw & mask) >> (i * 4);
-      if (isFree & (1 << p)) {
-        if (p != free[nextSub++]) {
-          return false;
-        }
-        isFree &= ~(1 << p);
-      }
-      mask >>= 4;
-      i--;
-    }
-  }
-
-  return true;
-}
-
 // Produce a reduced AC which only contains representative codewords given the zero and free colors in PS.
 template <typename SolverConfig>
 vector<typename SolverConfig::CodewordT> SolverCPUFaster<SolverConfig>::getReducedAC(
@@ -346,17 +295,12 @@ vector<typename SolverConfig::CodewordT> SolverCPUFaster<SolverConfig>::getReduc
 
   // The subsetting algorithms expect the Zero and Free sets to be in lexicographical order, so transformed codewords
   // are as well.
-  // TODO: I'm not really a fan of how I've chosen to represent these. I feel like there's improvements to be had here.
-  vector<uint8_t> zero = {};
   uint32_t isZero = 0;
-  vector<uint8_t> free = {};
   uint32_t isFree = 0;
   for (uint8_t color = 1; color <= SolverConfig::COLOR_COUNT; color++) {
     if ((usedColors & 0xFF) == 0) {
-      zero.push_back(color);
       isZero |= (1 << color);
     } else if ((playedColors & 0xFF) == 0) {
-      free.push_back(color);
       isFree |= (1 << color);
     }
     usedColors >>= 8;
@@ -364,15 +308,17 @@ vector<typename SolverConfig::CodewordT> SolverCPUFaster<SolverConfig>::getReduc
   }
 
   // Sets of size one are useless, as any transformation does nothing.
-  if (zero.size() == 1) {
-    zero = {};
+  int zeroSize = popcount(isZero);
+  int freeSize = popcount(isFree);
+  if (zeroSize == 1) {
     isZero = 0;
+    zeroSize = 0;
   }
-  if (free.size() == 1) {
-    free = {};
+  if (freeSize == 1) {
     isFree = 0;
+    freeSize = 0;
   }
-  if (zero.empty() && free.empty()) {
+  if (zeroSize == 0 && freeSize == 0) {
     return allCodewords;
   }
 
@@ -388,11 +334,11 @@ vector<typename SolverConfig::CodewordT> SolverCPUFaster<SolverConfig>::getReduc
   // idea.)
   vector<CodewordT> reducedAC;
   std::copy_if(allCodewords.begin(), allCodewords.end(), std::back_inserter(reducedAC),
-               [&](auto cw) { return isClassRepresentative(cw.packedCodeword(), zero, free, isFree); });
+               [&](auto cw) { return cw.isClassRepresentative(isZero, isFree); });
 
   // Verify AC_r size with the cache.
   auto& ACrCache = getACrCache();
-  int k = SolverConfig::PIN_COUNT * 1000000 + SolverConfig::COLOR_COUNT * 10000 + zero.size() * 100 + free.size();
+  int k = SolverConfig::PIN_COUNT * 1000000 + SolverConfig::COLOR_COUNT * 10000 + zeroSize * 100 + freeSize;
   if (ACrCache.contains(k)) {
     if (ACrCache[k] != reducedAC.size()) {
       cout << "ACrCache: incorrect entry, " << k << "=" << ACrCache[k] << " vs actual=" << reducedAC.size() << endl;

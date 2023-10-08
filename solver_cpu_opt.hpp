@@ -73,8 +73,6 @@ class SolverCPUFaster : public Solver {
   vector<typename SolverConfig::CodewordT> getReducedAC(const vector<CodewordT>& allCodewords,
                                                         const vector<CodewordT>& possibleSolutions,
                                                         const vector<CodewordT>& usedCodewords, uint depth);
-  bool isClassRepresentative(uint32_t cw, const vector<uint8_t>& zero, const vector<uint8_t>& free,
-                             uint32_t isFree) const;
 
   uint32_t getPackedCodewordForRegion(int level, uint32_t regionIndex) const override {
     return nextMovesList[level][regionIndex].packedCodeword();

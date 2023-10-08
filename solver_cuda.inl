@@ -48,6 +48,8 @@ struct Counters {
   constexpr static int FDOPT_REGIONS = find_counter(S::counterDescs, "FDOpt Regions");
   constexpr static int FDOPT_GAMES = find_counter(S::counterDescs, "FDOpt Games");
   constexpr static int BIG_REGIONS = find_counter(S::counterDescs, "Big Regions");
+  constexpr static int ACR_COUNT = find_counter(S::counterDescs, "ACr Count");
+  constexpr static int ACR_SIZE = find_counter(S::counterDescs, "ACr Size");
 };
 
 // Mastermind scoring function
@@ -182,7 +184,7 @@ struct SubsettingAlgosKernelConfig {
   // Max threads we could put in a group given how much shared memory space we need for packed subset counters.
   // This is rounded down to the prior power of two to satisfy the final reduction step.
   template <typename T>
-  constexpr static uint32_t maxThreadsFromSubsetType() {
+  __host__ __device__ constexpr static uint32_t maxThreadsFromSubsetType() {
     uint32_t sharedMemSize = 48 * 1024;  // Default on 8.6
     uint32_t sharedMemPerThread = sizeof(T) * TOTAL_PACKED_SCORES;
     uint32_t threadsPerBlock = nextPowerOfTwo((sharedMemSize / sharedMemPerThread) / 2);
@@ -192,26 +194,25 @@ struct SubsettingAlgosKernelConfig {
   // How many threads will be put in each block. Always at least one warp, but no more than 512 (which needs to be tuned
   // more; 512 is picked based on results from 8p5c runs on MostParts and Knuth.)
   template <typename T>
-  constexpr static uint32_t threadsPerBlock() {
-    return std::clamp(std::min(static_cast<uint64_t>(maxThreadsFromSubsetType<T>()), CodewordT::TOTAL_CODEWORDS), 32ul,
-                      512ul);
+  __host__ __device__ constexpr static uint32_t threadsPerBlock(const uint64_t totalCodewords) {
+    return cudaExtra::std::clamp(
+        cudaExtra::std::min(static_cast<uint64_t>(maxThreadsFromSubsetType<T>()), totalCodewords), 32ul, 512ul);
   }
-  static constexpr uint32_t THREADS_PER_BLOCK = threadsPerBlock<SubsetSizeT>();
+  static constexpr uint32_t THREADS_PER_BLOCK = threadsPerBlock<SubsetSizeT>(CodewordT::TOTAL_CODEWORDS);
 
   // How many blocks we'll launch. This is rounded up to ensure we capture the last partial block. All kernels are
   // written to tolerate an incomplete final block.
-  constexpr static uint32_t numBlocks(const uint32_t threadsPerBlock) {
-    return (CodewordT::TOTAL_CODEWORDS + threadsPerBlock - 1) / threadsPerBlock;
+  __host__ __device__ constexpr static uint32_t numBlocks(const uint64_t totalCodewords,
+                                                          const uint32_t threadsPerBlock) {
+    return (totalCodewords + threadsPerBlock - 1) / threadsPerBlock;
   }
-  static constexpr uint32_t NUM_BLOCKS = numBlocks(THREADS_PER_BLOCK);
-  static constexpr uint32_t ROUNDED_TOTAL_CODEWORDS = NUM_BLOCKS * THREADS_PER_BLOCK;
+  static constexpr uint32_t NUM_BLOCKS = numBlocks(CodewordT::TOTAL_CODEWORDS, THREADS_PER_BLOCK);
 
   // These are the worst-case values over all types this config will be specialized with. Currently, those are 1, 2, and
   // 4 byte types. We use the most blocks with the largest type, but we need the most space for codewords with the
   // smallest type since the block size is larger, and we round up a full block.
-  static constexpr uint32_t LARGEST_NUM_BLOCKS = numBlocks(threadsPerBlock<uint32_t>());
-  static constexpr uint32_t LARGEST_ROUNDED_TOTAL_CODEWORDS =
-      numBlocks(threadsPerBlock<uint8_t>()) * threadsPerBlock<uint8_t>();
+  static constexpr uint32_t LARGEST_NUM_BLOCKS =
+      numBlocks(CodewordT::TOTAL_CODEWORDS, threadsPerBlock<uint32_t>(CodewordT::TOTAL_CODEWORDS));
 
   using BlockReduce = cub::BlockReduce<IndexAndRank, THREADS_PER_BLOCK>;
 
@@ -226,7 +227,9 @@ struct SubsettingAlgosKernelConfig {
 using testConfig = SubsettingAlgosKernelConfig<SolverConfig<8, 5, false, Algos::Knuth>>;
 static_assert(nextPowerOfTwo(uint32_t(136)) == 256);
 static_assert(testConfig::maxThreadsFromSubsetType<uint32_t>() == 256);
-static_assert(testConfig::numBlocks(testConfig::threadsPerBlock<uint32_t>()) == 1526);
+static_assert(testConfig::numBlocks(testConfig::CodewordT::TOTAL_CODEWORDS,
+                                    testConfig::threadsPerBlock<uint32_t>(testConfig::CodewordT::TOTAL_CODEWORDS)) ==
+              1526);
 
 // This takes two sets of codewords: the "all codewords" set, which is every possible codeword, and the "possible
 // solutions" set. The all codewords set is placed into GPU memory once at program start and remains constant. The
@@ -351,18 +354,23 @@ __device__ void launchSubsettingKernel(const CodewordT* __restrict__ allCodeword
                                        IndexAndRank* __restrict__ perBlockSolutions,
                                        unsigned long long int* __restrict__ deviceCounters,
                                        const uint32_t* __restrict__ acr, uint32_t acrLength) {
-  // mmmfixme: with ACr, NUM_BLOCKS and THEADS_PER_BLOCK are no longer correct. They were computed assuming |AC|.
-  //  - |ACr| < |AC|, sometimes by quite a lot, so we'll be launching too many blocks.
-  //  - THREADS_PER_BLOCK is capped at 512.
-  subsettingAlgosKernel<SubsettingAlgosKernelConfig>
-      <<<SubsettingAlgosKernelConfig::NUM_BLOCKS, SubsettingAlgosKernelConfig::THREADS_PER_BLOCK>>>(
-          allCodewords, regionIDsAsCodeword, regionIDsAsIndex, regionStart, regionLength, nextMovesVecs,
-          nextMovesVecsSize, perBlockSolutions, acr, acrLength);
+  // There's a constant def for blocks, threads, and shared mem layout based on |AC|. With the case equivalence opt,
+  // those values are too large as |ACr| < |AC|, often by quite a lot. Adjust the number of blocks here. The threads per
+  // block and shared mem size won't change, and they're too large, but that's not the end of the world. Ideally I'd
+  // switch to dynamic shared memory, but I'm lazy.
+  auto numBlocks = SubsettingAlgosKernelConfig::NUM_BLOCKS;
+  if (acr != nullptr) {
+    numBlocks = SubsettingAlgosKernelConfig::numBlocks(acrLength, SubsettingAlgosKernelConfig::THREADS_PER_BLOCK);
+  }
+
+  subsettingAlgosKernel<SubsettingAlgosKernelConfig><<<numBlocks, SubsettingAlgosKernelConfig::THREADS_PER_BLOCK>>>(
+      allCodewords, regionIDsAsCodeword, regionIDsAsIndex, regionStart, regionLength, nextMovesVecs, nextMovesVecsSize,
+      perBlockSolutions, acr, acrLength);
   CubDebug(cudaGetLastError());
 
   // nb: block size on this one must be a power of 2
-  reduceBestGuess<128><<<1, 128>>>(perBlockSolutions, SubsettingAlgosKernelConfig::NUM_BLOCKS, regionIDsAsIndex,
-                                   nextMoves, regionStart, regionLength);
+  reduceBestGuess<128>
+      <<<1, 128>>>(perBlockSolutions, numBlocks, regionIDsAsIndex, nextMoves, regionStart, regionLength);
   CubDebug(cudaGetLastError());
 
   atomicAdd(&deviceCounters[Counters<typename SubsettingAlgosKernelConfig::SolverConfig>::SCORES],
@@ -667,12 +675,7 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
     //
     // Adapted from Ville[2], section 5.4. See docs/Symmetry_and_Case_Equivalence.ipynb for full details.
     // The first step is to gather the Zero and Free info for each region.
-    constexpr bool shouldApplyCEOpt = true;  // mmmfixme: move
-    // mmmfixme:
-    //  - 7p7c score ops:
-    //    - applied: 1,688,549,605,473 -- 65.07%
-    //    - not:     2,594,858,890,338
-    if (shouldApplyCEOpt) {
+    if constexpr (SolverConfig::SYMOPT) {
       buildZerosAndFrees(pdAllCodewords, dRegionIDs, dRegionIDsEnd, regionCount, dRegionStarts, pdNextMovesVecs,
                          nextMovesVecsSize, dZFColors);
 
@@ -686,7 +689,6 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
     }
 
     // Have to take the hit and pull the region lengths back, so we can launch different kernels
-    // TODO: would be nice to have this async with other work above, not needed until later
     hRegionLengths = dRegionLengths;
 
     // How many regions are "tiny"? We'll process these separately below, and avoid doing any more CE work for them too.
@@ -700,7 +702,7 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
     // The next phase in the Case Equivalence opt is to gather the unique combinations of Zero and Free, and generate
     // all ACr from them. I'm building these all together for now, and assuming they will fit. When that fails to be
     // the case we'll have to generate as many as will fit in memory, launch the kernels we can, then loop.
-    if (shouldApplyCEOpt) {
+    if constexpr (SolverConfig::SYMOPT) {
       buildAllACr(dZFColors, dAllCodewords, dRegionStarts, dRegionLengths, regionCount, tinyRegionCount, dACrBuffer,
                   dACrStarts, dACrLengths);
     }
@@ -761,9 +763,11 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
     // time is really spent on the big ones.
     uint32_t fdRegionCount = 0;
     uint32_t fdGameCount = 0;
-    for (uint32_t i = tinyRegionCount; i < regionCount && hRegionLengths[i] < SolverConfig::TOTAL_PACKED_SCORES; i++) {
-      fdGameCount += hRegionLengths[i];
-      fdRegionCount++;
+    for (uint32_t i = tinyRegionCount; i < regionCount; i++) {
+      if (hRegionLengths[i] < SolverConfig::TOTAL_PACKED_SCORES) {
+        fdGameCount += hRegionLengths[i];
+        fdRegionCount++;
+      }
     }
 
     counters[Counters<SolverConfig>::TINY_REGIONS] += tinyRegionCount;
@@ -775,9 +779,11 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
     counters[Counters<SolverConfig>::BIG_REGIONS] += bigRegionCount;
 
     if (LOG) {
-      printf("Tiny regions: %d, totalling %d games\n", tinyRegionCount, tinyGameCount);
-      printf("Possibly fully discriminating regions: %d, totalling %d games\n", fdRegionCount, fdGameCount);
-      printf("Big regions: %d\n", bigRegionCount);
+      printf("Tiny regions: %s, totalling %s games\n", commaString(tinyRegionCount).c_str(),
+             commaString(tinyGameCount).c_str());
+      printf("Possibly fully discriminating regions: %s, totalling %s games\n", commaString(fdRegionCount).c_str(),
+             commaString(fdGameCount).c_str());
+      printf("Big regions: %s\n", commaString(bigRegionCount).c_str());
     }
 
     CubDebug(cudaDeviceSynchronize());
@@ -912,6 +918,8 @@ void SolverCUDA<SolverConfig>::buildAllACr(thrust::device_vector<ZFColors>& dZFC
                                            uint32_t tinyRegionCount, thrust::device_vector<uint32_t>& dACrBuffer,
                                            thrust::device_vector<uint32_t>& dACrStarts,
                                            thrust::device_vector<uint32_t>& dACrLengths) {
+  constexpr static bool LOG = SolverConfig::LOG;
+
   // nb: skipping the tiny regions, and keeping region starts and lengths associated with the Zero and Free data.
   auto begin = thrust::make_zip_iterator(
       thrust::make_tuple(dRegionStarts.begin() + tinyRegionCount, dRegionLengths.begin() + tinyRegionCount));
@@ -924,13 +932,13 @@ void SolverCUDA<SolverConfig>::buildAllACr(thrust::device_vector<ZFColors>& dZFC
                                                   dZFColorsUniqueLens.begin());
   dZFColorsUnique.resize(thrust::distance(dZFColorsUnique.begin(), dZFColorsUniqueEnd.first));
   dZFColorsUniqueLens.resize(thrust::distance(dZFColorsUniqueLens.begin(), dZFColorsUniqueEnd.second));
-  cout << "Unique combinations of Zero and Free colors: " << dZFColorsUnique.size() << endl;
+  if (LOG) cout << "Unique combinations of Zero and Free colors: " << commaString(dZFColorsUnique.size()) << endl;
 
   // How much space will we need for all ACr?
   thrust::host_vector<ZFColors> hZFColorsUnique(dZFColorsUnique);
   thrust::host_vector<uint32_t> hZFColorsUniqueLens(dZFColorsUniqueLens);
   auto& acrCache = getACrCache();
-  int totalACrEntries = 0;
+  uint32_t totalACrEntries = 0;
   for (auto& k : hZFColorsUnique) {
     int zeroSize = popcount(k.zero);
     int freeSize = popcount(k.free);
@@ -944,7 +952,8 @@ void SolverCUDA<SolverConfig>::buildAllACr(thrust::device_vector<ZFColors>& dZFC
       cout << "WARNING: acrCache[" << ck << "]: missing entry" << endl;
     }
   }
-  cout << "Total ACrEntries: " << commaString(totalACrEntries) << endl;
+  if (LOG) cout << "Total ACrEntries: " << commaString(totalACrEntries) << endl;
+  counters[Counters<SolverConfig>::ACR_SIZE] += totalACrEntries;
   dACrBuffer.resize(totalACrEntries);
 
   // Build every ACr, and a map of color combos to ACr position and length in the buffer.
@@ -983,6 +992,7 @@ void SolverCUDA<SolverConfig>::buildAllACr(thrust::device_vector<ZFColors>& dZFC
     currentACrStart += len;
   }
   assert(currentACrStart == dACrBuffer.size());
+  counters[Counters<SolverConfig>::ACR_COUNT] += zfColorsToACrLocations.size();
 
   // Finally, use the map to set the ARc location and length for every region, in device memory.
   thrust::host_vector<uint32_t> hACrStarts(dZFColors.size());
