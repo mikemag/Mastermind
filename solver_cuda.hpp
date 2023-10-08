@@ -6,6 +6,7 @@
 #pragma once
 
 #include <thrust/device_vector.h>
+#include <thrust/host_vector.h>
 
 #include <vector>
 
@@ -123,10 +124,10 @@ class SolverCUDA : public Solver {
                           thrust::device_vector<uint32_t>& dRegionStarts, uint32_t** pdNextMovesVecs,
                           uint32_t nextMovesVecsSize, thrust::device_vector<ZFColors>& dZFColors);
 
-  void buildAllACr(thrust::device_vector<ZFColors>& dZFColors, thrust::device_vector<CodewordT>& dAllCodewords,
-                   thrust::device_vector<uint32_t>& dRegionStarts, thrust::device_vector<uint32_t>& dRegionLengths,
-                   uint32_t regionCount, uint32_t tinyRegionCount, thrust::device_vector<uint32_t>& dACrBuffer,
-                   thrust::device_vector<uint32_t>& dACrStarts, thrust::device_vector<uint32_t>& dACrLengths);
+  uint32_t buildSomeACr(uint32_t start, thrust::host_vector<ZFColors>& dZFColors,
+                        thrust::device_vector<CodewordT>& dAllCodewords, uint32_t regionCount,
+                        thrust::device_vector<uint32_t>& dACrBuffer, thrust::device_vector<uint32_t>& dACrStarts,
+                        thrust::device_vector<uint32_t>& dACrLengths);
 };
 
 #include "solver_cuda.inl"

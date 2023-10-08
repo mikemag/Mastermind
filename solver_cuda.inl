@@ -613,7 +613,12 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
   thrust::device_vector<CodewordT> dRegionIDsAsCodeword(dRegionIDs.size());
 
   // Space for the Case Equivalence opts
-  thrust::device_vector<uint32_t> dACrBuffer;
+  uint32_t ACR_BUFFER_SIZE = 0;
+  if constexpr (SolverConfig::SYMOPT) {
+    ACR_BUFFER_SIZE = cuda::std::numeric_limits<uint32_t>::max();  // Arbitrary, and larger than max |ACr|
+  }
+  thrust::device_vector<uint32_t> dACrBuffer(ACR_BUFFER_SIZE);
+  auto pdACrBuffer = thrust::raw_pointer_cast(dACrBuffer.data());
   thrust::device_vector<uint32_t> dACrStarts;
   thrust::device_vector<uint32_t> dACrLengths;
   thrust::device_vector<ZFColors> dZFColors(dRegionIDs.size());
@@ -699,18 +704,6 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
       tinyRegionCount++;
     }
 
-    // The next phase in the Case Equivalence opt is to gather the unique combinations of Zero and Free, and generate
-    // all ACr from them. I'm building these all together for now, and assuming they will fit. When that fails to be
-    // the case we'll have to generate as many as will fit in memory, launch the kernels we can, then loop.
-    if constexpr (SolverConfig::SYMOPT) {
-      buildAllACr(dZFColors, dAllCodewords, dRegionStarts, dRegionLengths, regionCount, tinyRegionCount, dACrBuffer,
-                  dACrStarts, dACrLengths);
-    }
-
-    auto pdACrIBuffer = thrust::raw_pointer_cast(dACrBuffer.data());
-    auto pdACrStarts = thrust::raw_pointer_cast(dACrStarts.data());
-    auto pdACrLengths = thrust::raw_pointer_cast(dACrLengths.data());
-
     // TODO: these could probably be one zipped transform
     // TODO: re-test these. Trades a lot of device space for a small time gain, worth it?
     thrust::transform(dRegionIDs.begin(), dRegionIDsEnd, dRegionIDsAsIndex.begin(),
@@ -745,17 +738,41 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
       nextGuessTiny<<<1, 128>>>(pdRegionsAsIndex, pdNextMoves, pdRegionStarts, pdRegionLengths, tinyRegionCount);
     }
 
-    // Kickoff the full subsetting kernel for each large region, with each kernel processing a chunk of regions at a
-    // time. This is where all the time is spent.
-    for (size_t offset = tinyRegionCount; offset < regionCount; offset += concurrentSubsettingKernels) {
-      auto regionsToDo = min(concurrentSubsettingKernels, regionCount - offset);
-      int threadsPerBlock = 4;  // Reduce dynamic launch parallelism by 4
+    thrust::host_vector<ZFColors> hZFColors;
+    uint32_t* pdACrStarts = nullptr;
+    uint32_t* pdACrLengths = nullptr;
+    if constexpr (SolverConfig::SYMOPT) {
+      // Sort the remaining regions by Zero/Free colors, so we can share ACr among them. nb: skipping the tiny regions,
+      // and keeping region starts and lengths associated with the Zero and Free data.
+      auto begin = thrust::make_zip_iterator(
+          thrust::make_tuple(dRegionStarts.begin() + tinyRegionCount, dRegionLengths.begin() + tinyRegionCount));
+      thrust::sort_by_key(dZFColors.begin() + tinyRegionCount, dZFColors.begin() + regionCount, begin);
+      hZFColors = dZFColors;
+    }
 
-      auto pdPerBlockSolutions = thrust::raw_pointer_cast(dPerBlockSolutions.data());
-      nextGuessForRegions<SolverConfig><<<(regionsToDo + threadsPerBlock - 1) / threadsPerBlock, threadsPerBlock>>>(
-          pdAllCodewords, pdRegionsAsCodeword, pdRegionsAsIndex, pdNextMoves, pdRegionStarts, pdRegionLengths, offset,
-          regionsToDo, pdNextMovesVecs, nextMovesVecsSize, pdPerBlockSolutions, pdDeviceCounters, pdACrIBuffer,
-          pdACrStarts, pdACrLengths);
+    uint32_t offset = tinyRegionCount;
+    while (offset < regionCount) {
+      auto end = regionCount;
+      if constexpr (SolverConfig::SYMOPT) {
+        // Build as many ACr as will fit within our fixed buffer.
+        end = buildSomeACr(offset, hZFColors, dAllCodewords, regionCount, dACrBuffer, dACrStarts, dACrLengths);
+        pdACrStarts = thrust::raw_pointer_cast(dACrStarts.data());
+        pdACrLengths = thrust::raw_pointer_cast(dACrLengths.data());
+      }
+
+      // Kickoff the full subsetting kernel for each large region, with each kernel processing a chunk of regions at a
+      // time. This is where all the time is spent.
+      for (; offset < end; offset += concurrentSubsettingKernels) {
+        auto regionsToDo = min(concurrentSubsettingKernels, end - offset);
+        int threadsPerBlock = 4;  // Reduce dynamic launch parallelism by 4
+
+        auto pdPerBlockSolutions = thrust::raw_pointer_cast(dPerBlockSolutions.data());
+        nextGuessForRegions<SolverConfig><<<(regionsToDo + threadsPerBlock - 1) / threadsPerBlock, threadsPerBlock>>>(
+            pdAllCodewords, pdRegionsAsCodeword, pdRegionsAsIndex, pdNextMoves, pdRegionStarts, pdRegionLengths, offset,
+            regionsToDo, pdNextMovesVecs, nextMovesVecsSize, pdPerBlockSolutions, pdDeviceCounters, pdACrBuffer,
+            pdACrStarts, pdACrLengths);
+      }
+      offset = end;
     }
 
     // Small regions are amenable to the fully discriminating opt. These are counted here, but really handled by
@@ -909,100 +926,68 @@ void SolverCUDA<SolverConfig>::buildZerosAndFrees(const CodewordT* pdAllCodeword
       }));
 }
 
-// Build all ACr and leave their locations in device memory, associated with each region.
+// Build as many ACr as will fit in the fixed-size buffer, and leave their locations in device memory, associated with
+// each region.
 template <typename SolverConfig>
-void SolverCUDA<SolverConfig>::buildAllACr(thrust::device_vector<ZFColors>& dZFColors,
-                                           thrust::device_vector<CodewordT>& dAllCodewords,
-                                           thrust::device_vector<uint32_t>& dRegionStarts,
-                                           thrust::device_vector<uint32_t>& dRegionLengths, uint32_t regionCount,
-                                           uint32_t tinyRegionCount, thrust::device_vector<uint32_t>& dACrBuffer,
-                                           thrust::device_vector<uint32_t>& dACrStarts,
-                                           thrust::device_vector<uint32_t>& dACrLengths) {
-  constexpr static bool LOG = SolverConfig::LOG;
-
-  // nb: skipping the tiny regions, and keeping region starts and lengths associated with the Zero and Free data.
-  auto begin = thrust::make_zip_iterator(
-      thrust::make_tuple(dRegionStarts.begin() + tinyRegionCount, dRegionLengths.begin() + tinyRegionCount));
-  thrust::sort_by_key(dZFColors.begin() + tinyRegionCount, dZFColors.begin() + regionCount, begin);
-
-  thrust::device_vector<ZFColors> dZFColorsUnique(regionCount);
-  thrust::device_vector<uint32_t> dZFColorsUniqueLens(regionCount);
-  auto dZFColorsUniqueEnd = thrust::reduce_by_key(dZFColors.begin() + tinyRegionCount, dZFColors.begin() + regionCount,
-                                                  dRegionLengths.begin() + tinyRegionCount, dZFColorsUnique.begin(),
-                                                  dZFColorsUniqueLens.begin());
-  dZFColorsUnique.resize(thrust::distance(dZFColorsUnique.begin(), dZFColorsUniqueEnd.first));
-  dZFColorsUniqueLens.resize(thrust::distance(dZFColorsUniqueLens.begin(), dZFColorsUniqueEnd.second));
-  if (LOG) cout << "Unique combinations of Zero and Free colors: " << commaString(dZFColorsUnique.size()) << endl;
-
-  // How much space will we need for all ACr?
-  thrust::host_vector<ZFColors> hZFColorsUnique(dZFColorsUnique);
-  thrust::host_vector<uint32_t> hZFColorsUniqueLens(dZFColorsUniqueLens);
+uint32_t SolverCUDA<SolverConfig>::buildSomeACr(uint32_t start, thrust::host_vector<ZFColors>& hZFColors,
+                                                thrust::device_vector<CodewordT>& dAllCodewords, uint32_t regionCount,
+                                                thrust::device_vector<uint32_t>& dACrBuffer,
+                                                thrust::device_vector<uint32_t>& dACrStarts,
+                                                thrust::device_vector<uint32_t>& dACrLengths) {
   auto& acrCache = getACrCache();
-  uint32_t totalACrEntries = 0;
-  for (auto& k : hZFColorsUnique) {
-    int zeroSize = popcount(k.zero);
-    int freeSize = popcount(k.free);
+  thrust::host_vector<uint32_t> hACrStarts(hZFColors.size());
+  thrust::host_vector<uint32_t> hACrLengths(hZFColors.size());
+  ZFColors lastColors{0, 0};
+  uint32_t currentACrStart = 0;
+  uint32_t currentACrLength = 0;
+  auto i = start;
+  for (; i < regionCount; i++) {
+    auto& c = hZFColors[i];
+    int zeroSize = popcount(c.zero);
+    int freeSize = popcount(c.free);
+
     if (zeroSize == 0 && freeSize == 0) {
+      hACrStarts[i] = cuda::std::numeric_limits<uint32_t>::max();
+      hACrLengths[i] = cuda::std::numeric_limits<uint32_t>::max();
       continue;
     }
-    int ck = SolverConfig::PIN_COUNT * 1000000 + SolverConfig::COLOR_COUNT * 10000 + zeroSize * 100 + freeSize;
-    if (acrCache.contains(ck)) {
-      totalACrEntries += acrCache[ck];
-    } else {
-      cout << "WARNING: acrCache[" << ck << "]: missing entry" << endl;
-    }
-  }
-  if (LOG) cout << "Total ACrEntries: " << commaString(totalACrEntries) << endl;
-  counters[Counters<SolverConfig>::ACR_SIZE] += totalACrEntries;
-  dACrBuffer.resize(totalACrEntries);
 
-  // Build every ACr, and a map of color combos to ACr position and length in the buffer.
-  struct ACrLocation {
-    uint32_t start;
-    uint32_t len;
-  };
-
-  map<ZFColors, ACrLocation> zfColorsToACrLocations;
-  uint32_t currentACrStart = 0;
-  for (int i = 0; i < hZFColorsUnique.size(); i++) {
-    auto& k = hZFColorsUnique[i];
-    int zeroSize = popcount(k.zero);
-    int freeSize = popcount(k.free);
-
-    if (zeroSize == 0 && freeSize == 0) {
-      zfColorsToACrLocations[k] = {cuda::std::numeric_limits<uint32_t>::max(),
-                                   cuda::std::numeric_limits<uint32_t>::max()};
+    if (c == lastColors) {
+      hACrStarts[i] = currentACrStart;
+      hACrLengths[i] = currentACrLength;
       continue;
     }
 
     int ck = SolverConfig::PIN_COUNT * 1000000 + SolverConfig::COLOR_COUNT * 10000 + zeroSize * 100 + freeSize;
     if (!acrCache.contains(ck)) {
-      zfColorsToACrLocations[k] = {cuda::std::numeric_limits<uint32_t>::max(),
-                                   cuda::std::numeric_limits<uint32_t>::max()};
+      hACrStarts[i] = cuda::std::numeric_limits<uint32_t>::max();
+      hACrLengths[i] = cuda::std::numeric_limits<uint32_t>::max();
+      cout << "WARNING: acrCache[" << ck << "]: missing entry" << endl;
       continue;
     }
 
+    currentACrStart += currentACrLength;
+    currentACrLength = acrCache[ck];
+    lastColors = c;
+    if (dACrBuffer.size() - currentACrStart <= currentACrLength) {
+      break;  // Out of buffer space
+    }
+
+    // @TODO: this would slap if it were async. I could fill the entire stream with work, but this is the only sync
+    //   point right now. I would need to populate starts and lengths on-device, too.
     auto acrEnd = thrust::copy_if(
         thrust::make_counting_iterator((uint32_t)0), thrust::make_counting_iterator((uint32_t)dAllCodewords.size()),
         dAllCodewords.begin(), dACrBuffer.begin() + currentACrStart,
-        [k] __device__(const CodewordT& cw) { return cw.isClassRepresentative(k.zero, k.free); });
-    uint32_t len = thrust::distance(dACrBuffer.begin() + currentACrStart, acrEnd);
-    assert(len == acrCache[ck]);
-    zfColorsToACrLocations[k] = {currentACrStart, len};
-    currentACrStart += len;
+        [c] __device__(const CodewordT& cw) { return cw.isClassRepresentative(c.zero, c.free); });
+    assert(thrust::distance(dACrBuffer.begin() + currentACrStart, acrEnd) == currentACrLength);
+    hACrStarts[i] = currentACrStart;
+    hACrLengths[i] = currentACrLength;
+    counters[Counters<SolverConfig>::ACR_COUNT] += 1;
+    counters[Counters<SolverConfig>::ACR_SIZE] += currentACrLength;
   }
-  assert(currentACrStart == dACrBuffer.size());
-  counters[Counters<SolverConfig>::ACR_COUNT] += zfColorsToACrLocations.size();
 
-  // Finally, use the map to set the ARc location and length for every region, in device memory.
-  thrust::host_vector<uint32_t> hACrStarts(dZFColors.size());
-  thrust::host_vector<uint32_t> hACrLengths(dZFColors.size());
-  thrust::host_vector<ZFColors> hZFColors(dZFColors);
-  for (int i = tinyRegionCount; i < regionCount; i++) {
-    auto& loc = zfColorsToACrLocations.at(hZFColors[i]);
-    hACrStarts[i] = loc.start;
-    hACrLengths[i] = loc.len;
-  }
   dACrStarts = hACrStarts;
   dACrLengths = hACrLengths;
+
+  return i;
 }
