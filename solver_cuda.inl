@@ -614,7 +614,7 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
 
   // Space for the Case Equivalence opts
   uint32_t ACR_BUFFER_SIZE = 0;
-  if constexpr (SolverConfig::SYMOPT) {
+  if constexpr (applySymOpt) {
     ACR_BUFFER_SIZE = cuda::std::numeric_limits<uint32_t>::max();  // Arbitrary, and larger than max |ACr|
   }
   thrust::device_vector<uint32_t> dACrBuffer(ACR_BUFFER_SIZE);
@@ -680,7 +680,7 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
     //
     // Adapted from Ville[2], section 5.4. See docs/Symmetry_and_Case_Equivalence.ipynb for full details.
     // The first step is to gather the Zero and Free info for each region.
-    if constexpr (SolverConfig::SYMOPT) {
+    if constexpr (applySymOpt) {
       buildZerosAndFrees(pdAllCodewords, dRegionIDs, dRegionIDsEnd, regionCount, dRegionStarts, pdNextMovesVecs,
                          nextMovesVecsSize, dZFColors);
 
@@ -741,7 +741,7 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
     thrust::host_vector<ZFColors> hZFColors;
     uint32_t* pdACrStarts = nullptr;
     uint32_t* pdACrLengths = nullptr;
-    if constexpr (SolverConfig::SYMOPT) {
+    if constexpr (applySymOpt) {
       // Sort the remaining regions by Zero/Free colors, so we can share ACr among them. nb: skipping the tiny regions,
       // and keeping region starts and lengths associated with the Zero and Free data.
       auto begin = thrust::make_zip_iterator(
@@ -753,7 +753,7 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
     uint32_t offset = tinyRegionCount;
     while (offset < regionCount) {
       auto end = regionCount;
-      if constexpr (SolverConfig::SYMOPT) {
+      if constexpr (applySymOpt) {
         // Build as many ACr as will fit within our fixed buffer.
         end = buildSomeACr(offset, hZFColors, dAllCodewords, regionCount, dACrBuffer, dACrStarts, dACrLengths);
         pdACrStarts = thrust::raw_pointer_cast(dACrStarts.data());

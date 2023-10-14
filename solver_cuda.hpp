@@ -63,6 +63,7 @@ class SolverCUDA : public Solver {
     }
   }
   void recordStats(StatsRecorder& sr) override {
+    sr.add("Use Sym Opt", applySymOpt);
     for (auto& c : counterDescs.descs) {
       sr.add(c.name, counters[c.index]);
     }
@@ -100,6 +101,10 @@ class SolverCUDA : public Solver {
     }
     return packedToStandardScore[score];
   }
+
+  // Tuned on a RTX 4090. A little brute force, would be interesting to see if there's something more nuanced some day.
+  constexpr static bool applySymOpt =
+      SolverConfig::SYMOPT && (constPow((int)SolverConfig::COLOR_COUNT, (int)SolverConfig::PIN_COUNT)) > 400000;
 
  public:
   // The only reason these are public is due to limitations w/ CUDA __device__ functions

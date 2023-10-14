@@ -131,7 +131,7 @@ std::chrono::nanoseconds SolverCPUFaster<SolverConfig>::playAllGames(uint32_t pa
             usedCodewords.push_back(previousMoves[region.regionID.index]);
           }
 
-          if constexpr (SolverConfig::SYMOPT) {
+          if constexpr (applySymOpt) {
             auto reducedAC = getReducedAC(allCodewords, ps, usedCodewords, depth);
             ng = nextGuess(reducedAC, ps, usedCodewords);
             assert(ng == nextGuess(allCodewords, ps, usedCodewords));

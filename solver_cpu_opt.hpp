@@ -38,6 +38,7 @@ class SolverCPUFaster : public Solver {
   }
 
   void recordStats(StatsRecorder& sr) override {
+    sr.add("Use Sym Opt", applySymOpt);
     for (auto& c : counterDescs.descs) {
       sr.add(c.name, counters[c.index]);
     }
@@ -78,6 +79,11 @@ class SolverCPUFaster : public Solver {
     return nextMovesList[level][regionIndex].packedCodeword();
   }
   uint8_t getStandardScore(uint8_t score) override { return score; }
+
+  // Tuned on a 2019 MBP w/ 2.4 GHz 8-Core Intel Core i9.
+  // A little brute force, would be interesting to see if there's something more nuanced some day.
+  constexpr static bool applySymOpt =
+      SolverConfig::SYMOPT && (constPow((int)SolverConfig::COLOR_COUNT, (int)SolverConfig::PIN_COUNT)) > 256;
 };
 
 #include "solver_cpu_opt.inl"

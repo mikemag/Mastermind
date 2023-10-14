@@ -91,7 +91,7 @@ T OSInfo::macOSSysctlByName(const string &name) {
   size_t size = sizeof(value);
   if (sysctlbyname(name.c_str(), &value, &size, nullptr, 0) < 0) {
     cerr << "sysctlbyname failed for " << name << std::endl;
-    exit(-1);
+    exit(EXIT_FAILURE);
   }
   return value;
 }
@@ -102,7 +102,7 @@ string OSInfo::macOSSysctlByName<std::string>(const string &name) {
   size_t size = sizeof(buffer);
   if (sysctlbyname(name.c_str(), &buffer, &size, nullptr, 0) < 0) {
     cerr << "sysctlbyname failed for " << name << std::endl;
-    exit(-1);
+    exit(EXIT_FAILURE);
   }
   return {buffer};
 }

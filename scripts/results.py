@@ -55,7 +55,7 @@ def build_system_list(results):
         for p, cd in pd.items():
             for c, gd in cd.items():
                 si = gd["best"]["sysinfo"]
-                sys = f"{si['GPU Name']}, CUDA Toolkit {si['GPU CUDA Runtime Version']} on {si['OS Product Version']}, {si['HW CPU Brand String']}"
+                sys = f"{si['GPU Name']}, {si['HW CPU Brand String']}, CUDA Toolkit {si['GPU CUDA Runtime Version']} on {si['OS Product Version']}, {si['OS Kernel Version']}"
                 systems.setdefault(sys, 0)
                 systems[sys] += 1
                 gd["best"]["sys_str"] = sys
@@ -107,10 +107,11 @@ def process_results(f, results, systems, metric, metric_format, header, desc):
 if __name__ == "__main__":
     results = OrderedDict()
     result_files = []
-    result_files.extend(
-        glob.glob("../results/2022_i7-10700K_CUDA_3070_ubuntu22/*.json")
-    )
-    result_files.extend(glob.glob("../results/2023_GCE_Various/*.json"))
+    # result_files.extend(
+    #     glob.glob("../results/2022_i7-10700K_CUDA_3070_ubuntu22/*.json")
+    # )
+    # result_files.extend(glob.glob("../results/2023_GCE_Various/*.json"))
+    result_files.extend(glob.glob("../results/2023_4090/*.json"))
 
     for f in result_files:
         load_json(f, results)
@@ -129,6 +130,13 @@ if __name__ == "__main__":
             "I only show results for games where I've determined the best "
             "starting guess. This takes a long time for larger games, thus the "
             "tables are only partially filled.\n\n"
+        )
+        f.write(
+            "All runs have all gameplay optimizations enabled, like small fully "
+            "discriminating sets, case equivalence, etc. "
+            "See [Mastermind on the GPU](../docs/Mastermind_on_the_GPU.md) for details. "
+            "Note: for the CUDA impl, the case equivalence opt applies when $c^p > 400000$."
+            "\n\n"
         )
         f.write("*Times reported are from the first system unless otherwise marked.* ")
         f.write("*Raw data is in the .json files in subdirectories here.*\n\n")

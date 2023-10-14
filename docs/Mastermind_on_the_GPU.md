@@ -132,6 +132,11 @@ Next, a list of start offsets and lengths for regions in $R$ is formed. This is 
 step process. First, a `reduce_by_key` gets us run lengths, then an `exclusive_scan` builds start offsets. The reduction
 returns the count of regions to the CPU, which is a second synchronization barrier.
 
+If the case equivalence optimization is enabled, discussed below, we build the zero and free sets for every active
+region with `buildZerosAndFrees`. The actual code is somewhat complicated, with a reduction fused with a few transforms
+to build the zero set, a simpler transform to build the free set, and a zipped transform to combine the sets and adjust
+free based on zero. The sets are represented by bit fields, each bit set representing a color present.
+
 Next, $R$ is sorted by region length in order to facilitate better grouping by work size later. At this point the region
 lengths are returned to the CPU for a third synchronization barrier, and a larger data transfer, though still small in
 the grand scheme of things.
@@ -162,21 +167,28 @@ regions no larger than the number of possible scores for a game (e.g., 14 for 4p
 different optimizations and custom kernels for each of these cases and tested them all, and much like all of Phase 1 the
 gains are insignificant vs. the work done on larger regions. Again, I've left them all out in favor of simplicity.
 
-All big regions are handled in chunks of 256 at a time, and currently processed in order from smallest to largest. A
-simple kernel `nextGuessForRegions` is launched which uses the region size to decide which kernels to use to search for
-the best next guess.
+If the case equivalence optimization is enabled, discussed below, the big regions are sorted by Zero/Free colors. This
+allows us to generate ACr for multiple regions at once and share them well. A fixed-sized ACr buffer is used to keep
+memory bounded, and the buffer is filled eagerly.
+
+All big regions are handled in chunks of 256 at a time.
+A simple kernel `nextGuessForRegions` is launched which uses the region size to decide which kernels to use to search
+for the best next guess. Only the regions which have an ACr generated are processed, and once those are done we iterate
+and build more ACr, and keep going with the next group of big regions until they're all done.
 
 The main kernel, `subsettingAlgosKernel`, is launched when no other optimization can be performed and we must consider
 every codeword in $AC$ as a possible next guess. This is launched with maximum parallelism and is specialized for GPU
 occupancy based on the size of the region (and thus PS). See the discussion of subset sizes below for more details.
 
-Each thread considers a single codeword from $AC$ and does the work to score it against every codeword in $PS$ (aka $R_i$) to accumulate
+Each thread considers a single codeword from $AC$ (or $AC_r} and does the work to score it against every codeword in
+$PS$ (aka $R_i$) to accumulate
 subset sizes. The thread's codeword is given a rank based on the algorithm being run (Knuth, Most Parts, etc.), and that
 rank is used by each thread block to reduce a single best guess for the block. Each block deposits the per-block best
 guess into temporary global GPU memory, and a reduction kernel, `reduceBestGuess`, is used to reduce these to the single
 best guess. This is written to $N_{i+1}$ in parallel by the reduction threads.
 
-If the region size is less than or equal to to the total number of possible scores then we have the opportunity to perform the fully discriminating
+If the region size is less than or equal to the total number of possible scores then we have the opportunity to perform
+the fully discriminating
 optimization discussed below. The `fullyDiscriminatingOpt` kernel is launched for these regions with just 32 threads.
 Each thread considers a single codeword from $PS$ and does the work to score it against every other codeword in $PS$,
 computing the number of subsets. If a codeword is found which fully discriminates the possibilities in $PS$ then that is
@@ -241,6 +253,53 @@ each round, however in the current GPU implementation playing all games at once 
 and reduce this is strictly slower than simply playing the result of the normal reduction. Multiple approaches were
 tried, but in every case the extra overhead of the comparisons or the extra memory defeated the purpose. Thus it has
 been left out of the current implementation.
+
+# Case Equivalence Optimization
+
+Another good optimization due to Ville(2013)[^2] is to exploit case equivalence in codewords based on colors not yet
+playes (free colors) and colors which cannot possibly be part of the solution (zero colors). This can lead to a
+significant reduction in $|AC|$ in many cases. The GPU and CPU implementations here are very similar, with the GPU
+version focused on computing the sets efficiently for all regions on each round, and building $AC_r$ in parallel.
+
+Currently, this optimization is only applied when $c^p > 400,000$. Games smaller than this complete in less than a
+second, and in such fast games the extra overhead isn't really worth it. A fun comparison is the cutoff for
+`SolverCPUFaster`: 256.
+
+The work done to both compute the Zero and Free sets, and to build every necessary $AC_r$ sounds large, but in fact is
+almost trivial vs the work to compute the next guess. I originally did it all in its own phase between 1 and 2 to
+measure the extra time, but it honestly wasn't worth noting. Much like the work done in Phase 1, it is such a tiny
+fraction of the real work needed that it's not worth measuring. It also parallelizes on a GPU easily.
+
+While each $AC_r$ is much smaller than $AC$, there can be a large number of regions in play mid-game, and thus a large
+number of $AC_r$ needed for those rounds. For games up to a few million codewords, all necessary $AC_r$ were able to
+fit into device memory on a single 4090 w/ 24GB memory, but larger games exhausted the RAM on this system. Thus, a
+fixed-sized buffer is used for the $AC_r$, and when it's full the big kernels are launched to consume them, then the
+buffer is filled again, and we rinse and repeat until the round is done.
+
+The pre-computed $AC_r$ sizes (see [Symmetry and Case Equivalence in Mastermind](Symmetry_and_Case_Equivalence.ipynb)))
+are used to determine how the sets can pack into the fixed buffer, so only a very small constant space is needed to
+build each new set. A predicate which rejects codewords which are not class representatives is used to filter $AC$ into
+$AC_r$ for any combination of Free and Zero colors. The sets are represented with bit fields, and we can determine if
+a codeword is a class representative by exploiting the fact that we use the lexically first codeword as the
+representative. See [isClassRepresentative](../codeword.inl).
+
+The current implementation takes a fairly straightforward approach to completing big regions with their $AC_r$. They
+are completed in order sorted by Zero/Free set, then region length. However, this is likely not optimal. The work
+done is $|AC_r| * |PS|$ for each region, and that is essentially random given the current sorting. It's likely better
+to batch regions based on total work schedulable instead, but this presents a challenge for sharing $AC_r$ and
+generating each one only once. More experimentation is necessary.
+
+It's also possible, if not likely, that this optimization isn't necessary for $PS$ of size 3, and maybe even 4 or 5.
+Those experiments have also not yet been done.
+
+Note that while pre-computed $AC_r$ sizes are used, they're not really necessary. They're quick to compute, but I
+implemented them in Python first as part of my initial experiments, and I was just too lazy to re-do it in C++.
+
+## Some Numbers
+
+TODO: Add a comparison with the opt on and off for decent sized games: total score counts and time impact.
+Might be fun to graph 6 all the way up to 15 and show the growth.
+Look at impact for c<=p and c>p, and c>>p.
 
 # Scoring Function on the GPU
 

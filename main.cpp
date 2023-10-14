@@ -117,13 +117,13 @@ void runUnitTests() {
       printf("Tests pass\n\n");
     } else {
       printf("Some tests failed!\n");
-      exit(-1);
+      exit(EXIT_FAILURE);
     }
   }
 }
 
 template <typename Solver>
-void validateSolutions(Solver& solver, json& validSolutions) {
+void validateSolutions(StatsRecorder& statsRecorder, Solver& solver, json& validSolutions) {
   using SolverConfig = typename Solver::SolverConfig;
   using CodewordT = typename SolverConfig::CodewordT;
 
@@ -172,6 +172,9 @@ void validateSolutions(Solver& solver, json& validSolutions) {
         }
         if (valid) {
           printf("Verified solution.\n");
+          statsRecorder.add("Verification", "Verified");
+        } else {
+          statsRecorder.add("Verification", "Failed");
         }
         return;
       }
@@ -179,6 +182,7 @@ void validateSolutions(Solver& solver, json& validSolutions) {
   }
 
   printf("Note: no saved solution to verify against.\n");
+  statsRecorder.add("Verification", "NA");
 }
 
 template <typename Solver>
@@ -225,7 +229,6 @@ void runSingleSolver(StatsRecorder& statsRecorder, json& validSolutions, uint32_
   cout << "Initial guess: " << CodewordT{packedInitialGuess} << endl;
   statsRecorder.add(initialGuessTag, hexString(packedInitialGuess));
 
-  statsRecorder.add("Use Sym Opt", shouldUseSymOpt);
   if constexpr (shouldUseSymOpt) {
     cout << "Optimization for Symmetry and Case Equivalence enabled" << endl;
     getACrCache();
@@ -256,7 +259,7 @@ void runSingleSolver(StatsRecorder& statsRecorder, json& validSolutions, uint32_
   std::transform(guesses.begin(), guesses.end(), std::back_inserter(sampleMoves), hexString);
   statsRecorder.add("Sample Game", json(sampleMoves));
 
-  validateSolutions(solver, validSolutions);
+  validateSolutions(statsRecorder, solver, validSolutions);
 
   if (shouldWriteStratFiles) {
     solver.dump();
@@ -469,6 +472,12 @@ int main(int argc, const char* argv[]) {
 
   if constexpr (shouldSkipCompletedGames) {
     readAllStats();
+  }
+
+  if (strlen(MASTERMIND_GIT_BRANCH) == 0) {
+    printf("***********************************************************\n");
+    printf("WARNING: no git commit or branch info. Build in a git repo.\n");
+    printf("***********************************************************\n\n");
   }
 
   auto now = std::chrono::system_clock::now();

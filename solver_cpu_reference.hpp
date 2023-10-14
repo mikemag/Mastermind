@@ -35,6 +35,7 @@ class SolverReferenceImpl : public Solver {
   }
 
   void recordStats(StatsRecorder& sr) override {
+    sr.add("Use Sym Opt", false);
     for (auto& c : counterDescs.descs) {
       sr.add(c.name, counters[c.index]);
     }
