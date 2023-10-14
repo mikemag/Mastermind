@@ -2,7 +2,7 @@
 
 This is an algorithm to play all games of Mastermind on a GPU. All possible games are played at once, in parallel,
 arranging per-game work and data effectively for the GPU. By doing so, we can also compute the next best guess for
-(often large) groups of games just once, and we can further gather work across games into units that make best
+(often large) groups of games just once, and we can further gather work across games into units that make the best
 utilization of GPU resources. All game state is kept on-device, with minimal copying back to the host each round and
 reduced synchronization overhead. Games are batched to improve scheduling and occupancy.
 
@@ -128,8 +128,8 @@ $R$ is sorted by id to bring the active regions together. This doesn't need to b
 to break ties any time lexical ordering is required, and there are no ordering guarantees when splitting work across
 blocks on the GPU.
 
-Next, a list of start offsets and lengths for regions in $R$ is formed. This is a two
-step process. First, a `reduce_by_key` gets us run lengths, then an `exclusive_scan` builds start offsets. The reduction
+Next, a list of start offsets and lengths for regions in $R$ is formed. This is a two-step
+process. First, a `reduce_by_key` gets us run lengths, then an `exclusive_scan` builds start offsets. The reduction
 returns the count of regions to the CPU, which is a second synchronization barrier.
 
 If the case equivalence optimization is enabled, discussed below, we build the zero and free sets for every active
@@ -176,11 +176,11 @@ A simple kernel `nextGuessForRegions` is launched which uses the region size to 
 for the best next guess. Only the regions which have an ACr generated are processed, and once those are done we iterate
 and build more ACr, and keep going with the next group of big regions until they're all done.
 
-The main kernel, `subsettingAlgosKernel`, is launched when no other optimization can be performed and we must consider
+The main kernel, `subsettingAlgosKernel`, is launched when no other optimization can be performed, and we must consider
 every codeword in $AC$ as a possible next guess. This is launched with maximum parallelism and is specialized for GPU
 occupancy based on the size of the region (and thus PS). See the discussion of subset sizes below for more details.
 
-Each thread considers a single codeword from $AC$ (or $AC_r} and does the work to score it against every codeword in
+Each thread considers a single codeword from $AC$ (or $AC_r) and does the work to score it against every codeword in
 $PS$ (aka $R_i$) to accumulate
 subset sizes. The thread's codeword is given a rank based on the algorithm being run (Knuth, Most Parts, etc.), and that
 rank is used by each thread block to reduce a single best guess for the block. Each block deposits the per-block best
@@ -203,7 +203,7 @@ We now have next guesses updated for all active games in the $N_{i+1}$ vector.
 
 # Computing Subset Sizes
 
-There are various well-known algorithms for playing Mastermind, and all of the interesting ones are centered around
+There are various well-known algorithms for playing Mastermind, and all the interesting ones are centered around
 computing scores of one codeword vs every element of $PS$, and counting how many of each score is observed. This
 effectively partitions $PS$ into subsets by score, and it's the sizes of these subsets that become interesting. Knuth's
 algorithm[^1], for example, uses these to select the guess which minimizes the maximum number of codewords in each of 
@@ -214,7 +214,7 @@ and maxes out at 45 for 8p games.
 
 That seemingly small number of counters quickly becomes large. Significant performance improvement comes from storing
 these counters in shared GPU memory, even though the counters don't need to be shared between threads. Such memory is
-typically limited to kilobytes per symmetric multiprocessor (SM), and on a NVidia RTX 3070 the default effective shared
+typically limited to kilobytes per symmetric multiprocessor (SM), and on an NVidia RTX 3070 the default effective shared
 memory size per thread block is 47KiB. With 32-bit counters, 45 subsets yields an upper limit of 267 threads. Rounded
 down to the warp size of 32, it's a practical limit of 256 concurrent threads per SM, which is not enough to keep each
 processor busy each cycle, resulting in suboptimal occupancy and thus GPU utilization. The result is blocks which are
@@ -251,13 +251,13 @@ A previous CPU implementation also looked for fully discriminating codewords in 
 performed a simple reduction to select the lexically first such codeword and play that. This saved significant CPU time
 each round, however in the current GPU implementation playing all games at once it turns out that the overhead to record
 and reduce this is strictly slower than simply playing the result of the normal reduction. Multiple approaches were
-tried, but in every case the extra overhead of the comparisons or the extra memory defeated the purpose. Thus it has
+tried, but in every case the extra overhead of the comparisons or the extra memory defeated the purpose. Thus, it has
 been left out of the current implementation.
 
 # Case Equivalence Optimization
 
 Another good optimization due to Ville(2013)[^2] is to exploit case equivalence in codewords based on colors not yet
-playes (free colors) and colors which cannot possibly be part of the solution (zero colors). This can lead to a
+played (free colors) and colors which cannot possibly be part of the solution (zero colors). This can lead to a
 significant reduction in $|AC|$ in many cases. The GPU and CPU implementations here are very similar, with the GPU
 version focused on computing the sets efficiently for all regions on each round, and building $AC_r$ in parallel.
 
@@ -276,7 +276,7 @@ fit into device memory on a single 4090 w/ 24GB memory, but larger games exhaust
 fixed-sized buffer is used for the $AC_r$, and when it's full the big kernels are launched to consume them, then the
 buffer is filled again, and we rinse and repeat until the round is done.
 
-The pre-computed $AC_r$ sizes (see [Symmetry and Case Equivalence in Mastermind](Symmetry_and_Case_Equivalence.ipynb)))
+The pre-computed $AC_r$ sizes (see [Symmetry and Case Equivalence in Mastermind](Symmetry_and_Case_Equivalence.ipynb))
 are used to determine how the sets can pack into the fixed buffer, so only a very small constant space is needed to
 build each new set. A predicate which rejects codewords which are not class representatives is used to filter $AC$ into
 $AC_r$ for any combination of Free and Zero colors. The sets are represented with bit fields, and we can determine if
@@ -304,12 +304,12 @@ Look at impact for c<=p and c>p, and c>>p.
 # Scoring Function on the GPU
 
 The scoring function used is based on the hand-vectorized version in [codeword.inl](../codeword.inl). The first portion,
-computing $b$ with the constant operations on a single 32 bit value was kept unchanged. Happily, GPU's
+computing $b$ with the constant operations on a single 32 bit value was kept unchanged. Happily, GPUs
 provide `popcount`.
 
 The second part, computing all hits based on color counts, changed a bit. GPUs provide data types which pack 8-bit
 integers into vectors of 4 values, and automatically turn common operations on them like addition and minimum into
-vector ops. Minimums of the pair of 16 color counts are taken with four such vector ops, then the minimus are reduced
+vector ops. Minimums of the pair of 16 color counts are taken with four such vector ops, then the minimums are reduced
 with a series of a few vector additions.
 
 This ends up being very efficient and, like the CPU version, far faster than any attempts to memoize results for reuse
@@ -332,24 +332,24 @@ also reduced by half for an extra time savings.
 
 # Processing Results
 
-There are two intersting results from this algorithm. First, the number of guesses needed to win a game configuration,
+There are two interesting results from this algorithm. First, the number of guesses needed to win a game configuration,
 average and maximum, and second the tree of guesses played and scores.
 
 All of this is captured in the $R$ and $N$ vectors on the device. These are returned to the CPU after all work is done.
 $R$ lets us compute the max turns required, and the average. $N$ allows us to build a strategy graph which shows what
 sequence guesses to make for any game played.
 
-There are other interesting stats as a byproduct of the implemenation, e.g. number of scoring opertions, time spent,
-region counts at each level, etc. These are accumulated in device memory and extracter afterwards as well.
+There are other interesting stats as a byproduct of the implementation, e.g. number of scoring operations, time spent,
+region counts at each level, etc. These are accumulated in device memory and extracted afterward as well.
 
 
-[^1]: D.E. Knuth. The computer as Master Mind. Journal of Recreational Mathematics, 9(1):1–6, 1976.
+[^1] D.E. Knuth. The computer as Master Mind. Journal of Recreational Mathematics, 9(1):1–6, 1976.
 
-[^2]: Geoffroy Ville, An Optimal Mastermind (4,7) Strategy and More Results in the Expected Case, March 2013, arXiv:
+[^2] Geoffroy Ville, An Optimal Mastermind (4,7) Strategy and More Results in the Expected Case, March 2013, arXiv:
 1305.1010 [cs.GT]. https://arxiv.org/abs/1305.1010
 
-[^3]: Barteld Kooi, Yet another mastermind Strategy. International Computer Games Association Journal,
+[^3] Barteld Kooi, Yet another mastermind Strategy. International Computer Games Association Journal,
 28(1):13–20, 2005. https://www.researchgate.net/publication/30485793_Yet_another_Mastermind_strategy
 
-[^4]: My previous implementation which played games serialy can be found on
+[^4] My previous implementation which played games serially can be found on
 the [`game_at_a_time` branch](https://github.com/mikemag/Mastermind/tree/game_at_a_time).
