@@ -4,13 +4,13 @@
 
 The number of codewords in a game of Mastermind with $p$ pins and $c$ colors is $c^p$. The more interesting
 gameplay algorithms require, at some point, scoring every codeword against a subset of possible codewords, which is
-an inherently $\mathcal{O}(n^2)$ operation, repeated once for each turn in every game. For a even a $4p6c$ game that's
+an inherently $\mathcal{O}(n^2)$ operation, repeated once for each turn in every game. For even a $4p6c$ game that's
 up to 1,679,616 comparisons.
 
 So it's reasonable to consider ways to speed up scoring, and a common first approach is to simply cache or memoize
 scores for pairs of codewords, eventually resulting in cached scores for all codewords. (Applying a true cache of a
 small, limited size is a poor choice for this problem.) Some may even choose to first compute scores for all pairs up front
-then simply retrive them via table lookup during gameplay.
+then simply retrieve them via table lookup during gameplay.
 
 In fact, this was my first approach to speeding up my early Java versions. And it worked nicely.
 
@@ -29,7 +29,7 @@ for each codeword A in all possible codewords:
     use setCounters to consider updating bestGuess to A
 ```
 
-Consider a $n \times n$ matrix of scores for all pairs of codewords. This algorithm will iterate through a random set of
+Consider an $n \times n$ matrix of scores for all pairs of codewords. This algorithm will iterate through a random set of
 rows each time it is called, decreasing the size of the subset used in the inner loop each turn until a game is won.
 This drags these rows through the processor's cache hierarchy as they're pulled in from main memory only to be discarded
 immediately in favor of new scores.
@@ -107,15 +107,15 @@ Just using the Time Profiler, which is a sampling CPU profiler on a fixed rate, 
 spent on the instruction performing the load from the cache.
 
 Using Counters and capturing stacks on `CYCLE_ACTIVITY.STALLS_L3_MISS` we could see a steady stream of
-L3 misses once the algorithm was into it's steady state. The screen shots below show the profile narrowed
+L3 misses once the algorithm was into it's steady state. The screenshots below show the profile narrowed
 towards the end of the runs to highlight this.
 
-Screen shot showing 80.08% samples spent waiting on L3 misses loading from the score cache along with the
+Screenshot showing 80.08% samples spent waiting on L3 misses loading from the score cache along with the
 settings for the Counters instrument:
 
 ![L3 Misses and Settings](images/ScoreCache/ScoreCache_STALLS_L3_MISS_settings.png)
 
-Screen shot showing the same profile at the same point, but with hotspots shown which give a hint that
+Screenshot showing the same profile at the same point, but with hotspots shown which give a hint that
 cache pollution by the score cache is wrecking our access to the `setCounters` array later as well.
 
 ![L3 Misses and Hotspots](images/ScoreCache/ScoreCache_STALLS_L3_MISS_hotspots.png)

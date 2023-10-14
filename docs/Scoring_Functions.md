@@ -87,7 +87,7 @@ or immediates. Each op is quite fast, and they schedule well with other work.
   
 ## Hand Vectorization FTW
 
-Computing $w$ in constant time starts with compuing the total of all hits, $b$ and $w$, by using the color counts.
+Computing $w$ in constant time starts with computing the total of all hits, $b$ and $w$, by using the color counts.
 Taking the min of each color count between the codewords, then summing them gives us all hits. We can then just subtract
 $b$ to get $w$.
 

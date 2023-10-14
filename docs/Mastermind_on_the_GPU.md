@@ -343,13 +343,13 @@ There are other interesting stats as a byproduct of the implementation, e.g. num
 region counts at each level, etc. These are accumulated in device memory and extracted afterward as well.
 
 
-[^1] D.E. Knuth. The computer as Master Mind. Journal of Recreational Mathematics, 9(1):1–6, 1976.
+[^1]: D.E. Knuth. The computer as Master Mind. Journal of Recreational Mathematics, 9(1):1–6, 1976.
 
-[^2] Geoffroy Ville, An Optimal Mastermind (4,7) Strategy and More Results in the Expected Case, March 2013, arXiv:
+[^2]: Geoffroy Ville, An Optimal Mastermind (4,7) Strategy and More Results in the Expected Case, March 2013, arXiv:
 1305.1010 [cs.GT]. https://arxiv.org/abs/1305.1010
 
-[^3] Barteld Kooi, Yet another mastermind Strategy. International Computer Games Association Journal,
+[^3]: Barteld Kooi, Yet another mastermind Strategy. International Computer Games Association Journal,
 28(1):13–20, 2005. https://www.researchgate.net/publication/30485793_Yet_another_Mastermind_strategy
 
-[^4] My previous implementation which played games serially can be found on
+[^4]: My previous implementation which played games serially can be found on
 the [`game_at_a_time` branch](https://github.com/mikemag/Mastermind/tree/game_at_a_time).
