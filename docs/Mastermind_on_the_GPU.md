@@ -320,9 +320,9 @@ many games they impact in terms of scoring operations or time.
 And here are log scale plots of the scores performed in all games to-date, with and without this optimization. 
 Recall that the optimization is only enabled when $c^p > 400000$. 
 
-![mmmfixme](images/scores_knuth_ce_all.jpg)
+![Scores, Knuth, CE opt, all games](images/scores_knuth_ce_all.jpg)
 
-![mmmfixme](images/scores_knuth_ce_big.jpg)
+![Scores, Knuth, CE opt, just biggies](images/scores_knuth_ce_big.jpg)
 
 # Scoring Function on the GPU
 
