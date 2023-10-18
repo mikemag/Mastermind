@@ -10,7 +10,7 @@ from collections import OrderedDict
 
 
 def load_json(filename, results):
-    with open(os.path.join(filename), "r") as f:
+    with open(filename, "r") as f:
         r = json.load(f)
         sysinfo = [x["system_specs"] for x in r if "system_specs" in x][0]
         runs = [x["run"] for x in r if "run" in x]

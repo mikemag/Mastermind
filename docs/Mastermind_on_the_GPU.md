@@ -265,6 +265,10 @@ Currently, this optimization is only applied when $c^p > 400,000$. Games smaller
 second, and in such fast games the extra overhead isn't really worth it. A fun comparison is the cutoff for
 `SolverCPUFaster`: 256.
 
+Also note that this is applied *after* the fully discriminating optimization described above. But, because it's not clear
+ahead of time if the FD opt will apply, $AC_r$ is generated for each FD region even though it may not be used. This kept the
+code simple, but is likely quite wasteful and an obvious point for improvement.
+
 The work done to both compute the Zero and Free sets, and to build every necessary $AC_r$ sounds large, but in fact is
 almost trivial vs the work to compute the next guess. I originally did it all in its own phase between 1 and 2 to
 measure the extra time, but it honestly wasn't worth noting. Much like the work done in Phase 1, it is such a tiny
@@ -297,9 +301,28 @@ implemented them in Python first as part of my initial experiments, and I was ju
 
 ## Some Numbers
 
-TODO: Add a comparison with the opt on and off for decent sized games: total score counts and time impact.
-Might be fun to graph 6 all the way up to 15 and show the growth.
-Look at impact for c<=p and c>p, and c>>p.
+Possible $AC_r$ sizes can be seen in [ACReduced.json](../ACReduced.json), but it's useful to see the impact on
+actual runs. After all, it's not readily apparent how many $AC_r$ will be produced for any given game, nor how
+many games they impact in terms of scoring operations or time.
+
+|   7p7c   | Time (s) |      Scores       |
+|:--------:|:--------:|:-----------------:|
+| Original |  3.5283  | 2,594,858,890,338 |
+|  CE Opt  |  2.6222  | 1,688,549,605,473 |
+| Speedup  |  1.35x   |       1.54x       | 
+
+|   8p8c   | Time (s) |        Scores         |
+|:--------:|:--------:|:---------------------:|
+| Original |   955    | 1,346,760,512,102,540 |
+|  CE Opt  |  1,974   |  701,717,829,399,382  |
+| Speedup  |  2.07x   |         1.92x         | 
+
+And here are log scale plots of the scores performed in all games to-date, with and without this optimization. 
+Recall that the optimization is only enabled when $c^p > 400000$. 
+
+![mmmfixme](images/scores_knuth_ce_all.jpg)
+
+![mmmfixme](images/scores_knuth_ce_big.jpg)
 
 # Scoring Function on the GPU
 

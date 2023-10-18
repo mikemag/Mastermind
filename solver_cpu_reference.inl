@@ -191,7 +191,6 @@ typename SolverConfig::CodewordT SolverReferenceImpl<SolverConfig>::nextGuess(
 
     if (rank > bestRank || (!bestIsPossibleSolution && isPossibleSolution && rank == bestRank)) {
       if (find(usedCodewords.cbegin(), usedCodewords.cend(), g) != usedCodewords.end()) {
-        printf("Discarding used codeword!\n");
         continue;  // Ignore codewords we've already used
       }
       bestRank = rank;
