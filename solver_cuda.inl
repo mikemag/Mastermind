@@ -615,7 +615,7 @@ std::chrono::nanoseconds SolverCUDA<SolverConfig>::playAllGames(uint32_t packedI
   // Space for the Case Equivalence opts
   uint32_t ACR_BUFFER_SIZE = 0;
   if constexpr (applySymOpt) {
-    ACR_BUFFER_SIZE = cuda::std::numeric_limits<uint32_t>::max();  // Arbitrary, and larger than max |ACr|
+    ACR_BUFFER_SIZE = 2 << 31;  // Arbitrary, and larger than max |ACr|
   }
   thrust::device_vector<uint32_t> dACrBuffer(ACR_BUFFER_SIZE);
   auto pdACrBuffer = thrust::raw_pointer_cast(dACrBuffer.data());

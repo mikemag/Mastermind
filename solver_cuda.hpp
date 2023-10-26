@@ -104,7 +104,7 @@ class SolverCUDA : public Solver {
 
   // Tuned on a RTX 4090. A little brute force, would be interesting to see if there's something more nuanced some day.
   constexpr static bool applySymOpt =
-      SolverConfig::SYMOPT && (constPow((int)SolverConfig::COLOR_COUNT, (int)SolverConfig::PIN_COUNT)) > 400000;
+      SolverConfig::SYMOPT && constPow<uint64_t>(SolverConfig::COLOR_COUNT, SolverConfig::PIN_COUNT) > 400000;
 
  public:
   // The only reason these are public is due to limitations w/ CUDA __device__ functions

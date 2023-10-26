@@ -44,8 +44,8 @@ static constexpr bool shouldPlaySingleGame = true;
 template <typename T>
 using SingleGameSolver = DefaultSolver<T>;
 using SingleGameAlgo = Algos::Knuth;
-static constexpr uint8_t singleGamePinCount = 7;    // 1-8, 4 is classic
-static constexpr uint8_t singleGameColorCount = 7;  // 1-15, 6 is classic
+static constexpr uint8_t singleGamePinCount = 4;    // 1-8, 4 is classic
+static constexpr uint8_t singleGameColorCount = 6;  // 1-15, 6 is classic
 static constexpr bool singleGameLog = true;
 
 // Config for playing a set of games
@@ -272,56 +272,63 @@ void runSingleSolver(StatsRecorder& statsRecorder, json& validSolutions, uint32_
 // patterns. For 4p6c the unique initial guesses ae 1111, 1112, 1122, 1123, 1234. Repetitions of the same pattern, such
 // as 2222, 2111, 3456, 1223, etc. aren't useful as they yield the same information.
 //
-// This is pretty brute-force. I feel like I'm missing a clever algorithm or representation for these.
-template <uint8_t p, uint8_t c>
-set<uint32_t> buildInitialGuessSet() {
-  set<uint32_t> initialGuessSet;
-  auto& allCodewords = Codeword<p, c>::getAllCodewords();
-  for (auto& codeword : allCodewords) {
-    auto packed = codeword.packedCodeword();
+// The integer partitions of the pin count gives us 1) the number of unique initial guesses, and 2) the counts of each
+// color in order. The integer partitions of n=4 are [[4], [3,1], [2, 2], [2, 1, 1], [1, 1, 1, 1]. Thus, the first one
+// is 4 ones (1111), next is 3 ones and 1 two (1112), two 1's and two 2's (1122), etc.
+//
+// This holds if c >= p. When c < p, we simply exclude the partitions which use too many colors.
+//
+// I'd like to thank ChatGPT for the insight that this series of color counts is given by integer partitioning. This
+// occurred after giving it an example series of color counts as part of a larger conversation about trying to recognize
+// redundant codewords.
 
-    // Count the colors.
-    vector<uint8_t> colorCounts(16, 0);
-    while (packed != 0) {
-      uint8_t d = packed & 0xFu;
-      colorCounts[d]++;
-      packed >>= 4u;
-    }
+// Find the integer partitions of n, with the largest piece being maxPart.
+vector<vector<int>> integerPartitions(int n, int maxPart) {
+  if (n == 0) {
+    return {{}};
+  }
+  if (n < 0 || maxPart == 0) {
+    return {};
+  }
 
-    // Sort the counts in reverse. Gives us the pattern we'll use next.
-    sort(begin(colorCounts), end(colorCounts), greater<>());
+  auto withMax = integerPartitions(n - maxPart, maxPart);
+  for (auto& part : withMax) {
+    part.insert(part.begin(), maxPart);
+  }
 
-    if (colorCounts[0] == p) {
-      // Never a good choice, so just skip it even though it is valid.
-      continue;
-    }
+  auto withoutMax = integerPartitions(n, maxPart - 1);
 
-    // Form up a new codeword using the pattern in colorCounts.
-    uint32_t uniquePacked = 0;
-    uint8_t nextDigit = 1;
-    for (auto count : colorCounts) {
-      for (int i = 0; i < count; i++) {
-        uniquePacked = (uniquePacked << 4u) | nextDigit;
+  withoutMax.insert(withoutMax.begin(), withMax.begin(), withMax.end());
+  return withoutMax;
+}
+
+// Build the actual guesses using the integer partitions of pins, respecting the max colors.
+vector<uint32_t> buildInitialGuesses(uint8_t pins, uint8_t colors) {
+  vector<uint32_t> initialGuesses;
+  auto parts = integerPartitions(pins, pins);
+
+  for (auto& p : parts) {
+    int c = 0;
+    uint32_t g = 0;
+    for (int n : p) {
+      c++;
+      while (n > 0) {
+        g = (g << 4) | c;
+        n--;
       }
-      nextDigit++;
     }
-
-    // Toss it in a set to uniquify them
-    initialGuessSet.insert(uniquePacked);
-
-    if (colorCounts[0] == 1) {
-      // Once we hit all unique digits we can stop. Subsequent codewords are guaranteed to be dups.
-      break;
+    if (c <= colors) {
+      initialGuesses.emplace_back(g);
     }
   }
 
-  printf("Unique initial guesses: ");
-  for (auto cp : initialGuessSet) {
-    printf("%x, ", cp);
+  printf("Unique initial guesses for %dp%dc: ", pins, colors);
+  for (auto g : initialGuesses) {
+    printf("%x, ", g);
   }
   printf("\n\n");
 
-  return initialGuessSet;
+  return initialGuesses;
 }
 
 struct PlayAllGames {
@@ -348,9 +355,12 @@ struct PlayAllGamesWithAllInitialGuesses {
   template <typename Solver>
   void runSolver() {
     using SolverConfig = typename Solver::SolverConfig;
-    set<uint32_t> igs = buildInitialGuessSet<SolverConfig::PIN_COUNT, SolverConfig::COLOR_COUNT>();
+    auto igs = buildInitialGuesses(SolverConfig::PIN_COUNT, SolverConfig::COLOR_COUNT);
 
     for (auto ig : igs) {
+      // All 1's is never a good choice
+      if (ig == SolverConfig::CodewordT::ONE_PINS) continue;
+
       runSingleSolver<Solver>(statsRecorder, validSolutions, ig);
     }
   }
