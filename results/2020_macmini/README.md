@@ -1,6 +1,6 @@
 # Results from Mac mini (Late 2012)
 
-@TODO: these are old results from the game_at_a_time branch.
+Note: these are old results from the game_at_a_time branch.
 
 * macOS Catalina 10.15.7 (19H15)
 * Processor: 2.6 GHz Quad-Core Intel Core i7-3720QM

@@ -13,7 +13,7 @@ of the game before, and I found attempting to play all games efficiently to be a
 This repo holds most of my work on playing all games of various sizes quickly:
 
 - A GPU implementation using CUDA which runs all games at once. This
-  has been tailored for compute capability 8.6, CUDA 11.7, running on an NVIDIA GeForce RTX 3070.
+  has been tailored for compute capability 8.9, CUDA 12.2, running on an NVIDIA GeForce RTX 4090.
 - A simple reference CPU implementation, and a more optimized CPU variant to compare with the GPU version.
 - Multiple versions of the scoring function, including a vectorized version using SSE2. See the comments
   in [codeword.inl](codeword.inl) for details, and Compiler Explorer links showing the generated code.
@@ -32,7 +32,7 @@ This repo holds most of my work on playing all games of various sizes quickly:
 * [Efficient Scoring Functions](docs/Scoring_Functions.md)
 * [Packed Indices for Mastermind Scores](docs/Score_Ordinals.md)
 * [Score Caching Considered Harmful](docs/Score_Cache.md)
-* [Initial Guesses](docs/initial_guesses/Initial_Guesses.md)
+* [Initial Guesses](docs/Initial_Guesses.md)
 
 ## Results
 

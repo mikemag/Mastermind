@@ -55,7 +55,7 @@ def load_json(filename, results, initial_guesses):
 
 
 def process_results():
-    with open("../docs/initial_guesses/preset_initial_guesses.json", "r") as f:
+    with open("../docs/preset_initial_guesses.json", "r") as f:
         initial_guesses = json.load(f)
 
     results = OrderedDict()

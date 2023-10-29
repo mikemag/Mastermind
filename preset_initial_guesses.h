@@ -115,6 +115,7 @@ constexpr uint32_t presetInitialGuessKnuth() {
     case 0x79:
     case 0x7a:
     case 0x7b:
+    case 0x7c:
       return 0x1122345;
     case 0x82:
       return 0x11111222;
@@ -234,6 +235,7 @@ constexpr uint32_t presetInitialGuessMostParts() {
     case 0x79:
     case 0x7a:
     case 0x7b:
+    case 0x7c:
       return 0x1122334;
     case 0x82:
       return 0x11112222;

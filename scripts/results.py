@@ -23,7 +23,7 @@ def load_json(filename, results):
                 {
                     "best": {
                         "avg": 9999.9,
-                        "scripts": "",
+                        "ig": "",
                         "max": 9999,
                         "time": 99999.9,
                         "scores": 999_999_999_999_999,
@@ -32,7 +32,7 @@ def load_json(filename, results):
             )
 
             d = {
-                "scripts": run["Initial Guess"],
+                "ig": run["Initial Guess"],
                 # nb, old results had lower precision.
                 "avg": round(float(run["Average Turns"]), 5),
                 "max": int(run["Max Turns"]),
@@ -104,13 +104,46 @@ def process_results(f, results, systems, metric, metric_format, header, desc):
         f.write("\n")
 
 
+def process_results3(f, results, systems, metrics):
+    f.write("## Grouped by Game\n\n")
+    f.write("The same metrics grouped by game, to easily compare algorithms.\n")
+
+    algos = results.keys()
+    min_pins = min([min(results[a].keys()) for a in results.keys()])
+    max_pins = max([max(results[a].keys()) for a in results.keys()])
+    min_colors = min(
+        [min(results[a][p].keys()) for a in results.keys() for p in results[a].keys()]
+    )
+    max_colors = max(
+        [max(results[a][p].keys()) for a in results.keys() for p in results[a].keys()]
+    )
+
+    for p in range(min_pins, max_pins + 1):
+        if any([True for a in algos if p in results[a]]):
+            for c in range(min_colors, max_colors + 1):
+                if any([True for a in algos if p in results[a] and c in results[a][p]]):
+                    f.write(f"\n### {p}p{c}c\n\n")
+                    f.write("| |" + "|".join([m["name"] for m in metrics]) + "|\n")
+                    f.write("|:---|" + "---:|" * len(metrics) + "\n")
+                    for a in algos:
+                        if p not in results[a] or c not in results[a][p]:
+                            continue
+                        f.write("|")
+                        f.write(f"{a}|")
+                        for m in metrics:
+                            ba = results[a][p][c]["best"]
+                            f.write(m["fmt"].format(ba[m["metric"]]))
+                            f.write(" |")
+                        f.write("\n")
+
+
 if __name__ == "__main__":
     results = OrderedDict()
     result_files = []
-    # result_files.extend(
-    #     glob.glob("../results/2022_i7-10700K_CUDA_3070_ubuntu22/*.json")
-    # )
+    # result_files.extend(glob.glob("../results/2022_i7-10700K_CUDA_3070_ubuntu22/*.json"))
     # result_files.extend(glob.glob("../results/2023_GCE_Various/*.json"))
+
+    # These are the only results using the CE opt at this time, only compare those.
     result_files.extend(glob.glob("../results/2023_4090/*.json"))
 
     for f in result_files:
@@ -141,25 +174,48 @@ if __name__ == "__main__":
         f.write("*Times reported are from the first system unless otherwise marked.* ")
         f.write("*Raw data is in the .json files in subdirectories here.*\n\n")
 
-        process_results(
-            f, results, systems, "avg", "{:,.4f}", "Average turns over all games", ""
-        )
-        process_results(
-            f, results, systems, "max", "{:,d}", "Max turns over all games", ""
-        )
-        process_results(
-            f, results, systems, "time", "{:,.3f}", "Run time", "All times in seconds."
-        )
-        process_results(
-            f,
-            results,
-            systems,
-            "scripts",
-            "{}",
-            "Initial guess",
-            "These were determined by running all unique initial guesses "
-            "and selecting the one with the lowest average turns.",
-        )
-        process_results(
-            f, results, systems, "scores", "{:,d}", "Codeword scores performed", ""
-        )
+        metrics = [
+            {
+                "name": "Avg",
+                "metric": "avg",
+                "fmt": "{:,.4f}",
+                "header": "Average turns over all games",
+                "desc": "",
+            },
+            {
+                "name": "Max",
+                "metric": "max",
+                "fmt": "{:,d}",
+                "header": "Max turns over all games",
+                "desc": "",
+            },
+            {
+                "name": "Time (s)",
+                "metric": "time",
+                "fmt": "{:,.3f}",
+                "header": "Run time",
+                "desc": "All times in seconds.",
+            },
+            {
+                "name": "Initial guess",
+                "metric": "ig",
+                "fmt": "{}",
+                "header": "Initial guess",
+                "desc": "These were determined by running all unique initial guesses "
+                "and selecting the one with the lowest average turns.",
+            },
+            {
+                "name": "Scores",
+                "metric": "scores",
+                "fmt": "{:,d}",
+                "header": "Codeword scores performed",
+                "desc": "",
+            },
+        ]
+
+        for m in metrics:
+            process_results(
+                f, results, systems, m["metric"], m["fmt"], m["header"], m["desc"]
+            )
+
+        process_results3(f, results, systems, metrics)

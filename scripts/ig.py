@@ -119,11 +119,7 @@ def generate_json(filename, results):
 
 def process_results():
     results = OrderedDict()
-    result_files = []
-    result_files.extend(glob.glob("../results/**/*_ig_*.json", recursive=True))
-    result_files.extend(
-        glob.glob("../docs/initial_guesses/*_ig_*.json", recursive=True)
-    )
+    result_files = glob.glob("../results/**/*_ig_*.json", recursive=True)
 
     for f in result_files:
         print(f)
@@ -156,9 +152,9 @@ def process_results():
             results_md.append(l)
         results_md.append("")
 
-    generate_md("../docs/initial_guesses/Initial_Guesses.md", results_md)
+    generate_md("../docs/Initial_Guesses.md", results_md)
     generate_cxx("../preset_initial_guesses.h", results)
-    generate_json("../docs/initial_guesses/preset_initial_guesses.json", results)
+    generate_json("../docs/preset_initial_guesses.json", results)
 
 
 if __name__ == "__main__":
