@@ -104,7 +104,7 @@ def process_results(f, results, systems, metric, metric_format, header, desc):
         f.write("\n")
 
 
-def process_results3(f, results, systems, metrics):
+def grouped_by_game(f, results, systems, metrics):
     f.write("## Grouped by Game\n\n")
     f.write("The same metrics grouped by game, to easily compare algorithms.\n")
 
@@ -218,4 +218,4 @@ if __name__ == "__main__":
                 f, results, systems, m["metric"], m["fmt"], m["header"], m["desc"]
             )
 
-        process_results3(f, results, systems, metrics)
+        grouped_by_game(f, results, systems, metrics)
