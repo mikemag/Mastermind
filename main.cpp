@@ -157,7 +157,7 @@ void validateSolutions(StatsRecorder& statsRecorder, Solver& solver, json& valid
         vector<vector<string>> sampleGames = vs["sample_games"];
         for (vector<string>& g : sampleGames) {
           vector<uint32_t> gi(g.size());
-          std::transform(g.begin(), g.end(), gi.begin(), [&](const string& s) { return stoi(s, nullptr, 16); });
+          std::transform(g.begin(), g.end(), gi.begin(), [&](const string& s) { return stol(s, nullptr, 16); });
           auto guesses = solver.getGuessesForGame(gi.back());
           if (guesses != gi) {
             printf("ERROR: Solution for secret %x, %dp%dc game, algo '%s', solver '%s', %ld moves: ", gi.back(),

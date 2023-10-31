@@ -9,13 +9,32 @@ import os
 from collections import OrderedDict
 
 
-def load_json(filename, results):
+ALGOS = ["Knuth", "Most Parts", "Expected Size", "Entropy"]
+
+
+def load_json(filename, results, initial_guesses):
     with open(filename, "r") as f:
         r = json.load(f)
         sysinfo = [x["system_specs"] for x in r if "system_specs" in x][0]
         runs = [x["run"] for x in r if "run" in x]
 
         for run in runs:
+            if run["Solver"] != "CUDA":
+                continue
+
+            ig = (
+                initial_guesses.get(run["Strategy"], {})
+                .get(str(run["Pin Count"]), {})
+                .get(str(run["Color Count"]), {})
+                .get("best_max", [])
+            )
+
+            if not ig:
+                print(
+                    f"Warning: no initial guess info: "
+                    "{run['Strategy']} {run['Pin Count']}p{run['Color Count']}c "
+                )
+
             ar = results.setdefault(run["Strategy"], {})
             pr = ar.setdefault(int(run["Pin Count"]), {})
             gr = pr.setdefault(
@@ -41,12 +60,22 @@ def load_json(filename, results):
                 "sysinfo": sysinfo,
             }
 
-            if d["avg"] < gr["best"]["avg"] or (
-                d["avg"] == gr["best"]["avg"]
-                and run["Solver"] == "CUDA"
-                and d["time"] < gr["best"]["time"]
-            ):
-                gr["best"] = d
+            # Take the best speed with the right initial guess, or take the best thing
+            # we can with a different initial guess.
+            if ig["initial_guess"] == run["Initial Guess"]:
+                if (
+                    gr["best"]["ig"] != ig["initial_guess"]
+                    or d["time"] < gr["best"]["time"]
+                ):
+                    gr["best"] = d
+            elif gr["best"]["ig"] != ig["initial_guess"]:
+                if d["avg"] < gr["best"]["avg"] or (
+                    d["avg"] == gr["best"]["avg"]
+                    and run["Solver"] == "CUDA"
+                    and d["time"] < gr["best"]["time"]
+                ):
+                    gr["best"] = d
+                    d["wrong_ig"] = True
 
 
 def build_system_list(results):
@@ -73,7 +102,8 @@ def process_results(f, results, systems, metric, metric_format, header, desc):
         f.write(desc)
         f.write("\n\n")
 
-    for a, pd in results.items():
+    for a in ALGOS:
+        pd = results[a]
         f.write(f"### {a}\n\n")
         f.write("|".join(["", " ", *[str(c) + "c" for c in range(2, 16)], ""]))
         f.write("\n")
@@ -100,6 +130,10 @@ def process_results(f, results, systems, metric, metric_format, header, desc):
                                 f.write(f"<sup>({sys_num})</sup>")
                         else:
                             f.write(metric_format.format(ba[metric]))
+                        if "wrong_ig" in ba:
+                            f.write("*")
+                    else:
+                        f.write(" ")
             f.write("|\n")
         f.write("\n")
 
@@ -108,7 +142,6 @@ def grouped_by_game(f, results, systems, metrics):
     f.write("## Grouped by Game\n\n")
     f.write("The same metrics grouped by game, to easily compare algorithms.\n")
 
-    algos = results.keys()
     min_pins = min([min(results[a].keys()) for a in results.keys()])
     max_pins = max([max(results[a].keys()) for a in results.keys()])
     min_colors = min(
@@ -119,13 +152,13 @@ def grouped_by_game(f, results, systems, metrics):
     )
 
     for p in range(min_pins, max_pins + 1):
-        if any([True for a in algos if p in results[a]]):
+        if any([True for a in ALGOS if p in results[a]]):
             for c in range(min_colors, max_colors + 1):
-                if any([True for a in algos if p in results[a] and c in results[a][p]]):
+                if any([True for a in ALGOS if p in results[a] and c in results[a][p]]):
                     f.write(f"\n### {p}p{c}c\n\n")
                     f.write("| |" + "|".join([m["name"] for m in metrics]) + "|\n")
                     f.write("|:---|" + "---:|" * len(metrics) + "\n")
-                    for a in algos:
+                    for a in ALGOS:
                         if p not in results[a] or c not in results[a][p]:
                             continue
                         f.write("|")
@@ -133,11 +166,16 @@ def grouped_by_game(f, results, systems, metrics):
                         for m in metrics:
                             ba = results[a][p][c]["best"]
                             f.write(m["fmt"].format(ba[m["metric"]]))
+                            if "wrong_ig" in ba:
+                                f.write("*")
                             f.write(" |")
                         f.write("\n")
 
 
 if __name__ == "__main__":
+    with open("../docs/preset_initial_guesses.json", "r") as f:
+        initial_guesses = json.load(f)
+
     results = OrderedDict()
     result_files = []
     # result_files.extend(glob.glob("../results/2022_i7-10700K_CUDA_3070_ubuntu22/*.json"))
@@ -147,7 +185,7 @@ if __name__ == "__main__":
     result_files.extend(glob.glob("../results/2023_4090/*.json"))
 
     for f in result_files:
-        load_json(f, results)
+        load_json(f, results, initial_guesses)
 
     systems = build_system_list(results)
 
@@ -161,7 +199,8 @@ if __name__ == "__main__":
         f.write("\n\n")
         f.write(
             "I only show results for games where I've determined the best "
-            "starting guess. This takes a long time for larger games, thus the "
+            "starting guess which yields the lowest maximum turns, then the lowest "
+            "average turns. This takes a long time for larger games, thus the "
             "tables are only partially filled.\n\n"
         )
         f.write(
@@ -171,8 +210,11 @@ if __name__ == "__main__":
             "Note: for the CUDA impl, the case equivalence opt applies when $c^p > 400000$."
             "\n\n"
         )
-        f.write("*Times reported are from the first system unless otherwise marked.* ")
-        f.write("*Raw data is in the .json files in subdirectories here.*\n\n")
+        f.write(
+            "*Times reported are from the first system unless otherwise marked.* "
+            "*Raw data is in the .json files in subdirectories here.*"
+            "\n\n"
+        )
 
         metrics = [
             {

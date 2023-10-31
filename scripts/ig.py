@@ -21,26 +21,37 @@ def load_json(filename, results):
             pr = ar.setdefault(int(run["Pin Count"]), SortedDict())
             gr = pr.setdefault(
                 int(run["Color Count"]),
-                {"best_avg": [9999.9, 9999, ""], "best_max": [9999.9, 9999, ""]},
+                {
+                    "best_avg": {
+                        "avg_turns": 9999.9,
+                        "max_turns": 9999,
+                        "initial_guess": "",
+                    },
+                    "best_max": {
+                        "avg_turns": 9999.9,
+                        "max_turns": 9999,
+                        "initial_guess": "",
+                    },
+                },
             )
 
             ig = run["Initial Guess"]
             at = float(run["Average Turns"])
             mt = int(run["Max Turns"])
 
-            if at < gr["best_avg"][0] or (
-                at == gr["best_avg"][0] and mt < gr["best_avg"][1]
+            if at < gr["best_avg"]["avg_turns"] or (
+                at == gr["best_avg"]["avg_turns"] and mt < gr["best_avg"]["max_turns"]
             ):
-                gr["best_avg"][0] = at
-                gr["best_avg"][1] = mt
-                gr["best_avg"][2] = ig
+                gr["best_avg"]["avg_turns"] = at
+                gr["best_avg"]["max_turns"] = mt
+                gr["best_avg"]["initial_guess"] = ig
 
-            if mt < gr["best_max"][1] or (
-                mt == gr["best_max"][1] and at < gr["best_max"][0]
+            if mt < gr["best_max"]["max_turns"] or (
+                mt == gr["best_max"]["max_turns"] and at < gr["best_max"]["avg_turns"]
             ):
-                gr["best_max"][0] = at
-                gr["best_max"][1] = mt
-                gr["best_max"][2] = ig
+                gr["best_max"]["avg_turns"] = at
+                gr["best_max"]["max_turns"] = mt
+                gr["best_max"]["initial_guess"] = ig
 
 
 def generate_md(filename, results_md):
@@ -95,8 +106,8 @@ def generate_cxx(filename, results):
             for p, cd in pd.items():
                 for c, gd in cd.items():
                     gd = cd[c]
-                    ba = gd["best_avg"]
-                    igl = igs.setdefault(ba[2], [])
+                    bm = gd["best_max"]
+                    igl = igs.setdefault(bm["initial_guess"], [])
                     igl.append("0x%d%x" % (p, c))
 
             for ig, igd in igs.items():
@@ -144,10 +155,10 @@ def process_results():
                         ba = gd["best_avg"]
                         bm = gd["best_max"]
 
-                        if ba[1] != bm[1]:
-                            l += "|" + ba[2] + "*"
+                        if ba["max_turns"] != bm["max_turns"]:
+                            l += "|" + bm["initial_guess"] + "*"
                         else:
-                            l += "|" + ba[2]
+                            l += "|" + bm["initial_guess"]
             l += "|"
             results_md.append(l)
         results_md.append("")

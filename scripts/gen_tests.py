@@ -25,7 +25,7 @@ def load_json(filename, results, initial_guesses):
             gr = pr.setdefault(
                 int(run["Color Count"]),
                 {
-                    "total_turns": 999_999_999_999_999,
+                    "total_turns": 999_999_999_999_999_999,
                     "max_turns": 9999,
                     "sample_games": [],
                 },
@@ -34,23 +34,25 @@ def load_json(filename, results, initial_guesses):
             total_turns = int(run["Total Turns"])
             max_turns = int(run["Max Turns"])
 
-            if total_turns < gr["total_turns"]:
+            if max_turns < gr["max_turns"] or (
+                max_turns == gr["max_turns"] and total_turns < gr["total_turns"]
+            ):
                 gr["total_turns"] = total_turns
                 gr["max_turns"] = max_turns
                 gr[
                     "desc"
                 ] = f"{run['Strategy']} {run['Pin Count']}p{run['Color Count']}c"
 
-            if "Sample Game" in run and total_turns == gr["total_turns"]:
+            if "Sample Game" in run:
                 sg = run["Sample Game"]
                 if sg not in gr["sample_games"]:
                     ig = (
                         initial_guesses.get(run["Strategy"], {})
                         .get(str(run["Pin Count"]), {})
                         .get(str(run["Color Count"]), {})
-                        .get("best_avg", [])
+                        .get("best_max", [])
                     )
-                    if ig and ig[2] == sg[0]:
+                    if ig and ig["initial_guess"] == sg[0]:
                         gr["sample_games"].append(sg)
 
 
@@ -61,7 +63,6 @@ def process_results():
     results = OrderedDict()
     result_files = []
     result_files.extend(glob.glob("../results/**/*.json", recursive=True))
-    # result_files.extend(glob.glob("../*_ig_*.json", recursive=True))
 
     for f in result_files:
         print(f)

@@ -49,6 +49,7 @@ constexpr uint32_t presetInitialGuessKnuth() {
     case 0x43:
     case 0x44:
     case 0x45:
+    case 0x4f:
       return 0x1123;
     case 0x46:
       return 0x1122;
@@ -60,7 +61,6 @@ constexpr uint32_t presetInitialGuessKnuth() {
     case 0x4c:
     case 0x4d:
     case 0x4e:
-    case 0x4f:
       return 0x1234;
     case 0x52:
     case 0x53:
@@ -107,14 +107,14 @@ constexpr uint32_t presetInitialGuessKnuth() {
     case 0x74:
       return 0x1112233;
     case 0x75:
+    case 0x79:
       return 0x1112234;
     case 0x76:
     case 0x77:
+    case 0x7b:
       return 0x1122334;
     case 0x78:
-    case 0x79:
     case 0x7a:
-    case 0x7b:
     case 0x7c:
       return 0x1122345;
     case 0x7d:
@@ -179,19 +179,20 @@ constexpr uint32_t presetInitialGuessMostParts() {
     case 0x48:
     case 0x49:
     case 0x4a:
-    case 0x4b:
     case 0x4c:
     case 0x4d:
     case 0x4e:
     case 0x4f:
       return 0x1234;
+    case 0x4b:
+      return 0x1122;
     case 0x52:
+    case 0x56:
       return 0x11122;
     case 0x53:
       return 0x11123;
     case 0x54:
     case 0x55:
-    case 0x56:
     case 0x57:
     case 0x58:
       return 0x11223;
@@ -211,18 +212,19 @@ constexpr uint32_t presetInitialGuessMostParts() {
     case 0x65:
       return 0x111223;
     case 0x66:
-    case 0x67:
     case 0x68:
+    case 0x6d:
       return 0x112233;
+    case 0x67:
     case 0x69:
     case 0x6a:
     case 0x6b:
     case 0x6c:
       return 0x112234;
-    case 0x6d:
     case 0x6e:
-    case 0x6f:
       return 0x112345;
+    case 0x6f:
+      return 0x111234;
     case 0x72:
       return 0x1111222;
     case 0x73:
@@ -231,15 +233,17 @@ constexpr uint32_t presetInitialGuessMostParts() {
       return 0x1112223;
     case 0x75:
     case 0x76:
-    case 0x77:
       return 0x1112233;
+    case 0x77:
+      return 0x1234567;
     case 0x78:
     case 0x79:
     case 0x7a:
     case 0x7b:
-    case 0x7c:
     case 0x7d:
       return 0x1122334;
+    case 0x7c:
+      return 0x1122345;
     case 0x82:
       return 0x11112222;
     case 0x83:
@@ -294,12 +298,13 @@ constexpr uint32_t presetInitialGuessExpectedSize() {
     case 0x43:
     case 0x44:
     case 0x45:
-    case 0x46:
+    case 0x4a:
       return 0x1123;
+    case 0x46:
+      return 0x1122;
     case 0x47:
     case 0x48:
     case 0x49:
-    case 0x4a:
     case 0x4b:
     case 0x4c:
     case 0x4d:
@@ -330,8 +335,8 @@ constexpr uint32_t presetInitialGuessExpectedSize() {
     case 0x63:
       return 0x111223;
     case 0x64:
-      return 0x111234;
     case 0x65:
+      return 0x111234;
     case 0x66:
     case 0x69:
       return 0x112233;
@@ -340,11 +345,12 @@ constexpr uint32_t presetInitialGuessExpectedSize() {
       return 0x112234;
     case 0x6a:
     case 0x6b:
+      return 0x123456;
     case 0x6c:
     case 0x6d:
     case 0x6e:
     case 0x6f:
-      return 0x123456;
+      return 0x112345;
     case 0x72:
       return 0x1111222;
     case 0x73:
@@ -355,7 +361,6 @@ constexpr uint32_t presetInitialGuessExpectedSize() {
     case 0x77:
       return 0x1112233;
     case 0x78:
-      return 0x1112234;
     case 0x79:
     case 0x7a:
     case 0x7b:
@@ -429,14 +434,15 @@ constexpr uint32_t presetInitialGuessEntropy() {
     case 0x4f:
       return 0x1234;
     case 0x52:
+    case 0x56:
       return 0x11122;
     case 0x53:
       return 0x11123;
     case 0x54:
     case 0x55:
-    case 0x56:
     case 0x57:
     case 0x58:
+    case 0x5f:
       return 0x11223;
     case 0x59:
     case 0x5a:
@@ -445,7 +451,6 @@ constexpr uint32_t presetInitialGuessEntropy() {
       return 0x11234;
     case 0x5d:
     case 0x5e:
-    case 0x5f:
       return 0x12345;
     case 0x62:
       return 0x111122;
@@ -454,14 +459,14 @@ constexpr uint32_t presetInitialGuessEntropy() {
     case 0x66:
       return 0x111223;
     case 0x65:
-    case 0x68:
-      return 0x112233;
     case 0x67:
     case 0x69:
     case 0x6a:
     case 0x6b:
     case 0x6c:
       return 0x112234;
+    case 0x68:
+      return 0x112233;
     case 0x6d:
     case 0x6e:
     case 0x6f:
@@ -489,8 +494,9 @@ constexpr uint32_t presetInitialGuessEntropy() {
     case 0x85:
     case 0x86:
     case 0x87:
-    case 0x88:
       return 0x11122334;
+    case 0x88:
+      return 0x12345678;
     default:
       return (Codeword<p, c>::ONE_PINS >> p / 2 * 4) + Codeword<p, c>::ONE_PINS;
   }
