@@ -130,6 +130,8 @@ constexpr uint32_t presetInitialGuessKnuth() {
     case 0x87:
     case 0x88:
       return 0x11223344;
+    case 0x89:
+      return 0x11223345;
     default:
       return (Codeword<p, c>::ONE_PINS >> p / 2 * 4) + Codeword<p, c>::ONE_PINS;
   }
@@ -254,6 +256,7 @@ constexpr uint32_t presetInitialGuessMostParts() {
       return 0x11122233;
     case 0x87:
     case 0x88:
+    case 0x89:
       return 0x11122334;
     default:
       return (Codeword<p, c>::ONE_PINS >> p / 2 * 4) + Codeword<p, c>::ONE_PINS;

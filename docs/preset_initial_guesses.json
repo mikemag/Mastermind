@@ -1080,6 +1080,18 @@
           "max_turns": 10,
           "initial_guess": "11223344"
         }
+      },
+      "9": {
+        "best_avg": {
+          "avg_turns": 7.554155750910737,
+          "max_turns": 10,
+          "initial_guess": "11223345"
+        },
+        "best_max": {
+          "avg_turns": 7.554155750910737,
+          "max_turns": 10,
+          "initial_guess": "11223345"
+        }
       }
     }
   },
@@ -2161,6 +2173,18 @@
         },
         "best_max": {
           "avg_turns": 7.154448926448822,
+          "max_turns": 12,
+          "initial_guess": "11122334"
+        }
+      },
+      "9": {
+        "best_avg": {
+          "avg_turns": 7.544815294990761,
+          "max_turns": 12,
+          "initial_guess": "11122334"
+        },
+        "best_max": {
+          "avg_turns": 7.544815294990761,
           "max_turns": 12,
           "initial_guess": "11122334"
         }
