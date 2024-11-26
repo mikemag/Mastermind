@@ -3,7 +3,9 @@
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree.
 
+#if defined(__x86_64__)
 #include <immintrin.h>  // For SSE/AVX support
+#endif
 
 #include <bit>
 #include <iomanip>
@@ -17,6 +19,8 @@ template <uint8_t PIN_COUNT, uint8_t COLOR_COUNT>
 std::ostream &operator<<(std::ostream &stream, const Codeword<PIN_COUNT, COLOR_COUNT> &codeword) {
   return codeword.dump(stream);
 }
+
+// nb: all mentions of instruction counts as of 2024/11/25 are on x64.
 
 // This is a relatively simple O(2p) scoring method. First we count black hits and unused colors in O(p) time,
 // then we consume colors in O(p) time and count white hits. This is quite efficient for a rather simple scoring
@@ -71,18 +75,21 @@ Score Codeword<PIN_COUNT, COLOR_COUNT>::scoreSimpleLoops(const Codeword &guess) 
 // big improvement for larger games and surprisingly efficient overall.
 //
 // Elapsed time 3.1218s, average search 2.4088ms
-#if 0
 template <uint8_t PIN_COUNT, uint8_t COLOR_COUNT>
 Score Codeword<PIN_COUNT, COLOR_COUNT>::scoreCountingScalar(const Codeword &guess) const {
   constexpr static uint32_t unusedPinsMask = (uint32_t)(0xFFFFFFFFlu << (PIN_COUNT * 4u));
   uint32_t v = this->codeword ^ guess.codeword;  // Matched pins are now 0.
   v |= unusedPinsMask;                           // Ensure that any unused pin positions are non-zero.
   uint32_t r = ~((((v & 0x77777777u) + 0x77777777u) | v) | 0x77777777u);  // Yields 1 bit per matched pin
+#if defined(__x86_64__)
   uint8_t b = _mm_popcnt_u32(r);
+#else
+  uint8_t b = popcount(r);
+#endif
 
   int allHits = 0;
-  uint64_t scc = this->colorCounts4;
-  uint64_t gcc = guess.colorCounts4;
+  auto scc = this->colorCounts;
+  auto gcc = guess.colorCounts;
   do {                                              // colorCounts are never 0, so a do-while is solid win
     allHits += std::min(scc & 0xFlu, gcc & 0xFlu);  // cmp/cmovb, no branching
     scc >>= 4u;
@@ -91,7 +98,6 @@ Score Codeword<PIN_COUNT, COLOR_COUNT>::scoreCountingScalar(const Codeword &gues
 
   return Score(b, allHits - b);
 }
-#endif
 
 // This uses the full counting method from Knuth, but is organized to allow auto-vectorization of the second part.
 // When properly vectorized by the compiler, this method is O(1) time and space.
@@ -104,6 +110,8 @@ Score Codeword<PIN_COUNT, COLOR_COUNT>::scoreCountingScalar(const Codeword &gues
 // is also pretty sensitive to how the code is structured, and the code it generates for adding up the minimums is
 // pretty large and sub-optimal. https://godbolt.org/z/arcE5e
 //
+// This ends up vectorizing alright on Arm, too: https://godbolt.org/z/qdzc38j7z
+//
 // Elapsed time 2.2948s, average search 1.7707ms
 template <uint8_t PIN_COUNT, uint8_t COLOR_COUNT>
 Score Codeword<PIN_COUNT, COLOR_COUNT>::scoreCountingAutoVec(const Codeword &guess) const {
@@ -111,7 +119,11 @@ Score Codeword<PIN_COUNT, COLOR_COUNT>::scoreCountingAutoVec(const Codeword &gue
   uint32_t v = this->codeword ^ guess.codeword;  // Matched pins are now 0.
   v |= unusedPinsMask;                           // Ensure that any unused pin positions are non-zero.
   uint32_t r = ~((((v & 0x77777777u) + 0x77777777u) | v) | 0x77777777u);  // Yields 1 bit per matched pin
+#if defined(__x86_64__)
   uint8_t b = _mm_popcnt_u32(r);
+#else
+  uint8_t b = popcount(r);
+#endif
 
   int allHits = 0;
   auto *scc = (uint8_t *)&(this->colorCounts);
@@ -129,6 +141,7 @@ Score Codeword<PIN_COUNT, COLOR_COUNT>::scoreCountingAutoVec(const Codeword &gue
 // See scoreCountingScalar() for an explanation of how hits are computed.
 //
 // Elapsed time 0.9237s, average search 0.7127ms
+#if defined(__x86_64__)
 template <uint8_t PIN_COUNT, uint8_t COLOR_COUNT>
 Score Codeword<PIN_COUNT, COLOR_COUNT>::scoreCountingHandVec(const Codeword &guess) const {
   constexpr static uint32_t unusedPinsMask = (uint32_t)(0xFFFFFFFFlu << (PIN_COUNT * 4u));
@@ -152,12 +165,17 @@ Score Codeword<PIN_COUNT, COLOR_COUNT>::scoreCountingHandVec(const Codeword &gue
 
   return Score(b, allHits - b);
 }
+#endif
 
 // Wrapper for the real scoring function to allow for easy experimentation.
 // Note: I used to employ a score cache here, see docs/Score_Cache.md for details.
 template <uint8_t PIN_COUNT, uint8_t COLOR_COUNT>
 Score Codeword<PIN_COUNT, COLOR_COUNT>::score(const Codeword &guess) const {
+#if defined(__x86_64__)
   return scoreCountingHandVec(guess);
+#else
+  return scoreCountingAutoVec(guess);
+#endif
 }
 
 // Make a list of all codewords for a given number of "colors". Colors are represented by the digits 1 thru n. This

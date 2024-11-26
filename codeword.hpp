@@ -95,7 +95,9 @@ class Codeword {
   Score scoreSimpleLoops(const Codeword &guess) const;
   Score scoreCountingScalar(const Codeword &guess) const;
   Score scoreCountingAutoVec(const Codeword &guess) const;
+#if defined(__x86_64__)
   Score scoreCountingHandVec(const Codeword &guess) const;
+#endif
 
   // Pre-compute color counts for all Codewords. The 8-bit counters are needed for SSE/AVX vectorization, both auto and
   // by-hand. https://godbolt.org/z/bfM86K

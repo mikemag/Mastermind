@@ -86,10 +86,10 @@ void StatsRecorder::newRun() {
 
 #if __APPLE__
 template <typename T>
-T OSInfo::macOSSysctlByName(const string &name) {
-  T value;
+T OSInfo::macOSSysctlByName(const string &name, bool optional) {
+  T value = 0;
   size_t size = sizeof(value);
-  if (sysctlbyname(name.c_str(), &value, &size, nullptr, 0) < 0) {
+  if (!optional && sysctlbyname(name.c_str(), &value, &size, nullptr, 0) < 0) {
     cerr << "sysctlbyname failed for " << name << std::endl;
     exit(EXIT_FAILURE);
   }
@@ -97,10 +97,11 @@ T OSInfo::macOSSysctlByName(const string &name) {
 }
 
 template <>
-string OSInfo::macOSSysctlByName<std::string>(const string &name) {
+string OSInfo::macOSSysctlByName<std::string>(const string &name, bool optional) {
   char buffer[1024];
+  buffer[0] = 0;
   size_t size = sizeof(buffer);
-  if (sysctlbyname(name.c_str(), &buffer, &size, nullptr, 0) < 0) {
+  if (!optional && sysctlbyname(name.c_str(), &buffer, &size, nullptr, 0) < 0) {
     cerr << "sysctlbyname failed for " << name << std::endl;
     exit(EXIT_FAILURE);
   }
@@ -122,13 +123,39 @@ OSInfo::OSInfo() {
 #if __APPLE__
   info["HW CPU Brand String"] = macOSSysctlByName<string>("machdep.cpu.brand_string");
   info["HW CPU Cacheline Size"] = macOSSysctlByName<uint64_t>("hw.cachelinesize");
-  info["HW CPU L1 iCache Size"] = macOSSysctlByName<uint64_t>("hw.l1icachesize");
-  info["HW CPU L1 dCache Size"] = macOSSysctlByName<uint64_t>("hw.l1dcachesize");
-  info["HW CPU L2 Cache Size"] = macOSSysctlByName<uint64_t>("hw.l2cachesize");
-  info["HW CPU L3 Cache Size"] = macOSSysctlByName<uint64_t>("hw.l3cachesize");
-  info["HW CPU Physical Count"] = macOSSysctlByName<int32_t>("hw.physicalcpu");
-  info["HW CPU Logical Count"] = macOSSysctlByName<int32_t>("hw.logicalcpu");
+
+  // Use the best perf level to match other systems.
+  info["HW CPU L1 iCache Size"] = macOSSysctlByName<uint64_t>("hw.perflevel0.l1icachesize");
+  info["HW CPU L1 dCache Size"] = macOSSysctlByName<uint64_t>("hw.perflevel0.l1dcachesize");
+  info["HW CPU L2 Cache Size"] = macOSSysctlByName<uint64_t>("hw.perflevel0.l2cachesize");
+  info["HW CPU L3 Cache Size"] = macOSSysctlByName<uint64_t>("hw.perflevel0.l3cachesize", true);
+  info["HW CPU Physical Count"] = macOSSysctlByName<int32_t>("hw.perflevel0.physicalcpu");
+  info["HW CPU Logical Count"] = macOSSysctlByName<int32_t>("hw.perflevel0.logicalcpu");
+
+  // Now grab all perf levels, just for fun
+  auto nperflevels = macOSSysctlByName<int>("hw.nperflevels");
+  for (auto i = 0; i < nperflevels; i++) {
+    string prefix = "hw.perflevel" + to_string(i);
+    info["HW CPU Perf Level " + to_string(i) + " L1 iCache Size"] =
+        macOSSysctlByName<uint64_t>(prefix + ".l1icachesize");
+    info["HW CPU Perf Level " + to_string(i) + " L1 dCache Size"] =
+        macOSSysctlByName<uint64_t>(prefix + ".l1dcachesize");
+    info["HW CPU Perf Level " + to_string(i) + " L2 Cache Size"] = macOSSysctlByName<uint64_t>(prefix + ".l2cachesize");
+    info["HW CPU Perf Level " + to_string(i) + " L3 Cache Size"] =
+        macOSSysctlByName<uint64_t>(prefix + ".l3cachesize", true);
+    info["HW CPU Perf Level " + to_string(i) + " Physical Count"] = macOSSysctlByName<int32_t>(prefix + ".physicalcpu");
+    info["HW CPU Perf Level " + to_string(i) + " Physical Max"] =
+        macOSSysctlByName<int32_t>(prefix + ".physicalcpu_max");
+    info["HW CPU Perf Level " + to_string(i) + " Logical Count"] = macOSSysctlByName<int32_t>(prefix + ".logicalcpu");
+    info["HW CPU Perf Level " + to_string(i) + " Logical Max"] = macOSSysctlByName<int32_t>(prefix + ".logicalcpu_max");
+    info["HW CPU Perf Level " + to_string(i) + " CPUs per L2"] = macOSSysctlByName<int32_t>(prefix + ".cpusperl2");
+    info["HW CPU Perf Level " + to_string(i) + " CPUs per L3"] =
+        macOSSysctlByName<int32_t>(prefix + ".cpusperl3", true);
+    info["HW CPU Perf Level " + to_string(i) + " Name"] = macOSSysctlByName<string>(prefix + ".name");
+  }
+
   info["HW Memory Size"] = macOSSysctlByName<int64_t>("hw.memsize");
+  info["HW Page Size"] = macOSSysctlByName<int64_t>("hw.pagesize");
   info["HW Model"] = macOSSysctlByName<string>("hw.model");
   info["OS Version"] = macOSSysctlByName<string>("kern.osversion");
   info["OS Product Version"] = macOSSysctlByName<string>("kern.osproductversion");

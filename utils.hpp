@@ -88,7 +88,7 @@ class OSInfo {
   }
 
   template <typename T>
-  T macOSSysctlByName(const std::string &name);
+  T macOSSysctlByName(const std::string &name, bool optional=false);
 };
 
 template <bool enabled>
