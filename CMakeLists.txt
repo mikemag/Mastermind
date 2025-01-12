@@ -31,6 +31,7 @@ set(MASTERMIND_SOURCES_LIST
         ${PROJECT_SOURCE_DIR}/main.cpp
         ${PROJECT_SOURCE_DIR}/score.cpp
         ${PROJECT_SOURCE_DIR}/utils.cpp
+        ${PROJECT_SOURCE_DIR}/codeword.inl
         )
 
 add_executable(mastermind ${MASTERMIND_SOURCES_LIST})

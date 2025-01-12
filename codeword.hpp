@@ -95,7 +95,7 @@ class Codeword {
   Score scoreSimpleLoops(const Codeword &guess) const;
   Score scoreCountingScalar(const Codeword &guess) const;
   Score scoreCountingAutoVec(const Codeword &guess) const;
-#if defined(__x86_64__)
+#if defined(__x86_64__) || defined(__ARM_NEON__)
   Score scoreCountingHandVec(const Codeword &guess) const;
 #endif
 

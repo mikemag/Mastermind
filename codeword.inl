@@ -7,6 +7,10 @@
 #include <immintrin.h>  // For SSE/AVX support
 #endif
 
+#if defined(__ARM_NEON__)
+#include <arm_neon.h>
+#endif
+
 #include <bit>
 #include <iomanip>
 
@@ -81,11 +85,7 @@ Score Codeword<PIN_COUNT, COLOR_COUNT>::scoreCountingScalar(const Codeword &gues
   uint32_t v = this->codeword ^ guess.codeword;  // Matched pins are now 0.
   v |= unusedPinsMask;                           // Ensure that any unused pin positions are non-zero.
   uint32_t r = ~((((v & 0x77777777u) + 0x77777777u) | v) | 0x77777777u);  // Yields 1 bit per matched pin
-#if defined(__x86_64__)
-  uint8_t b = _mm_popcnt_u32(r);
-#else
-  uint8_t b = popcount(r);
-#endif
+  uint8_t b = __builtin_popcount(r);
 
   int allHits = 0;
   auto scc = this->colorCounts;
@@ -119,11 +119,7 @@ Score Codeword<PIN_COUNT, COLOR_COUNT>::scoreCountingAutoVec(const Codeword &gue
   uint32_t v = this->codeword ^ guess.codeword;  // Matched pins are now 0.
   v |= unusedPinsMask;                           // Ensure that any unused pin positions are non-zero.
   uint32_t r = ~((((v & 0x77777777u) + 0x77777777u) | v) | 0x77777777u);  // Yields 1 bit per matched pin
-#if defined(__x86_64__)
-  uint8_t b = _mm_popcnt_u32(r);
-#else
-  uint8_t b = popcount(r);
-#endif
+  uint8_t b = __builtin_popcount(r);
 
   int allHits = 0;
   auto *scc = (uint8_t *)&(this->colorCounts);
@@ -141,15 +137,15 @@ Score Codeword<PIN_COUNT, COLOR_COUNT>::scoreCountingAutoVec(const Codeword &gue
 // See scoreCountingScalar() for an explanation of how hits are computed.
 //
 // Elapsed time 0.9237s, average search 0.7127ms
-#if defined(__x86_64__)
 template <uint8_t PIN_COUNT, uint8_t COLOR_COUNT>
 Score Codeword<PIN_COUNT, COLOR_COUNT>::scoreCountingHandVec(const Codeword &guess) const {
   constexpr static uint32_t unusedPinsMask = (uint32_t)(0xFFFFFFFFlu << (PIN_COUNT * 4u));
   uint32_t v = this->codeword ^ guess.codeword;  // Matched pins are now 0.
   v |= unusedPinsMask;                           // Ensure that any unused pin positions are non-zero.
   uint32_t r = ~((((v & 0x77777777u) + 0x77777777u) | v) | 0x77777777u);  // Yields 1 bit per matched pin
-  uint8_t b = _mm_popcnt_u32(r);
+  uint8_t b = __builtin_popcount(r);
 
+#if defined(__x86_64__)
   // Load the 128-bit color counts into vector registers. Each one is 16 8-bit counters.
   __m128i_u secretColorsVec = _mm_loadu_si128((__m128i_u *)&this->colorCounts);
   __m128i_u guessColorsVec = _mm_loadu_si128((__m128i_u *)&guess.colorCounts);
@@ -162,20 +158,30 @@ Score Codeword<PIN_COUNT, COLOR_COUNT>::scoreCountingHandVec(const Codeword &gue
 
   // Pull out the two 16-bit sums and add them together normally to get our final answer. 3 instructions.
   int allHits = _mm_extract_epi16(vsum, 0) + _mm_extract_epi16(vsum, 4);
+#endif
+
+#if (__ARM_NEON__)
+  // Load the 128-bit color counts into vector registers. Each one is 16 8-bit counters.
+  uint8x16_t secretColorsVec = vld1q_u8(reinterpret_cast<const unsigned char *>(&this->colorCounts));
+  uint8x16_t guessColorsVec = vld1q_u8(reinterpret_cast<const unsigned char *>(&guess.colorCounts));
+
+  // Find the minimum of each pair of 8-bit counters in one instruction.
+  uint8x16_t minColorsVec = vminq_u8(secretColorsVec, guessColorsVec);
+
+  // Fun fact: the pairwise sum and the final sum are faster than a single vaddvq_u8 over the whole vector.
+  // Pairwise add bytes into 16-bit sums, then sum the 16-bit values into a single scalar.
+  uint16x8_t pairwiseSum16 = vpaddlq_u8(minColorsVec);
+  int allHits = vaddvq_u16(pairwiseSum16);
+#endif
 
   return Score(b, allHits - b);
 }
-#endif
 
 // Wrapper for the real scoring function to allow for easy experimentation.
 // Note: I used to employ a score cache here, see docs/Score_Cache.md for details.
 template <uint8_t PIN_COUNT, uint8_t COLOR_COUNT>
 Score Codeword<PIN_COUNT, COLOR_COUNT>::score(const Codeword &guess) const {
-#if defined(__x86_64__)
   return scoreCountingHandVec(guess);
-#else
-  return scoreCountingAutoVec(guess);
-#endif
 }
 
 // Make a list of all codewords for a given number of "colors". Colors are represented by the digits 1 thru n. This
